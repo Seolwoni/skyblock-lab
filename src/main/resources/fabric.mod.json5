@@ -4,9 +4,9 @@
   "version": "${version}",
   "name": "Riftwalk",
   //#if CHEAT
-  "description": "Riftwalk for @MINECRAFT_VERSION@ - dungeon toolkit built on NoammAddons (CC0) and Secret Routes (GPL-3.0). Version: Cheat",
+  "description": "Riftwalk for @MINECRAFT_VERSION@ - dungeon toolkit built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
   //#else
-  //!"description": "Riftwalk for @MINECRAFT_VERSION@ - dungeon toolkit built on NoammAddons (CC0) and Secret Routes (GPL-3.0). Version: Legit",
+  //!"description": "Riftwalk for @MINECRAFT_VERSION@ - dungeon toolkit built on NoammAddons (CC0) and Secret Routes (GPL-3.0). Legit build.",
   //#endif
   "authors": [
     "Noamm"
