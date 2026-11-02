@@ -1,0 +1,53 @@
+name: build
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+      - run: chmod +x ./gradlew
+      - name: build
+        run: |
+          set -o pipefail
+          ./gradlew build --stacktrace 2>&1 | tee build.log
+      - name: probe api
+        if: always()
+        run: ./gradlew probeApi > /dev/null 2>&1 || true
+      - name: save log
+        if: always()
+        run: |
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          grep -A6 "error:" build.log | head -300 > /tmp/compile.txt || true
+          tail -300 build.log > /tmp/tail.txt
+          cp build/probe.txt /tmp/probe.txt 2>/dev/null || echo "no probe" > /tmp/probe.txt
+          git checkout --orphan ci-log
+          git rm -rf --cached . > /dev/null
+          cp /tmp/compile.txt /tmp/tail.txt /tmp/probe.txt .
+          echo "${{ github.sha }} ${{ job.status }}" > status.txt
+          git add compile.txt tail.txt probe.txt status.txt
+          git commit -m "build log ${{ github.run_number }}"
+          git push -f origin ci-log
+      - name: upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: skyblocklab-jar
+          path: build/libs/skyblocklab-*.jar
+      - name: release
+        if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no release]')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0-build-${{ github.run_number }}
+          name: SkyBlock Lab (build ${{ github.run_number }})
+          body: "개인 맵 테스트용. Hypixel 같은 공개 서버에서 쓰면 밴될 수 있어요."
+          files: build/libs/skyblocklab-*.jar

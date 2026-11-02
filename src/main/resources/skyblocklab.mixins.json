@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "com.seolwoni.skyblocklab.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"MinecraftMixin",
+		"EntityMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

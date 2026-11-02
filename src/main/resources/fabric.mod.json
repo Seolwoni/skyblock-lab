@@ -1,0 +1,20 @@
+{
+	"schemaVersion": 1,
+	"id": "skyblocklab",
+	"version": "${version}",
+	"name": "SkyBlock Lab",
+	"description": "개인 맵 테스트용 던전 도우미: ESP, 자동 터미널, 자동 GFS. Made by seolwoni",
+	"authors": ["seolwoni"],
+	"license": "All-Rights-Reserved",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["com.seolwoni.skyblocklab.SkyblockLab"]
+	},
+	"mixins": ["skyblocklab.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
