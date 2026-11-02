@@ -20,8 +20,10 @@ object MasterSwitch {
         val on = FeatureManager.features.filter { it.enabled && it !is ClickGui }
         if (on.isEmpty()) return NotificationManager.push("Riftwalk", "&7Nothing is on")
         on.forEach { runCatching { it.toggle() } }
-        ClickGui.masterSaved.value = on.joinToString("\n") { it.jsonName }
-        NotificationManager.push("Riftwalk", "&cEverything off &7(${on.size} features)")
+        // Some built-in parts (server link, door fix, class colours, mod hider) can't be switched off: skip those.
+        val turnedOff = on.filter { ! it.enabled }
+        ClickGui.masterSaved.value = turnedOff.joinToString("\n") { it.jsonName }
+        NotificationManager.push("Riftwalk", "&cEverything off &7(${turnedOff.size} features)")
     }
 
     private fun turnOn() {

@@ -105,7 +105,8 @@ public class SmokeTest implements FabricClientGameTest {
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled) before.add(f.getJsonName());
 				com.github.noamm9.features.MasterSwitch.INSTANCE.toggle();
 				int stillOn = 0;
-				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled && !(f instanceof ClickGui)) stillOn++;
+				java.util.Set<String> fixed = java.util.Set.of("ClickGui", "WebSocketFeature", "DoorFix", "ClassColors", "ModHider");
+				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled && !fixed.contains(f.getClass().getSimpleName())) stillOn++;
 				com.github.noamm9.features.MasterSwitch.INSTANCE.toggle();
 				java.util.Set<String> after = new java.util.HashSet<>();
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled) after.add(f.getJsonName());
