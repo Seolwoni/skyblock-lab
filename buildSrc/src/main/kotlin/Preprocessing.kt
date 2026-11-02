@@ -16,6 +16,8 @@ private fun Project.loadGradleProperties(): Map<String, String> {
     listOf(rootProject.file("gradle.properties"), file("gradle.properties")).filter(File::exists).forEach { propsFile ->
         propsFile.inputStream().use(props::load)
     }
+    // Riftwalk: a -P value on the command line (CI sets -Pmod_version=1.1.<build>) wins over the file.
+    for (key in props.stringPropertyNames()) findProperty(key)?.let { props.setProperty(key, it.toString()) }
     return props.mapKeys { it.key as String }.mapValues { it.value as String }
 }
 
