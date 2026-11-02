@@ -76,6 +76,7 @@ class ClassGraphInitializer {
 
         register<RenderOverlayEvent> {
             if (mc.gui.screen() is HudEditorScreen) return@register
+            if (com.github.noamm9.features.impl.routes.AssistBridge.hudHidden()) return@register // Assist Core's H key
 
             Resolution.push(event.context)
             FeatureManager.hudElements.forEach { if (it.shouldDraw) it.renderElement(event.context, false) }

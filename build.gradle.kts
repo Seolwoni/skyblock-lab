@@ -191,6 +191,8 @@ listOf("jarCheat", "jarLegit").forEach { taskName ->
     tasks.named<ShadowJar>(taskName) {
         // NoammAddons-<mod_version>-<minecraft_version>-<cheat|legit>.jar
         archiveVersion.set("$mod_version-$minecraft_version")
+        // Assist Core / Assist Path API stubs are only for compiling; the real classes come from those mods.
+        exclude("com/seolwoni/**")
 
         dependsOn("processIncludeJars")
         from(processedIncludeJarsDir) {

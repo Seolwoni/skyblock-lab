@@ -43,6 +43,10 @@
     "fabric-api": "*",
     "fabric-language-kotlin": "*"
   },
+  "suggests": {
+    "assistcore": "*",
+    "assistpath": "*"
+  },
   "custom": {
     "modmenu": {
       "links": {

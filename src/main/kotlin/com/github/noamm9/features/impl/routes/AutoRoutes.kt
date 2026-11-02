@@ -72,6 +72,10 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val detourRange by SliderSetting("Detour Range", 6.0, 0.0, 12.0, 0.5, " blocks").withDescription("How far it leaves the route to chase a target (0 = only hit what is already in reach)")
     private val hitDelay by SliderSetting("Hit Delay", 2, 1, 10, 1, " ticks").withDescription("Ticks between hits")
     private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) to hold while fighting. 0 = keep the current item")
+    private val useAssistPath by ToggleSetting("Use Assist Path", true).section("Assist").withDescription(
+        "With Assist Core + Assist Path installed: when the straight walk is blocked, or the target is far, finds a way around with Assist Path (no breaking or placing)"
+    )
+    private val assistLog by ToggleSetting("Assist Journal", true).withDescription("Writes runs (room, why it stopped) to the Assist usage log")
     private val showPlan by ToggleSetting("Show Plan", true).section("Debug").withDescription("Draws the next point, etherwarp and action in the world, even before you start - check the route is read right")
     private val statusHud by ToggleSetting("Status HUD", true).withDescription("Room, step, phase and next action on screen (move it in the HUD editor)")
     private val checkEther by ToggleSetting("Check Etherwarp Landing", true).withDescription("Before warping, tries a few aim points on the block and picks one whose predicted landing is the route's block")
@@ -107,6 +111,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private var status = "idle"
     private var hitCooldown = 0
     private var pendingCast = false
+    private var assistFailedGoal: BlockPos? = null
     private var fightTarget: Entity? = null
     private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
     private val MINIBOSSES = setOf("Shadow Assassin", "Lost Adventurer", "Frozen Adventurer", "Angry Archaeologist", "King Midas", "Diamond Guy")
@@ -142,7 +147,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             s.secretPos?.let { event.ctx.renderBlock(it, Color(0, 255, 80), fill = false, phase = true, lineWidth = 3) }
         }
 
-        hudElement("Auto Routes Status", { statusHud.value }) { ctx, example ->
+        hudElement("Auto Routes Status", { statusHud.value && ! AssistBridge.hudHidden() }) { ctx, example ->
             val s = if (example) null else currentStepForPreview()
             val lines = if (example) listOf("§bAuto Routes §aRUNNING", "§7Room: §fBalcony-4  §7step §f1", "§7Path §f2/3  §7phase §fETHER_WAIT", "§7etherwarp landing: §aok")
             else listOf(
@@ -181,10 +186,13 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         stepRef = null
         phase = Phase.MOVE
         info("&aFollowing route. Press the key again to stop.")
+        if (assistLog.value) AssistBridge.logStart("Auto Routes in ${Main.currentRoom?.name ?: DungeonScanner.currentRoom?.getName() ?: "?"}")
     }
 
     private fun stop(reason: String?) {
+        if (running && assistLog.value) AssistBridge.logEnd(reason ?: "stopped", "room ${Main.currentRoom?.name ?: "-"}")
         running = false
+        AssistBridge.reset()
         releaseKeys()
         stepRef = null
         step = null
@@ -370,6 +378,27 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
 
     private fun walkTowards(pos: Vec3, goal: Vec3) {
         val p = mc.player!!
+        val goalBlock = BlockPos.containing(goal.x, goal.y, goal.z)
+        if (useAssistPath.value && AssistBridge.pathLoaded && goalBlock != assistFailedGoal && (AssistBridge.walking || stuckTicks > 8 || horizontal(pos, goal) > 14.0)) {
+            when (AssistBridge.walkTo(mc, p, goalBlock)) {
+                AssistBridge.RUN -> {
+                    stuckTicks = 0
+                    lastPos = pos
+                    status = "assist path to ${goalBlock.x}, ${goalBlock.y}, ${goalBlock.z}"
+                    return
+                }
+                AssistBridge.DONE -> {
+                    stuckTicks = 0
+                    releaseMovement()
+                    return
+                }
+                else -> {
+                    if (assistLog.value) AssistBridge.logEvent("Assist Path gave up: ${AssistBridge.failReason() ?: "no way"}")
+                    assistFailedGoal = goalBlock // don't plan to this point again, finish with the straight walk
+                    stuckTicks = 0
+                }
+            }
+        }
         val yaw = Math.toDegrees(atan2(goal.z - pos.z, goal.x - pos.x)).toFloat() - 90f
         PlayerUtils.rotate(yaw, if (speed.value == 3) p.xRot else 10f)
         mc.options.keyUp.isDown = true
