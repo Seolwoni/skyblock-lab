@@ -16,6 +16,8 @@ import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import net.minecraft.core.BlockPos
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
+import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.ambient.Bat
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.Vec3
@@ -34,8 +36,8 @@ import kotlin.math.sqrt
  */
 object AutoRoutes: Feature("Follows the current room's secret route automatically (walk, etherwarp, pearl, stonk, superboom, levers, secret).") {
     private val toggleKey by KeybindSetting("Start / Stop Key").withDescription("Press to start following the route in your room, press again to stop")
-    private val speed by DropdownSetting("Speed", 0, listOf("Fastest", "Fast", "Careful")).withDescription(
-        "Fastest: every action on the next tick, instant rotations. Fast: one extra tick between actions. Careful: a few ticks between actions"
+    private val speed by DropdownSetting("Speed", 0, listOf("0-Tick", "Fastest", "Fast", "Careful")).withDescription(
+        "0-Tick: sends the new rotation to the server itself and acts in the same tick (etherwarps, pearls, levers and hits happen instantly). Fastest: acts on the next tick. Fast: one extra tick between actions. Careful: a few ticks between actions"
     )
     private val etherTimeout by SliderSetting("Etherwarp Timeout", 12, 4, 40, 1, " ticks").withDescription("Give up on an etherwarp that did not land after this long and try again")
     private val sprint by ToggleSetting("Sprint", true)
@@ -111,7 +113,8 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         if (chatInfo.value) modMessage(msg)
     }
 
-    private val actionDelay get() = when (speed.value) { 0 -> 0; 1 -> 1; else -> 3 }
+    private val zeroTick get() = speed.value == 0
+    private val actionDelay get() = when (speed.value) { 0, 1 -> 0; 2 -> 1; else -> 3 }
 
     // ------------------------------------------------------------------ main loop
 
@@ -229,6 +232,11 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             PlayerUtils.swapToSlot(slot)
             releaseMovement()
             PlayerUtils.rotate(pearl.second.yaw, pearl.second.pitch)
+            if (zeroTick) {
+                useNow()
+                wait = 10
+                return
+            }
             phase = Phase.PEARL_WAIT
             wait = actionDelay
             return
@@ -247,11 +255,19 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             if (slot != null) {
                 PlayerUtils.swapToSlot(slot)
                 releaseMovement()
+                val alreadySneaking = mc.player!!.isShiftKeyDown
                 PlayerUtils.toggleSneak(true)
                 PlayerUtils.rotateTo(Vec3(ether.x + 0.5, ether.y + 0.98, ether.z + 0.5))
                 etherTarget = ether
-                phase = Phase.ETHER_AIM
-                wait = actionDelay
+                if (zeroTick && alreadySneaking) {
+                    useNow()
+                    phase = Phase.ETHER_WAIT
+                    timer = 0
+                }
+                else {
+                    phase = Phase.ETHER_AIM
+                    wait = actionDelay
+                }
                 return
             }
         }
@@ -290,7 +306,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         when (s.secretType) {
             "interact" -> if (timer % 10 == 1) {
                 if (mc.player!!.eyePosition.distanceTo(Vec3.atCenterOf(sp)) > REACH) walkTowards(pos, Vec3.atCenterOf(sp))
-                else aimThen(Vec3.atCenterOf(sp), use = true).also { phase = Phase.ACTION_AIM }
+                else aimThen(Vec3.atCenterOf(sp), use = true)
             }
 
             "item" -> if (horizontal(pos, Vec3.atCenterOf(sp)) > 0.4) walkTowards(pos, Vec3(sp.x + 0.5, sp.y.toDouble(), sp.z + 0.5)) else releaseMovement()
@@ -299,8 +315,15 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                 val bat = mc.player!!.level().getEntitiesOfClass(Bat::class.java, mc.player!!.boundingBox.inflate(8.0)).minByOrNull { it.distanceTo(mc.player!!) }
                 if (bat != null && timer % 3 == 0) {
                     PlayerUtils.rotateTo(bat.boundingBox.center)
-                    actionUse = false
-                    phase = Phase.ACTION_AIM
+                    if (zeroTick) {
+                        sendRotation()
+                        mc.gameMode?.attack(mc.player!!, bat)
+                        mc.player!!.swing(InteractionHand.MAIN_HAND)
+                    }
+                    else {
+                        actionUse = false
+                        phase = Phase.ACTION_AIM
+                    }
                 }
             }
         }
@@ -311,9 +334,28 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private fun aimThen(target: Vec3, use: Boolean) {
         releaseMovement()
         PlayerUtils.rotateTo(target)
+        if (zeroTick) {
+            sendRotation()
+            if (use) PlayerUtils.rightClick() else PlayerUtils.leftClick()
+            return
+        }
         actionUse = use
         phase = Phase.ACTION_AIM
         wait = actionDelay
+    }
+
+    /** 0-Tick: tell the server the new look direction right away, so a click in this same tick uses it. */
+    private fun sendRotation() {
+        val p = mc.player ?: return
+        mc.connection?.send(ServerboundMovePlayerPacket.Rot(p.yRot, p.xRot, p.onGround(), p.horizontalCollision))
+    }
+
+    /** 0-Tick right click with the held item (etherwarp, pearl): rotation packet first, then the use packet. */
+    private fun useNow() {
+        val p = mc.player ?: return
+        sendRotation()
+        mc.gameMode?.useItem(p, InteractionHand.MAIN_HAND)
+        p.swing(InteractionHand.MAIN_HAND)
     }
 
     private fun releaseMovement() {

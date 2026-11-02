@@ -25,7 +25,7 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.minecraft.network.chat.Component
 
 object NaCommand: ICommandProvider {
-    val names = listOf("na", "noamm", "noammaddons").toTypedArray()
+    val names = listOf("sbl", "skyblocklab", "na", "noamm", "noammaddons").toTypedArray()
 
     override fun CommandBuilder.command() {
         setName(*names)
