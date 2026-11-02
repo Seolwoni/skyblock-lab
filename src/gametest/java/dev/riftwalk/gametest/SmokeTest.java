@@ -26,7 +26,7 @@ import net.fabricmc.loader.api.FabricLoader;
  */
 public class SmokeTest implements FabricClientGameTest {
 	/** Features that would change the connection or the game in ways that make the rest of the test meaningless. */
-	private static final Set<String> SKIP = Set.of("PvpBlink", "ModHider");
+	private static final Set<String> SKIP = Set.of("ModHider");
 
 	private final List<String> log = new ArrayList<>();
 	private final List<String> failures = new ArrayList<>();
