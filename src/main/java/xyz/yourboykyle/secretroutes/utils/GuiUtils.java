@@ -1,0 +1,43 @@
+/*
+ * Secret Routes Mod - Secret Route Waypoints for Hypixel Skyblock Dungeons
+ * Copyright 2025 yourboykyle & R-aMcC & christechs
+ *
+ * <DO NOT REMOVE THIS COPYRIGHT NOTICE>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package xyz.yourboykyle.secretroutes.utils;
+
+import net.minecraft.client.Minecraft;
+// I have idea to what this would translate to in 26.1 but its not important
+public class GuiUtils {
+    /*public static void displayText(DrawContext context, String text, float posx, float posy, float scale) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+
+            int screenWidth = mc.getWindow().getGuiScaledWidth();
+            int screenHeight = mc.getWindow().getGuiScaledHeight();
+
+            int textWidth = mc.textRenderer.getWidth(text);
+            int x = (int) ((screenWidth / 2.0f - ((textWidth * scale) / 2.0f)) + posx);
+            int y = (int) (screenHeight / 2.0f + posy);
+
+            // TODO: Check that the text rendering actually works
+            context.drawText(mc.textRenderer, text, x, y, 0xFFFFFF, true);
+        } catch (Exception e) {
+            LogUtils.error(e);
+        }
+    }*/
+}

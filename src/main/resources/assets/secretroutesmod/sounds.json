@@ -1,0 +1,15 @@
+{
+  "zyra.meow": {
+    "sounds": [
+      "secretroutesmod:zyra/meow0",
+      "secretroutesmod:zyra/meow1",
+      "secretroutesmod:zyra/meow2",
+      "secretroutesmod:zyra/meow3",
+      "secretroutesmod:zyra/meow4",
+      "secretroutesmod:zyra/meow5",
+      "secretroutesmod:zyra/meow6",
+      "secretroutesmod:zyra/meow7",
+      "secretroutesmod:zyra/meow8"
+    ]
+  }
+}
