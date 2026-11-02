@@ -23,8 +23,13 @@ import com.google.gson.JsonObject
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.ambient.Bat
+import net.minecraft.world.entity.decoration.ArmorStand
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import xyz.yourboykyle.secretroutes.Main
 import xyz.yourboykyle.secretroutes.utils.RoomDirectionUtils
@@ -53,6 +58,12 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val doLevers by ToggleSetting("Flip Levers", true)
     private val doSecret by ToggleSetting("Collect Secret", true).withDescription("Opens chests/levers/skulls and hits bats at the end of each step")
     private val chatInfo by ToggleSetting("Chat Messages", true)
+    private val killStars by ToggleSetting("Kill Star Mobs", true).section("Combat").withDescription("Stops to kill starred (✯) mobs near the route")
+    private val killMinis by ToggleSetting("Kill Minibosses", true).withDescription("Shadow Assassin, Lost / Frozen Adventurer, Angry Archaeologist, King Midas, Diamond Guy")
+    private val attackRange by SliderSetting("Attack Range", 3.0, 2.0, 3.0, 0.1, " blocks").withDescription("Normal hand reach at most")
+    private val detourRange by SliderSetting("Detour Range", 6.0, 0.0, 12.0, 0.5, " blocks").withDescription("How far it leaves the route to chase a target (0 = only hit what is already in reach)")
+    private val hitDelay by SliderSetting("Hit Delay", 2, 1, 10, 1, " ticks").withDescription("Ticks between hits")
+    private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) to hold while fighting. 0 = keep the current item")
     private val showPlan by ToggleSetting("Show Plan", true).section("Debug").withDescription("Draws the next point, etherwarp and action in the world, even before you start - check the route is read right")
     private val statusHud by ToggleSetting("Status HUD", true).withDescription("Room, step, phase and next action on screen (move it in the HUD editor)")
     private val checkEther by ToggleSetting("Check Etherwarp Landing", true).withDescription("Before warping, tries a few aim points on the block and picks one whose predicted landing is the route's block")
@@ -86,6 +97,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private var stuckTicks = 0
     private var secretTimer = 0
     private var status = "idle"
+    private var hitCooldown = 0
+    private var fightTarget: Entity? = null
+    private val MINIBOSSES = setOf("Shadow Assassin", "Lost Adventurer", "Frozen Adventurer", "Angry Archaeologist", "King Midas", "Diamond Guy")
     private var lastEtherCheck: Boolean? = null
     private var lastPos: Vec3? = null
 
@@ -112,6 +126,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                 event.ctx.renderBlock(it, Color(255, 0, 255), fill = false, phase = true, lineWidth = 4)
             }
             (s.mines + s.tnts + s.levers).forEach { event.ctx.renderBlock(it, Color(255, 200, 0), fill = false, phase = true) }
+            fightTarget?.takeIf { running && it.isAlive }?.let {
+                event.ctx.renderLine(p.eyePosition, it.boundingBox.center, Color(255, 60, 60), 2, phase = true)
+            }
             s.secretPos?.let { event.ctx.renderBlock(it, Color(0, 255, 80), fill = false, phase = true, lineWidth = 3) }
         }
 
@@ -194,6 +211,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             wait--
             return
         }
+
+        if (hitCooldown > 0) hitCooldown--
+        if ((phase == Phase.MOVE || phase == Phase.SECRET) && fight()) return
 
         when (phase) {
             Phase.MOVE -> move(s, p.position())
@@ -387,6 +407,64 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             }
         }
         if (timer > 200) stop("couldn't get the secret")
+    }
+
+    // ------------------------------------------------------------------ combat
+
+    /** Kills the nearest star mob / miniboss in detour range. Returns true while busy fighting. */
+    private fun fight(): Boolean {
+        if (! killStars.value && ! killMinis.value) return false
+        val p = mc.player ?: return false
+        val target = findTarget(p)
+        fightTarget = target
+        if (target == null) return false
+
+        val dist = p.eyePosition.distanceTo(target.boundingBox.clipNearest(p.eyePosition))
+        if (dist > attackRange.value) {
+            walkTowards(p.position(), target.position())
+            status = "chasing ${target.name.string}"
+            return true
+        }
+
+        releaseMovement()
+        if (weaponSlot.value in 1 .. 9) PlayerUtils.swapToSlot(weaponSlot.value - 1)
+        PlayerUtils.rotateTo(target.boundingBox.center)
+        status = "fighting ${target.name.string}"
+        if (hitCooldown > 0) return true
+        hitCooldown = hitDelay.value
+        if (zeroTick) {
+            sendRotation()
+            mc.gameMode?.attack(p, target)
+            p.swing(InteractionHand.MAIN_HAND)
+        }
+        else PlayerUtils.leftClick() // rotation from last tick is already on the server
+        return true
+    }
+
+    private fun AABB.clipNearest(from: Vec3) = Vec3(from.x.coerceIn(minX, maxX), from.y.coerceIn(minY, maxY), from.z.coerceIn(minZ, maxZ))
+
+    private fun findTarget(p: Player): Entity? {
+        val range = maxOf(detourRange.value, attackRange.value)
+        val level = p.level()
+        val area = p.boundingBox.inflate(range + 2.0)
+        val found = LinkedHashSet<Entity>()
+
+        if (killStars.value) for (stand in level.getEntitiesOfClass(ArmorStand::class.java, area)) {
+            val name = stand.customName?.string ?: continue
+            if (! name.contains("✯")) continue
+            val offset = if (name.uppercase().contains("WITHERMANCER")) 3 else 1
+            val byId = level.getEntity(stand.id - offset)
+            val mob = byId?.takeIf { it !is ArmorStand && it is LivingEntity }
+                ?: level.getEntities(stand, stand.boundingBox.move(0.0, - 1.5, 0.0).inflate(0.6, 1.0, 0.6)) { it is LivingEntity && it !is ArmorStand && it != p }.minByOrNull { it.distanceToSqr(stand) }
+            if (mob != null) found += mob
+        }
+        if (killMinis.value) for (other in level.getEntitiesOfClass(Player::class.java, area)) {
+            if (other == p || other.isInvisible) continue
+            if (other.gameProfile.name in MINIBOSSES || other.name.string in MINIBOSSES) found += other
+        }
+
+        return found.filter { it.isAlive && (it as? LivingEntity)?.health?.let { h -> h > 0f } != false && p.distanceTo(it) <= range + 1.0 }
+            .minByOrNull { p.distanceToSqr(it) }
     }
 
     /** Rotate now, click on a later tick (the server needs the new rotation first). */
