@@ -36,7 +36,7 @@ import java.awt.Color
  * every option as a card with its description underneath on the right.
  * Uses the same settings and widgets as the classic ClickGUI, so both always show the same values.
  */
-class SkyHanniScreen: Screen(Component.literal("SkyBlock Lab")) {
+class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     private companion object {
         const val MARGIN_X = 40f
         const val MARGIN_Y = 22f
@@ -124,7 +124,7 @@ class SkyHanniScreen: Screen(Component.literal("SkyBlock Lab")) {
         val y = winY()
         ctx.drawRect(x, y, winW(), TITLE_H, panel)
         ctx.drawRect(x, y + TITLE_H - 1f, winW(), 1f, Style.accentColor.withAlpha(160))
-        ctx.drawString("§lSkyBlock Lab", x + 10f, y + 9f, Color.WHITE)
+        ctx.drawString("§lRiftwalk", x + 10f, y + 9f, Color.WHITE)
 
         val sw = 230f
         val sx = x + (winW() - sw) / 2f
@@ -403,7 +403,7 @@ class SkyHanniScreen: Screen(Component.literal("SkyBlock Lab")) {
     private fun openFeature(f: Feature) {
         if (f is IFeatureScreen) {
             if (f.enabled) GuiUtils.setScreen(f.createScreen())
-            else NotificationManager.push("SkyBlock Lab", "&fEnable &b${f.name} &ffirst to open its settings!")
+            else NotificationManager.push("Riftwalk", "&fEnable &b${f.name} &ffirst to open its settings!")
             return
         }
         Style.playClickSound(1f)

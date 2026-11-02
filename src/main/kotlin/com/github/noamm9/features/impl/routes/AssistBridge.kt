@@ -7,11 +7,11 @@ import net.minecraft.core.BlockPos
 
 /**
  * Optional link to seolwoni's Assist Core and Assist Path (both must be installed to be used).
- * Every call into them is behind a "loaded" check, so SkyBlock Lab runs the same without them.
+ * Every call into them is behind a "loaded" check, so Riftwalk runs the same without them.
  * Their classes are only referenced inside the functions (never as field types) so nothing loads them early.
  */
 object AssistBridge {
-    const val MOD = "skyblocklab"
+    const val MOD = "riftwalk"
     const val RUN = 0
     const val DONE = 1
     const val FAIL = 2
@@ -22,7 +22,7 @@ object AssistBridge {
     private var walker: Any? = null
     private var walkerGoal: BlockPos? = null
 
-    /** Assist Core's H key hides every HUD box; SkyBlock Lab HUDs follow it. */
+    /** Assist Core's H key hides every HUD box; Riftwalk HUDs follow it. */
     fun hudHidden(): Boolean = coreLoaded && runCatching { com.seolwoni.assistcore.hud.AssistHud.hidden() }.getOrDefault(false)
 
     fun logStart(what: String) {

@@ -45,7 +45,7 @@ public class SecretSounds {
 
     public static void secretChime(Boolean bypass) {
         SRMConfig config = SRMConfig.get();
-        // SkyBlock Lab: one sound per secret - NoammAddons plays it when its Secret Sound is on.
+        // Riftwalk: one sound per secret - NoammAddons plays it when its Secret Sound is on.
         if (!bypass && com.github.noamm9.features.impl.routes.RouteBridge.noammPlaysSecretSound()) return;
         if (!bypass && (!config.customSecretSound || ((System.currentTimeMillis() - lastPlayed <= 10) || !LocationUtils.isInDungeons()))) {
             return;

@@ -15,7 +15,7 @@ object NoammAddons: ClientModInitializer {
     const val MOD_NAME = "@MOD_NAME@"
     const val MOD_VERSION = "@MOD_VERSION@"
     val PREFIX by lazy {
-        if (isCheat) Component.literal("§6§l[§b§lN§d§lA§6§l]§r")
+        if (isCheat) Component.literal("§5§l[§d§lRW§5§l]§r")
         else Component.empty().apply {
             append(Component.literal("[").withStyle { it.withBold(true).withColor(0x4498DB).withShadowColor(0x2B5C85) })
             append(Component.literal("N").withStyle { it.withBold(true).withColor(0x588CD2).withShadowColor(0x3B5782) })

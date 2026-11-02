@@ -104,7 +104,7 @@ enums = re.sub(r'\n\s*@Override\n(\s*public Component getDisplayName)', r'\n\1',
 
 java = header + '''public class SRMConfig {
     /**
-     * SkyBlock Lab: settings live in the NoammAddons config (ClickGUI, "Routes" panel).
+     * Riftwalk: settings live in the NoammAddons config (ClickGUI, "Routes" panel).
      * This stand-in keeps the old HANDLER.load/save/instance calls working.
      */
     public static final Handler HANDLER = new Handler();

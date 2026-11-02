@@ -2,7 +2,7 @@ package xyz.yourboykyle.secretroutes.utils;
 
 import xyz.yourboykyle.secretroutes.config.SRMConfig;
 
-/** SkyBlock Lab: location comes from NoammAddons (no Hypixel Mod API mod needed). Server checking off = always "in dungeon". */
+/** Riftwalk: location comes from NoammAddons (no Hypixel Mod API mod needed). Server checking off = always "in dungeon". */
 public class LocationUtils {
     public static void init() {
     }

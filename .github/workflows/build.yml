@@ -47,13 +47,13 @@ jobs:
       - name: upload jars
         uses: actions/upload-artifact@v4
         with:
-          name: skyblocklab-26.2
+          name: riftwalk-26.2
           path: build/libs/*-26.2-*.jar
       - name: release
         if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no release]')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: SkyBlock Lab (build ${{ github.run_number }})
-          body: "NoammAddons + Secret Routes, 개인 맵 전용. cheat jar 사용."
+          name: Riftwalk (build ${{ github.run_number }})
+          body: "Riftwalk - NoammAddons + Secret Routes 기반, 개인 서버 전용. cheat jar 사용."
           files: build/libs/*-26.2-cheat.jar

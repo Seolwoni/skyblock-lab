@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "id": "noammaddons",
   "version": "${version}",
-  "name": "SkyBlock Lab",
+  "name": "Riftwalk",
   //#if CHEAT
-  "description": "@MINECRAFT_VERSION@ port of the greatest skyblock mod ever made! Version: Cheat",
+  "description": "Riftwalk for @MINECRAFT_VERSION@ - dungeon toolkit built on NoammAddons (CC0) and Secret Routes (GPL-3.0). Version: Cheat",
   //#else
-  //!"description": "@MINECRAFT_VERSION@ port of the greatest skyblock mod ever made! Version: Legit",
+  //!"description": "Riftwalk for @MINECRAFT_VERSION@ - dungeon toolkit built on NoammAddons (CC0) and Secret Routes (GPL-3.0). Version: Legit",
   //#endif
   "authors": [
     "Noamm"
