@@ -20,6 +20,12 @@ object DataDownloader {
 
     @JvmStatic
     fun downloadData() {
+        runCatching(::downloadDataUnsafe).onFailure {
+            LOGGER.error("Could not reach the Noamm data server, the bundled data will be used", it)
+        }
+    }
+
+    private fun downloadDataUnsafe() {
         val versionFile = modDataPath.resolve("version.txt")
 
         LOGGER.info("Checking for remote data updates...")
@@ -83,5 +89,15 @@ object DataDownloader {
         }
     }
 
-    inline fun <reified T: Any> loadJson(fileName: String) = GsonUtils.decode<T>(modDataPath.resolve(fileName).readText())
+    /** Reads a data file: the downloaded copy, or the copy bundled in the jar when the Noamm server could not be reached. */
+    inline fun <reified T: Any> loadJson(fileName: String) = GsonUtils.decode<T>(readData(fileName))
+
+    fun readData(fileName: String): String {
+        val local = modDataPath.resolve(fileName)
+        if (local.exists()) return local.readText()
+        val bundled = DataDownloader::class.java.getResourceAsStream("/noamm-data/$fileName")
+            ?: throw IOException("Data file $fileName is missing (not downloaded, not bundled)")
+        LOGGER.warn("Using the bundled copy of $fileName (the Noamm data server was not reachable)")
+        return bundled.use { it.readBytes().toString(Charsets.UTF_8) }
+    }
 }

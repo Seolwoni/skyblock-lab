@@ -18,6 +18,33 @@ jobs:
           distribution: 'microsoft'
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x ./gradlew
+      - name: bundle noamm data
+        run: |
+          # Noamm's data (puzzle answers, room list...) is normally downloaded in game. Keep a copy in the jar
+          # so the mod still works when api.noamm.org is down. Fresh copies are kept on the noamm-data branch.
+          if curl -fsSL --retry 3 --max-time 60 -A "Riftwalk-CI" https://api.noamm.org/na/data/download -o /tmp/data.zip; then
+            echo "fresh noamm data"
+            mkdir -p /tmp/ndrepo && cd /tmp/ndrepo && git init -q && cp /tmp/data.zip . && git add data.zip \
+              && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "noamm data $(date -u +%F)" \
+              && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:noamm-data || true
+            cd "$GITHUB_WORKSPACE"
+          elif git fetch -q origin noamm-data 2>/dev/null && git show origin/noamm-data:data.zip > /tmp/data.zip; then
+            echo "noamm data server down, using the saved copy"
+          else
+            echo "no noamm data available"; rm -f /tmp/data.zip
+          fi
+          if [ -s /tmp/data.zip ]; then
+            python3 -c "
+          import zipfile, os
+          z = zipfile.ZipFile('/tmp/data.zip'); out = 'src/main/resources/noamm-data'
+          for n in z.namelist():
+              rel = n.split('/', 1)[1] if '/' in n else n
+              if not rel or n.endswith('/'): continue
+              p = os.path.join(out, rel); os.makedirs(os.path.dirname(p), exist_ok=True)
+              open(p, 'wb').write(z.read(n))
+          print(len(os.listdir(out)), 'data files bundled')
+          "
+          fi
       - name: build 26.2
         run: |
           set -o pipefail

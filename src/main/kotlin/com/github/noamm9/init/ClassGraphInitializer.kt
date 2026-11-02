@@ -20,6 +20,11 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import kotlin.system.measureTimeMillis
 
 class ClassGraphInitializer {
+    companion object {
+        /** Features that threw while loading (shown by the game test, logged for players). */
+        @JvmField val failedFeatures = mutableListOf<String>()
+    }
+
     private val classLoader = Thread.currentThread().contextClassLoader
 
     fun initAll() = ClassGraph().enableClassInfo().ignoreClassVisibility().apply {
@@ -67,7 +72,12 @@ class ClassGraphInitializer {
 
     private fun ScanResult.registerFeatures() {
         getAllSubclasses(Feature::class.java).forEach { classInfo ->
-            val feature = classInfo.getInstance<Feature>().apply(Feature::initialize)
+            // Riftwalk: one broken feature (missing data, API change) must not stop the others from loading.
+            val feature = runCatching { classInfo.getInstance<Feature>().apply(Feature::initialize) }.getOrElse {
+                NoammAddons.logger.error("Feature ${classInfo.simpleName} failed to load and was skipped", it)
+                failedFeatures += classInfo.simpleName
+                return@forEach
+            }
             FeatureManager.hudElements.addAll(feature.hudElements)
             FeatureManager.features.add(feature)
         }

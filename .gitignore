@@ -43,3 +43,5 @@ replay_*.log
 *.salive
 /logs
 /config
+# bundled by CI from api.noamm.org
+src/main/resources/noamm-data/

@@ -46,6 +46,9 @@ public class SmokeTest implements FabricClientGameTest {
 			if (total < 100) failures.add("only " + total + " features registered (expected 100+)");
 			int routes = context.computeOnClient(mc -> FeatureManager.INSTANCE.getFeaturesByCategory(CategoryType.ROUTES).size());
 			log.add("routes features: " + routes);
+			java.util.List<String> broken = com.github.noamm9.init.ClassGraphInitializer.failedFeatures;
+			log.add("features that failed to load: " + broken);
+			if (!broken.isEmpty()) failures.add("features failed to load: " + broken);
 			if (routes < 2) failures.add("Routes panel has " + routes + " features (expected Secret Routes + Auto Routes)");
 
 			// 2. Secret Routes started
