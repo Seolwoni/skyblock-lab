@@ -99,7 +99,7 @@ tasks.named("legitClasses") {
 val jarCheat = tasks.register<ShadowJar>("jarCheat") {
     dependsOn("cheatClasses", "processCheatResources")
     from(cheatSourceSet.output)
-    archiveClassifier.set("cheat")
+    archiveClassifier.set("") // Riftwalk: the main jar has no suffix
     destinationDirectory.set(rootLibsDir)
     from("LICENSE") { rename { "${it}_$mod_name" } }
 }

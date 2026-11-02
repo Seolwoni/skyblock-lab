@@ -30,7 +30,7 @@ jobs:
           grep -E -A6 "error:|^e: " build.log | head -400 > /tmp/compile.txt || true
           tail -300 build.log > /tmp/tail.txt
           ls -la build/libs > /tmp/libs.txt 2>&1 || true
-          for j in build/libs/*-26.2-cheat.jar; do
+          for j in build/libs/Riftwalk-*-26.2.jar; do
             echo "== $j" >> /tmp/libs.txt
             unzip -l "$j" | grep -c "xyz/yourboykyle/secretroutes/.*class" >> /tmp/libs.txt || true
             echo "assist stubs in jar: $(unzip -l "$j" | grep -c "com/seolwoni/")" >> /tmp/libs.txt
@@ -48,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: riftwalk-26.2
-          path: build/libs/*-26.2-*.jar
+          path: build/libs/Riftwalk-*.jar
       - name: release
         if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no release]')
         uses: softprops/action-gh-release@v2
@@ -56,4 +56,4 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: Riftwalk (build ${{ github.run_number }})
           body: "Riftwalk - NoammAddons + Secret Routes 기반, 개인 서버 전용. cheat jar 사용."
-          files: build/libs/*-26.2-cheat.jar
+          files: build/libs/Riftwalk-*-26.2.jar
