@@ -1,0 +1,87 @@
+@file:Suppress("UNCHECKED_CAST")
+
+package com.github.noamm9.init
+
+import com.github.noamm9.NoammAddons
+import com.github.noamm9.NoammAddons.mc
+import com.github.noamm9.commands.CommandBuilder
+import com.github.noamm9.config.ConfigManager
+import com.github.noamm9.event.EventBus.register
+import com.github.noamm9.event.impl.RenderOverlayEvent
+import com.github.noamm9.features.Feature
+import com.github.noamm9.features.FeatureManager
+import com.github.noamm9.init.types.*
+import com.github.noamm9.ui.hud.HudEditorScreen
+import com.github.noamm9.ui.utils.Resolution
+import com.mojang.brigadier.builder.LiteralArgumentBuilder
+import io.github.classgraph.*
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
+import kotlin.system.measureTimeMillis
+
+class ClassGraphInitializer {
+    private val classLoader = Thread.currentThread().contextClassLoader
+
+    fun initAll() = ClassGraph().enableClassInfo().ignoreClassVisibility().apply {
+        acceptPackages(NoammAddons::class.java.`package`.name)
+        rejectPackages("${NoammAddons::class.java.`package`.name}.lib")
+        enableClassLoaders(classLoader)
+    }.scan().use { scan ->
+        val time = measureTimeMillis {
+            scan.registerSelfInits()
+            scan.registerCustomMenus()
+            scan.registerCommands()
+            scan.registerFeatures()
+        }
+
+        NoammAddons.logger.info("${this::class.simpleName} initialized in $time ms.")
+    }
+
+    private fun ScanResult.registerSelfInits() {
+        getAllClassesImplementing(ISelfInit::class.java).forEach { ci ->
+            (ci.getInstance<ISelfInit>()).init()
+        }
+    }
+
+    private fun ScanResult.registerCustomMenus() {
+        getAllClassesImplementing(ICustomMenu::class.java).forEach { ci ->
+            ModCompatibility.customMenus.add(ci.getInstance())
+        }
+    }
+
+    private fun ScanResult.registerCommands() {
+        val providers = getAllClassesImplementing(ICommandProvider::class.java).map { it.getInstance<ICommandProvider>() }
+
+        ClientCommandRegistrationCallback.EVENT.register { dispatcher, _ ->
+            CommandBuilder.clear()
+            providers.forEach { provider ->
+                val commandBuilder = CommandBuilder()
+                with(provider) { commandBuilder.command() }
+
+                commandBuilder.build().forEach { root ->
+                    dispatcher.register(root as LiteralArgumentBuilder<FabricClientCommandSource>)
+                }
+            }
+        }
+    }
+
+    private fun ScanResult.registerFeatures() {
+        getAllSubclasses(Feature::class.java).forEach { classInfo ->
+            val feature = classInfo.getInstance<Feature>().apply(Feature::initialize)
+            FeatureManager.hudElements.addAll(feature.hudElements)
+            FeatureManager.features.add(feature)
+        }
+
+        ConfigManager.load()
+
+        register<RenderOverlayEvent> {
+            if (mc.gui.screen() is HudEditorScreen) return@register
+
+            Resolution.push(event.context)
+            FeatureManager.hudElements.forEach { if (it.shouldDraw) it.renderElement(event.context, false) }
+            Resolution.pop(event.context)
+        }
+    }
+
+    private fun <T> ClassInfo.getInstance() = Class.forName(name, true, classLoader).getDeclaredField("INSTANCE").get(null) as T
+}

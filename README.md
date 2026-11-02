@@ -1,18 +1,32 @@
-# SkyBlock Lab
+# NoammAddons 26.3
 
-개인 맵 테스트용 던전 도우미 (Fabric 26.2, Java 25). Made by seolwoni
+[![GitHub Downloads](https://img.shields.io/github/downloads/Noamm9/NoammAddons/total?style=for-the-badge&logo=github)](https://github.com/Noamm9/NoammAddons/releases)
+[![Discord](https://img.shields.io/discord/1281979747605418024?color=5865F2&logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/pj9mQGxMxB)
 
-> Hypixel 같은 공개 서버에서 쓰면 계정이 밴될 수 있어요. 개인 맵 전용.
+> 26.3 port of the greatest skyblock mod ever!
 
-## 기능
-- **ESP**: 스타 몹(✯), 박쥐, 위더, 플레이어, 모든 몹, 이름 필터. 벽 너머로 보이는 발광 외곽선.
-- **자동 터미널**: 순서대로 / 색상 고르기 / 시작 글자 / 패널 맞추기 / 루빅스 / 멜로디. 첫 클릭 대기, 클릭 간격 조절.
-- **자동 GFS**: 엔더 진주, 스피릿 립, 슈퍼붐 TNT, 디코이를 `/gfs`로 목표 개수까지 채움. 던전 시작 시, 주기적으로, 또는 키로.
+----
 
-## 사용
-- **오른쪽 Shift**: 설정 화면
-- **GFS 지금 채우기**: 조작 설정에서 키 지정
-- 설정 파일: `config/skyblocklab.json`
+## How to install?
 
-## 빌드
-`main`에 푸시하면 GitHub Actions가 빌드하고 Releases에 jar를 올려요.
+1. Install **[Fabric for Minecraft 26.3](https://fabricmc.net/use/installer/)**
+2. Install **[Fabric API](https://modrinth.com/mod/fabric-api/versions?g=26.3)** and **[Fabric Kotlin Language](https://modrinth.com/mod/fabric-language-kotlin)**
+3. Download the latest mod file from the [**Releases page**](https://github.com/Noamm9/NoammAddons/releases)
+4. Put the downloaded `.jar` files into your `.minecraft/mods` folder
+5. Launch Minecraft using the **Fabric** profile
+
+* Type  `/na` in chat to open the config menu.
+
+## Contributions
+
+Contributions are always welcome! If you have a feature idea or want to fix a bug, feel free to open an issue or submit
+a pull request.
+
+* Open an **Issue** to suggest something
+* Make a **Pull Request** to add/fix stuff
+
+---
+
+## License
+
+This project is licensed under the [**CC0-1.0 License**](LICENSE).
