@@ -15,6 +15,7 @@ import com.github.noamm9.ui.clickgui.SkyHanniScreen;
 import com.github.noamm9.ui.clickgui.enums.CategoryType;
 
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
+import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.loader.api.FabricLoader;
@@ -111,7 +112,7 @@ public class SmokeTest implements FabricClientGameTest {
 			log.add(shot + " open: " + open);
 			if (skyHanni && !open.equals(SkyHanniScreen.class.getSimpleName())) failures.add("SkyHanni screen did not open (got " + open + ")");
 			if (!skyHanni && !open.equals(ClickGuiScreen.class.getSimpleName())) failures.add("classic screen did not open (got " + open + ")");
-			context.takeScreenshot(shot);
+			context.takeScreenshot(TestScreenshotOptions.of(shot).withSize(1920, 1080));
 			context.runOnClient(mc -> mc.gui.setScreen(null));
 			context.waitTicks(5);
 		} catch (Throwable t) {

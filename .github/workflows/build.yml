@@ -31,7 +31,7 @@ jobs:
           ./gradlew :26.2:downloadAssets > /dev/null 2>&1 || (sleep 15; ./gradlew :26.2:downloadAssets > /dev/null 2>&1) || true
           set -o pipefail
           start=$(date +%s)
-          xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :26.2:runClientGameTest --stacktrace 2>&1 | tee gametest.log
+          xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew :26.2:runClientGameTest --stacktrace 2>&1 | tee gametest.log
           echo "gametest seconds: $(( $(date +%s) - start ))" >> gametest.log
       - name: save log
         if: always()
