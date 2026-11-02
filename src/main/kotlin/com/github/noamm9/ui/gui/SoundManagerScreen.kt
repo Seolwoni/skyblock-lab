@@ -284,7 +284,7 @@ class SoundManagerScreen: Screen(Component.literal("SoundManager")) {
         return super.charTyped(e)
     }
 
-    override fun onClose() = GuiUtils.setScreen(ClickGuiScreen())
+    override fun onClose() = GuiUtils.setScreen(com.github.noamm9.features.impl.dev.ClickGui.createScreen())
 
     private enum class SoundCategory {
         All, Recent, Blocks, HostileMobs, NeutralMobs, Music, Ambient, Items, UI, Misc;

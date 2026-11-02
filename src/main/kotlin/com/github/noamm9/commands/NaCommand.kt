@@ -30,7 +30,7 @@ object NaCommand: ICommandProvider {
     override fun CommandBuilder.command() {
         setName(*names)
         description("opens the Config GUI")
-        runs { GuiUtils.setScreen(ClickGuiScreen()) }
+        runs { GuiUtils.setScreen(com.github.noamm9.features.impl.dev.ClickGui.createScreen()) }
 
         literal("help") {
             runs {

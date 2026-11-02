@@ -129,7 +129,7 @@ java = header + '''public class SRMConfig {
     }
 
 ''' + body_fields + helpers + '''    public static Screen getScreen(Screen parent) {
-        return new com.github.noamm9.ui.clickgui.ClickGuiScreen();
+        return com.github.noamm9.features.impl.dev.ClickGui.createScreen();
     }
 
 ''' + enums

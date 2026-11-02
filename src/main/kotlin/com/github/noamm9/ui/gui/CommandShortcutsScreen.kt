@@ -219,7 +219,7 @@ class CommandShortcutsScreen: Screen(Component.literal("Command Shortcuts")) {
             if (command.isNotEmpty() && replacement.isNotEmpty()) shortcuts[command] = replacement
         }
 
-        GuiUtils.setScreen(ClickGuiScreen())
+        GuiUtils.setScreen(com.github.noamm9.features.impl.dev.ClickGui.createScreen())
         CommandShortcuts.shortcuts.set(shortcuts)
         CommandShortcuts.rebuild()
     }

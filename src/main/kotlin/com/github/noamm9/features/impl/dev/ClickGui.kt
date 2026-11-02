@@ -16,6 +16,7 @@ import java.awt.Color
 object ClickGui: Feature("A feature used to change the ClickGui configuration.", toggled = true) {
     private val openKeybind by KeybindSetting("Open Keybind")
     val accentColor by ColorSetting("Accent Color", Color(99, 176, 217), false).withDescription("The accent color used by the whole ClickGui.")
+    val guiStyle by DropdownSetting("GUI Style", 0, listOf("SkyHanni", "Classic")).withDescription("SkyHanni: one window with search, a category list and option cards with descriptions. Classic: the original NoammAddons panels.")
     val panelSorting by DropdownSetting("Sorting", 1, listOf("A-Z Sorting", "Width Sorting", "No Sorting")).withDescription("The order of the features in the panels.")
 
     val editGuiButton by ButtonSetting("Open HUD Editor") {
@@ -31,7 +32,7 @@ object ClickGui: Feature("A feature used to change the ClickGui configuration.",
             if (mc.gui.screen() != null || event.action != InputConstants.PRESS) return@register
             if (! openKeybind.matches(event.keyEvent.key, mouse = false)) return@register
 
-            GuiUtils.setScreen(ClickGuiScreen())
+            GuiUtils.setScreen(createScreen())
             event.isCanceled = true
         }
 
@@ -39,10 +40,15 @@ object ClickGui: Feature("A feature used to change the ClickGui configuration.",
             if (mc.gui.screen() != null || event.action != InputConstants.PRESS) return@register
             if (! openKeybind.matches(event.button, mouse = true)) return@register
 
-            GuiUtils.setScreen(ClickGuiScreen())
+            GuiUtils.setScreen(createScreen())
             event.isCanceled = true
         }
     }
+
+    /** The settings screen in the chosen style. */
+    @JvmStatic
+    fun createScreen(): net.minecraft.client.gui.screens.Screen =
+        if (guiStyle.value == 0) com.github.noamm9.ui.clickgui.SkyHanniScreen() else ClickGuiScreen()
 
     override fun toggle() = Unit
 }
