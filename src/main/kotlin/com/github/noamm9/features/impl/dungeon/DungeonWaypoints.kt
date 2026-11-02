@@ -106,6 +106,7 @@ object DungeonWaypoints: Feature("Add a custom waypoint with /ndw add while look
 
             if (! secretWaypoints.value) return@register
             if (room.mainRoom.state == RoomState.GREEN) return@register
+            if (com.github.noamm9.features.impl.routes.RouteBridge.hideNoammSecretWaypoints()) return@register
 
             val done = doneSecrets[room] ?: emptySet()
             for ((type, positions) in room.secretCoords) {

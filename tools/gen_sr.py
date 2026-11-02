@@ -239,6 +239,9 @@ object SecretRoutes: Feature("Secret route waypoints for every dungeon room (Sec
     }.section("Secret Sound")
     private val saveProfile by ButtonSetting("Save Color Profile") { ConfigUtils.writeColorConfig(C().copyFileName) }
         .section("Color Profiles").withDescription("Saves the current colors under the profile name")
+    private val handOffSetting by ToggleSetting("Hand Off to Noamm Waypoints", true).section("General")
+        .withDescription("While a route has steps left in your room, Noamm's Dungeon Waypoints secret boxes are hidden so only the route shows. When the route is done, or a room has no route, Noamm shows every secret that is still left")
+    val handOff get() = handOffSetting.value
     private val loadProfile by ButtonSetting("Load Color Profile") { ConfigUtils.loadColorConfig(C().copyFileName); pullFromSrm() }
         .section("Color Profiles").withDescription("Loads the profile with the name below")
 

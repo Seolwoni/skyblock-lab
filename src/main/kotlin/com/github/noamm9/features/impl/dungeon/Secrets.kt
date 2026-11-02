@@ -36,7 +36,7 @@ object Secrets: Feature(), IFeatureWindow {
     private val mode by DropdownSetting("Render Mode", 2, listOf("Fill", "Outline", "Filled Outline")).withDescription("Choose how the box is rendered.").showIf { secretClicked.value }
     private val phase by ToggleSetting("See Through Walls").withDescription("If enabled, the highlight will be visible through other blocks.").showIf { secretClicked.value }
 
-    private val secretSound by ToggleSetting("Secret Sound").withDescription("Plays a sound effect when a secret is clicked/found.").section("Secret Sound")
+    val secretSound by ToggleSetting("Secret Sound").withDescription("Plays a sound effect when a secret is clicked/found. While on, Secret Routes' own secret sound stays quiet so you hear one sound.").section("Secret Sound")
     private val playSound = createSoundSettings("Sound", SoundEvents.EXPERIENCE_ORB_PICKUP) { secretSound.value }
 
     private val hudDisplay by ToggleSetting("Secret HUD", true).withDescription("Displays the current room's secrets on screen.").section("HUD")
