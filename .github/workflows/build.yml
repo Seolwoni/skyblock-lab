@@ -45,10 +45,16 @@ jobs:
           print(len(os.listdir(out)), 'data files bundled')
           "
           fi
+      - name: version
+        run: |
+          # major.minor from gradle.properties, the last number is this build's number: 1.1.0 -> 1.1.<build>
+          BASE=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | cut -d. -f1-2)
+          echo "RW_VERSION=$BASE.${{ github.run_number }}" >> $GITHUB_ENV
       - name: build 26.2
         run: |
           set -o pipefail
-          ./gradlew :26.2:build --stacktrace 2>&1 | tee build.log
+          echo "Riftwalk $RW_VERSION"
+          ./gradlew :26.2:build -Pmod_version=$RW_VERSION --stacktrace 2>&1 | tee build.log
       - name: game test
         id: gametest
         continue-on-error: true
@@ -58,7 +64,7 @@ jobs:
           ./gradlew :26.2:downloadAssets > /dev/null 2>&1 || (sleep 15; ./gradlew :26.2:downloadAssets > /dev/null 2>&1) || true
           set -o pipefail
           start=$(date +%s)
-          xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew :26.2:runClientGameTest --stacktrace 2>&1 | tee gametest.log
+          xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew :26.2:runClientGameTest -Pmod_version=$RW_VERSION --stacktrace 2>&1 | tee gametest.log
           echo "gametest seconds: $(( $(date +%s) - start ))" >> gametest.log
       - name: build assist mods
         if: contains(github.event.head_commit.message, '[assist]')
@@ -105,7 +111,7 @@ jobs:
           mkdir -p jar && cp build/libs/Riftwalk-*-26.2.jar jar/ 2>/dev/null || true
           cp /tmp/assist/*.jar jar/ 2>/dev/null || true
           mkdir -p gt && cp /tmp/assist/*-build.log gt/ 2>/dev/null || true
-          echo "${{ github.sha }} ${{ job.status }}" > status.txt
+          echo "${{ github.sha }} ${{ job.status }} ${{ env.RW_VERSION }}" > status.txt
           git add compile.txt tail.txt libs.txt status.txt gt jar
           git commit -m "build log ${{ github.run_number }}"
           git push -f origin ci-log
@@ -118,7 +124,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no release]')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: Riftwalk (build ${{ github.run_number }})
+          tag_name: v${{ env.RW_VERSION }}
+          name: Riftwalk ${{ env.RW_VERSION }}
           body: "Riftwalk - NoammAddons + Secret Routes 기반, 개인 서버 전용. cheat jar 사용."
           files: build/libs/Riftwalk-*-26.2.jar
