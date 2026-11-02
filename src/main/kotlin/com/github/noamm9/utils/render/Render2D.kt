@@ -101,7 +101,8 @@ object Render2D: ISelfInit {
         pose().pushMatrix()
         pose().translate(fx, fy)
         if (fScale != 1f) pose().scale(fScale, fScale)
-        text(mc.font, str.addColor(), 0, 0, color.rgb, shadow)
+        if (UiFont.active) text(mc.font, UiFont.component(str), 0, 0, color.rgb, shadow)
+        else text(mc.font, str.addColor(), 0, 0, color.rgb, shadow)
         pose().popMatrix()
     }
 

@@ -16,6 +16,7 @@ import com.github.noamm9.ui.utils.MouseHelper
 import com.github.noamm9.ui.utils.Resolution
 import com.github.noamm9.ui.utils.ScrollState
 import com.github.noamm9.ui.utils.TextInputHandler
+import com.github.noamm9.utils.render.UiFont
 import com.github.noamm9.utils.ColorUtils.withAlpha
 import com.github.noamm9.utils.GuiUtils
 import com.github.noamm9.utils.render.Render2D.drawBorder
@@ -106,6 +107,15 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     // ------------------------------------------------------------------ render
 
     override fun extractRenderState(context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, a: Float) {
+        UiFont.active = com.github.noamm9.features.impl.dev.ClickGui.customFont.value
+        try {
+            render(context, mouseX, mouseY)
+        } finally {
+            UiFont.active = false
+        }
+    }
+
+    private fun render(context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int) {
         val mx = Resolution.getMouseX(mouseX.toDouble())
         val my = Resolution.getMouseY(mouseY.toDouble())
         Resolution.push(context)
@@ -131,7 +141,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         ctx.drawRect(x, y + TITLE_H - 4f, winW(), 3f, panel)
         ctx.drawRect(x, y + TITLE_H - 1f, winW(), 1f, Style.accentColor.withAlpha(170))
         ctx.drawString("Riftwalk", x + 10f, y + 9f, Color.WHITE)
-        ctx.drawString(com.github.noamm9.NoammAddons.MOD_VERSION, x + 10f + mc.font.width("Riftwalk") + 6f, y + 9f, textFaint, shadow = false)
+        ctx.drawString(com.github.noamm9.NoammAddons.MOD_VERSION, x + 10f + uiWidth("Riftwalk") + 6f, y + 9f, textFaint, shadow = false)
 
         val sw = 240f
         val sx = x + (winW() - sw) / 2f
@@ -195,7 +205,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     ctx.drawString(label, x + 8f, y + 4f, if (open) accentLight() else textMain)
                     val all = featuresIn(key)
                     val count = if (open) "${all.count { it.enabled }}/${all.size}" else "${all.size}"
-                    ctx.drawString(count, x + SIDEBAR_W - 8f - mc.font.width(count), y + 4f, if (open) accentLight() else textFaint, shadow = false)
+                    ctx.drawString(count, x + SIDEBAR_W - 8f - uiWidth(count), y + 4f, if (open) accentLight() else textFaint, shadow = false)
                 }
 
                 is Feature -> {
@@ -296,7 +306,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                 is Entry.Header -> if (visible) {
                     ctx.drawString(entry.text, x + 2f, y + 4f, accentLight())
                     val on = headerOnCount(entry.text)
-                    if (on != null) ctx.drawString(on, x + 8f + mc.font.width(entry.text), y + 4f, textFaint, shadow = false)
+                    if (on != null) ctx.drawString(on, x + 8f + uiWidth(entry.text), y + 4f, textFaint, shadow = false)
                     ctx.drawRect(x + 2f, y + 15f, w - 4f, 1f, line)
                 }
 
@@ -319,7 +329,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                         if (selected != f && hasSettings(f)) {
                             val n = f.configSettings.size
                             val label = if (f is IFeatureScreen) "open ›" else "$n setting${if (n == 1) "" else "s"} ›"
-                            ctx.drawString(label, x + w - 8f - mc.font.width(label), y + eh - 12f, if (f.enabled) accentLight() else textFaint, shadow = false)
+                            ctx.drawString(label, x + w - 8f - uiWidth(label), y + eh - 12f, if (f.enabled) accentLight() else textFaint, shadow = false)
                         }
                     }
                 }
@@ -502,9 +512,11 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
     // ------------------------------------------------------------------ text helpers
 
+    private fun uiWidth(s: String) = if (UiFont.active) UiFont.width(s) else mc.font.width(s)
+
     private fun inside(mx: Float, my: Float, r: FloatArray) = mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3]
 
-    private fun textWidth(s: String) = mc.font.width(s.replace(Regex("[§&][0-9a-fk-or]"), ""))
+    private fun textWidth(s: String) = if (UiFont.active) UiFont.width(s) else mc.font.width(s.replace(Regex("[§&][0-9a-fk-or]"), ""))
 
     private fun fit(s: String, max: Float): String {
         if (textWidth(s) <= max) return s

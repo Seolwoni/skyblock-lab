@@ -1,0 +1,6 @@
+{
+  "providers": [
+    {"type": "space", "advances": {" ": 2.5}},
+    {"type": "ttf", "file": "noammaddons:pretendard-regular.ttf", "size": 9.0, "oversample": 8.0, "shift": [0.0, 0.5]}
+  ]
+}

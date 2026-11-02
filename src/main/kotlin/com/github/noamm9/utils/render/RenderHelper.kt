@@ -16,7 +16,7 @@ object RenderHelper {
 
     val Entity.renderBoundingBox get() = boundingBox.move(renderX - x, renderY - y, renderZ - z)
 
-    fun String.width() = addColor().lineSequence().maxOf(mc.font::width)
+    fun String.width() = addColor().lineSequence().maxOf { if (UiFont.active) UiFont.width(it) else mc.font.width(it) }
     fun String.height() = mc.font.lineHeight * (count { it == '\n' } + 1)
     fun String.wrap(maxWidth: Int) = buildList {
         for (raw in addColor().lineSequence()) {
