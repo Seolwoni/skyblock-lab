@@ -30,6 +30,12 @@ jobs:
           grep -E -A6 "error:|^e: " build.log | head -400 > /tmp/compile.txt || true
           tail -300 build.log > /tmp/tail.txt
           ls -la build/libs > /tmp/libs.txt 2>&1 || true
+          for j in build/libs/*-26.2-cheat.jar; do
+            echo "== $j" >> /tmp/libs.txt
+            unzip -l "$j" | grep -c "xyz/yourboykyle/secretroutes/.*class" >> /tmp/libs.txt || true
+            unzip -l "$j" | grep -E "features/impl/routes|secretroutes.mixins|assets/secretroutesmod/(rooms|secretlocations)" >> /tmp/libs.txt || true
+            unzip -p "$j" fabric.mod.json >> /tmp/libs.txt || true
+          done
           git checkout --orphan ci-log
           git rm -rf --cached . > /dev/null
           cp /tmp/compile.txt /tmp/tail.txt /tmp/libs.txt .
