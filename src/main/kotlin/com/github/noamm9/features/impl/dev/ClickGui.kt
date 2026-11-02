@@ -15,7 +15,7 @@ import java.awt.Color
 
 object ClickGui: Feature("A feature used to change the ClickGui configuration.", toggled = true) {
     private val openKeybind by KeybindSetting("Open Keybind")
-    val accentColor by ColorSetting("Accent Color", Color(99, 176, 217), false).withDescription("The accent color used by the whole ClickGui.")
+    val accentColor by ColorSetting("Accent Color", Color(155, 108, 240), false).withDescription("The accent color used by the whole ClickGui.")
     val guiStyle by DropdownSetting("GUI Style", 0, listOf("SkyHanni", "Classic")).withDescription("SkyHanni: one window with search, a category list and option cards with descriptions. Classic: the original NoammAddons panels.")
     val panelSorting by DropdownSetting("Sorting", 1, listOf("A-Z Sorting", "Width Sorting", "No Sorting")).withDescription("The order of the features in the panels.")
 

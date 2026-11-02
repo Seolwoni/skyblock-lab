@@ -37,27 +37,33 @@ import java.awt.Color
  * Uses the same settings and widgets as the classic ClickGUI, so both always show the same values.
  */
 class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
-    private companion object {
-        const val MARGIN_X = 40f
-        const val MARGIN_Y = 22f
-        const val TITLE_H = 26f
-        const val SIDEBAR_W = 150f
-        const val ROW_H = 15f
-        const val CARD_PAD = 5f
-        const val CARD_GAP = 5f
-        const val LINE_H = 10f
+    companion object {
+        private const val MARGIN_X = 40f
+        private const val MARGIN_Y = 22f
+        private const val TITLE_H = 26f
+        private const val SIDEBAR_W = 150f
+        private const val ROW_H = 15f
+        private const val CARD_PAD = 5f
+        private const val CARD_GAP = 5f
+        private const val LINE_H = 10f
 
-        val bg = Color(28, 28, 28, 245)
-        val panel = Color(40, 40, 40, 255)
-        val card = Color(44, 44, 44, 255)
-        val cardHover = Color(52, 52, 52, 255)
-        val field = Color(20, 20, 20, 255)
-        val textDim = Color(150, 150, 150)
-        val textFaint = Color(115, 115, 115)
+        private val bg = Color(22, 20, 28, 248)
+        private val panel = Color(31, 28, 39, 255)
+        private val card = Color(36, 32, 46, 255)
+        private val cardOff = Color(29, 26, 37, 255)
+        private val cardHover = Color(44, 40, 56, 255)
+        private val field = Color(18, 16, 23, 255)
+        private val line = Color(46, 42, 58, 255)
+        private val textMain = Color(232, 230, 239)
+        private val textSoft = Color(185, 181, 200)
+        private val textDim = Color(143, 139, 163)
+        private val textFaint = Color(108, 104, 128)
+        private val onDot = Color(95, 211, 138)
+        private val offDot = Color(74, 70, 88)
 
         /** Remembered between openings, like SkyHanni does. */
-        var lastCategory: CategoryType = CategoryType.DUNGEON
-        var lastFeature: Feature? = null
+        @JvmField var lastCategory: CategoryType = CategoryType.DUNGEON
+        @JvmField var lastFeature: Feature? = null
     }
 
     private var query = ""
@@ -108,8 +114,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         sideScroll.mouseDragged(my.toFloat())
 
         context.drawRect(0, 0, Resolution.width, Resolution.height, Color(0, 0, 0, 110))
-        context.drawRect(winX(), winY(), winW(), winH(), bg)
-        context.drawBorder(winX(), winY(), winW(), winH(), Color(255, 255, 255, 28))
+        Style.roundRect(context, winX(), winY(), winW(), winH(), 4f, bg)
 
         drawTitleBar(context, mx.toFloat(), my.toFloat())
         drawSidebar(context, mx.toFloat(), my.toFloat())
@@ -122,26 +127,29 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     private fun drawTitleBar(ctx: GuiGraphicsExtractor, mx: Float, my: Float) {
         val x = winX()
         val y = winY()
-        ctx.drawRect(x, y, winW(), TITLE_H, panel)
-        ctx.drawRect(x, y + TITLE_H - 1f, winW(), 1f, Style.accentColor.withAlpha(160))
-        ctx.drawString("§lRiftwalk", x + 10f, y + 9f, Color.WHITE)
+        Style.roundRect(ctx, x, y, winW(), TITLE_H, 4f, panel)
+        ctx.drawRect(x, y + TITLE_H - 4f, winW(), 3f, panel)
+        ctx.drawRect(x, y + TITLE_H - 1f, winW(), 1f, Style.accentColor.withAlpha(170))
+        ctx.drawString("Riftwalk", x + 10f, y + 9f, Color.WHITE)
+        ctx.drawString(com.github.noamm9.NoammAddons.MOD_VERSION, x + 10f + mc.font.width("Riftwalk") + 6f, y + 9f, textFaint, shadow = false)
 
-        val sw = 230f
+        val sw = 240f
         val sx = x + (winW() - sw) / 2f
         val sy = y + 4f
-        ctx.drawRect(sx, sy, sw, 18f, field)
-        ctx.drawRect(sx, sy + 17f, sw, 1f, if (search.listening) Style.accentColor else Color(255, 255, 255, 30))
-        search.x = sx + 4f
+        Style.roundRect(ctx, sx, sy, sw, 18f, 3f, field)
+        if (search.listening) ctx.drawRect(sx + 3f, sy + 17f, sw - 6f, 1f, Style.accentColor)
+        search.x = sx + 14f
         search.y = sy
-        search.width = sw - 8f
+        search.width = sw - 18f
         search.height = 18f
-        if (query.isEmpty() && !search.listening) ctx.drawString("§8Search all settings... (Ctrl+F)", sx + 6f, sy + 5f, textFaint, shadow = false)
+        ctx.drawString("⌕", sx + 5f, sy + 5f, if (search.listening) Style.accentColor else textFaint, shadow = false)
+        if (query.isEmpty() && !search.listening) ctx.drawString("Search ${FeatureManager.features.size} features  (Ctrl+F)", sx + 15f, sy + 5f, textFaint, shadow = false)
         else search.draw(ctx, mx, my)
 
         titleButtons().forEach { (label, rect) ->
             val hovered = inside(mx, my, rect)
-            ctx.drawRect(rect[0], rect[1], rect[2], rect[3], if (hovered) cardHover else card)
-            ctx.drawCenteredString(label, rect[0] + rect[2] / 2f, rect[1] + 5f, if (hovered) Style.accentColor else Color.WHITE)
+            Style.roundRect(ctx, rect[0], rect[1], rect[2], rect[3], 3f, if (hovered) cardHover else Color(42, 38, 52))
+            ctx.drawCenteredString(label, rect[0] + rect[2] / 2f, rect[1] + 5f, if (hovered) Style.accentColor else textSoft)
         }
     }
 
@@ -149,7 +157,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val y = winY() + 5f
         val right = winX() + winW() - 6f
         return listOf(
-            "X" to floatArrayOf(right - 16f, y, 16f, 16f),
+            "✕" to floatArrayOf(right - 16f, y, 16f, 16f),
             "HUD" to floatArrayOf(right - 16f - 4f - 34f, y, 34f, 16f),
             "Classic" to floatArrayOf(right - 16f - 4f - 34f - 4f - 46f, y, 46f, 16f),
         )
@@ -159,7 +167,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val x = winX() + 4f
         val top = winY() + TITLE_H + 6f
         val h = winH() - TITLE_H - 12f
-        ctx.drawRect(x, top, SIDEBAR_W, h, panel)
+        Style.roundRect(ctx, x, top, SIDEBAR_W, h, 4f, panel)
 
         val rows = ArrayList<Pair<Any, String>>()
         for (cat in CategoryType.entries) {
@@ -177,19 +185,26 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
             val hovered = inside(mx, my, rect) && my in top .. top + h
             when (key) {
                 is CategoryType -> {
-                    val active = key == category && selected == null && query.isBlank()
-                    if (active) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Style.accentColor.withAlpha(45))
-                    else if (hovered) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Color(255, 255, 255, 12))
-                    val color = if (key == category) Style.accentColor else Color.WHITE
-                    ctx.drawString((if (key == category && query.isBlank()) "▾ " else "▸ ") + label, x + 6f, y + 4f, color)
+                    val open = key == category && query.isBlank()
+                    val active = open && selected == null
+                    if (open) {
+                        ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Style.accentColor.withAlpha(if (active) 58 else 30))
+                        ctx.drawRect(x, y, 2f, ROW_H, Style.accentColor)
+                    }
+                    else if (hovered) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Color(255, 255, 255, 10))
+                    if (key != CategoryType.entries.first()) ctx.drawRect(x + 6f, y, SIDEBAR_W - 12f, 1f, line)
+                    ctx.drawString(label, x + 8f, y + 4f, if (open) accentLight() else textMain)
+                    val all = featuresIn(key)
+                    val count = if (open) "${all.count { it.enabled }}/${all.size}" else "${all.size}"
+                    ctx.drawString(count, x + SIDEBAR_W - 8f - mc.font.width(count), y + 4f, if (open) accentLight() else textFaint, shadow = false)
                 }
 
                 is Feature -> {
                     val active = key == selected
-                    if (active) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Style.accentColor.withAlpha(45))
-                    else if (hovered) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Color(255, 255, 255, 12))
-                    ctx.drawRect(x + 14f, y + 5f, 4f, 4f, if (key.enabled) Color(85, 200, 85) else Color(90, 90, 90))
-                    ctx.drawString(fit(label, SIDEBAR_W - 30f), x + 22f, y + 4f, if (active) Style.accentColor else if (key.enabled) Color(220, 220, 220) else textDim)
+                    if (active) ctx.drawRect(x + 6f, y, SIDEBAR_W - 6f, ROW_H, Style.accentColor.withAlpha(45))
+                    else if (hovered) ctx.drawRect(x + 6f, y, SIDEBAR_W - 6f, ROW_H, Color(255, 255, 255, 10))
+                    Style.roundRect(ctx, x + 14f, y + 5f, 5f, 5f, 2.5f, if (key.enabled) onDot else offDot)
+                    ctx.drawString(fit(label, SIDEBAR_W - 32f), x + 23f, y + 4f, if (active) accentLight() else if (key.enabled) textSoft else textFaint, shadow = active)
                 }
             }
             y += ROW_H
@@ -279,8 +294,10 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
             val visible = y + eh >= top && y <= top + h
             when (entry) {
                 is Entry.Header -> if (visible) {
-                    ctx.drawString("§l${entry.text}", x + 2f, y + 5f, Style.accentColor)
-                    ctx.drawRect(x + 2f, y + 15f, w - 4f, 1f, Color(255, 255, 255, 25))
+                    ctx.drawString(entry.text, x + 2f, y + 4f, accentLight())
+                    val on = headerOnCount(entry.text)
+                    if (on != null) ctx.drawString(on, x + 8f + mc.font.width(entry.text), y + 4f, textFaint, shadow = false)
+                    ctx.drawRect(x + 2f, y + 15f, w - 4f, 1f, line)
                 }
 
                 is Entry.FeatureCard -> {
@@ -289,23 +306,28 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     drawnFeatureCards += f to rect
                     if (visible) {
                         val hovered = insideContent && inside(mx, my, rect)
-                        ctx.drawRect(x, y, w, eh, if (hovered && selected != f) cardHover else card)
-                        ctx.drawRect(x, y, 2f, eh, if (f.enabled) Style.accentColor else Color(80, 80, 80))
-                        ctx.drawString("§l${f.name}", x + CARD_PAD + 3f, y + 6f, Color.WHITE)
+                        val base = if (f.enabled) card else cardOff
+                        Style.roundRect(ctx, x, y, w, eh, 3f, if (hovered && selected != f) cardHover else base)
+                        ctx.drawRect(x, y + 1f, 2f, eh - 2f, if (f.enabled) Style.accentColor else line)
+                        ctx.drawString("§l${f.name}", x + CARD_PAD + 3f, y + 6f, if (f.enabled) textMain else textSoft)
                         var ly = y + 18f
-                        for (line in wrap(f.description.orEmpty().replace("\\n", " "), w - CARD_PAD * 2 - 60f)) {
-                            ctx.drawString(line, x + CARD_PAD + 3f, ly, textDim, shadow = false)
+                        for (l in wrap(f.description.orEmpty().replace("\\n", " "), w - CARD_PAD * 2 - 60f)) {
+                            ctx.drawString(l, x + CARD_PAD + 3f, ly, if (f.enabled) textDim else textFaint, shadow = false)
                             ly += LINE_H
                         }
-                        drawSwitch(ctx, x + w - 34f, y + 6f, f.enabled)
-                        if (selected != f && hasSettings(f)) ctx.drawString("§8settings ›", x + w - 58f, y + eh - 12f, textFaint, shadow = false)
+                        Style.drawSwitch(ctx, x + w - 32f, y + 6f, 24f, 12f, if (f.enabled) 1f else 0f)
+                        if (selected != f && hasSettings(f)) {
+                            val n = f.configSettings.size
+                            val label = if (f is IFeatureScreen) "open ›" else "$n setting${if (n == 1) "" else "s"} ›"
+                            ctx.drawString(label, x + w - 8f - mc.font.width(label), y + eh - 12f, if (f.enabled) accentLight() else textFaint, shadow = false)
+                        }
                     }
                 }
 
                 is Entry.Option -> {
                     val widget = entry.widget
                     if (visible) {
-                        ctx.drawRect(x, y, w, eh, card)
+                        Style.roundRect(ctx, x, y, w, eh, 3f, card)
                         var wy = y + CARD_PAD
                         if (entry.prefix != null) {
                             ctx.drawString("§8${entry.prefix} ›", x + CARD_PAD, wy + 1f, textFaint, shadow = false)
@@ -334,9 +356,17 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         scroll.drawScrollbar(ctx, x + w + 2f, top, 2f, h, mx, my)
     }
 
-    private fun drawSwitch(ctx: GuiGraphicsExtractor, x: Float, y: Float, on: Boolean) {
-        ctx.drawRect(x, y, 26f, 11f, if (on) Style.accentColor.withAlpha(150) else Color(70, 70, 70))
-        ctx.drawRect(if (on) x + 16f else x, y, 10f, 11f, if (on) Style.accentColor else Color(160, 160, 160))
+    /** The accent, lifted towards white for text on dark backgrounds. */
+    private fun accentLight(): Color {
+        val a = Style.accentColor
+        return Color((a.red + 255) / 2, (a.green + 255) / 2, (a.blue + 255) / 2)
+    }
+
+    /** "3 on" next to a category header (only for the category list view). */
+    private fun headerOnCount(text: String): String? {
+        if (selected != null || query.isNotBlank()) return null
+        val n = featuresIn(category).count { it.enabled }
+        return if (n > 0) "$n on" else null
     }
 
     private fun hasSettings(f: Feature) = f is IFeatureScreen || f.configSettings.isNotEmpty()
@@ -356,7 +386,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
             if (!inside(mx, my, rect)) return@forEach
             Style.playClickSound(1f)
             when (label) {
-                "X" -> onClose()
+                "✕" -> onClose()
                 "HUD" -> { saveAndClear(); GuiUtils.setScreen(HudEditorScreen()) }
                 "Classic" -> { saveAndClear(); GuiUtils.setScreen(ClickGuiScreen()) }
             }

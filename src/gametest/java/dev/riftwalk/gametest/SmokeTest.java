@@ -53,6 +53,15 @@ public class SmokeTest implements FabricClientGameTest {
 			// 3. Settings screens open and draw
 			checkScreen(context, "rw-01-skyhanni", true);
 			checkScreen(context, "rw-02-classic", false);
+			context.runOnClient(mc -> {
+				for (Feature f : FeatureManager.INSTANCE.getFeatures()) {
+					if (f.getClass().getSimpleName().equals("AutoRoutes")) {
+						SkyHanniScreen.lastCategory = CategoryType.ROUTES;
+						SkyHanniScreen.lastFeature = f;
+					}
+				}
+			});
+			checkScreen(context, "rw-04-settings", true);
 
 			// 4. Every feature on, run, off
 			List<String> toggled = new ArrayList<>();

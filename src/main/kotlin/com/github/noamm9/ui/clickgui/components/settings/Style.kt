@@ -35,11 +35,41 @@ object Style {
     }
 
     fun drawSlider(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, progress: Float, color: Color) {
-        val kSize = 4f
-        val h = 2.5f
-        ctx.drawRect(x, y, w, h, sliderBackgroundColor)
-        ctx.drawRect(x, y, w * progress, h, color)
-        ctx.drawRect(x + (w * progress) - (kSize / 2f), y + (h / 2f) - (kSize / 2f), kSize, kSize)
+        val kSize = 6f
+        val h = 3f
+        roundRect(ctx, x, y, w, h, 1.5f, sliderBackgroundColor)
+        if (progress > 0.01f) roundRect(ctx, x, y, w * progress, h, 1.5f, color)
+        roundRect(ctx, x + (w * progress) - (kSize / 2f), y + (h / 2f) - (kSize / 2f), kSize, kSize, 3f, Color(240, 236, 255))
+    }
+
+    /** A filled rectangle with rounded corners (radius in GUI pixels, drawn as stacked strips). */
+    fun roundRect(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, radius: Float, color: Color) {
+        val r = radius.coerceAtMost(minOf(w, h) / 2f).coerceAtLeast(0f)
+        if (r < 0.75f) return ctx.drawRect(x, y, w, h, color)
+        ctx.drawRect(x, y + r, w, h - 2 * r, color)
+        val steps = kotlin.math.ceil(r * 2).toInt().coerceAtLeast(2)
+        val strip = r / steps
+        for (i in 0 until steps) {
+            val dy = r - (i + 0.5f) * strip
+            val inset = r - kotlin.math.sqrt((r * r - dy * dy).coerceAtLeast(0f))
+            ctx.drawRect(x + inset, y + i * strip, w - 2 * inset, strip, color)
+            ctx.drawRect(x + inset, y + h - (i + 1) * strip, w - 2 * inset, strip, color)
+        }
+    }
+
+    /** Pill-shaped on/off switch. [progress] 0 = off, 1 = on (animated by the caller). */
+    fun drawSwitch(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, progress: Float) {
+        val off = Color(58, 54, 70)
+        roundRect(ctx, x, y, w, h, h / 2f, off.lerpTo(accentColor, progress))
+        val knob = h - 2f
+        val kx = x + 1f + (w - knob - 2f) * progress
+        roundRect(ctx, kx, y + 1f, knob, knob, knob / 2f, Color(143, 139, 163).lerpTo(Color.WHITE, progress))
+    }
+
+    private fun Color.lerpTo(other: Color, t: Float): Color {
+        val k = t.coerceIn(0f, 1f)
+        fun c(a: Int, b: Int) = (a + (b - a) * k).toInt().coerceIn(0, 255)
+        return Color(c(red, other.red), c(green, other.green), c(blue, other.blue), c(alpha, other.alpha))
     }
 
     fun drawRangeSlider(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, start: Float, end: Float, color: Color) {

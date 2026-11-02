@@ -24,13 +24,9 @@ class ToggleWidget(config: ToggleSetting): Widget<Boolean>(config) {
         Style.drawHoverBar(ctx, x, y, height, hoverAnim.value)
         Style.drawNudgedText(ctx, name, x + 8f, y + 6f, hoverAnim.value)
 
-        val sw = 18f
-        val sh = 6f
-        val sx = x + width - sw - 10f
-        val sy = y + (height / 2f) - (sh / 2f)
-        ctx.drawRect(sx, sy, sw, sh, Color(40, 40, 40, 120).lerp(Style.accentColorTrans, toggleAnim.value))
-        val tx = sx + (toggleAnim.value * (sw - 8f))
-        ctx.drawRect(tx, sy - 1f, 8f, 8f, Color(160, 160, 160).lerp(Style.accentColor, toggleAnim.value))
+        val sw = 22f
+        val sh = 11f
+        Style.drawSwitch(ctx, x + width - sw - 8f, y + (height / 2f) - (sh / 2f), sw, sh, toggleAnim.value)
     }
 
     override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
