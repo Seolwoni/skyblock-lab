@@ -67,6 +67,11 @@ jobs:
           mkdir -p /tmp/assist
           for r in assist-core assist-path; do
             git clone -q --depth 1 "https://github.com/Seolwoni/$r" "/tmp/src-$r"
+            # The core/ folder inside each Assist mod is a copy of assist-core: refresh it to the latest.
+            if [ "$r" != "assist-core" ] && [ -d "/tmp/src-$r/core" ]; then
+              rm -rf "/tmp/src-$r/core/src" && cp -r /tmp/src-assist-core/src "/tmp/src-$r/core/src"
+              cp /tmp/src-assist-core/build.gradle "/tmp/src-$r/core/build.gradle"
+            fi
             (cd "/tmp/src-$r" && chmod +x gradlew && ./gradlew build -x test --stacktrace > "/tmp/assist/$r-build.log" 2>&1) || echo "$r build failed"
             find "/tmp/src-$r/build/libs" -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-dev.jar" -exec cp {} /tmp/assist/ \;
           done
