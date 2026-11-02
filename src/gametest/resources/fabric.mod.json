@@ -1,0 +1,15 @@
+{
+	"schemaVersion": 1,
+	"id": "riftwalk-gametest",
+	"version": "1.0.0",
+	"name": "Riftwalk Game Tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": [
+			"dev.riftwalk.gametest.SmokeTest"
+		]
+	},
+	"depends": {
+		"noammaddons": "*"
+	}
+}

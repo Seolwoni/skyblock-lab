@@ -22,9 +22,27 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew :26.2:build --stacktrace 2>&1 | tee build.log
+      - name: game test
+        id: gametest
+        continue-on-error: true
+        timeout-minutes: 30
+        run: |
+          sudo apt-get update -q > /dev/null && sudo apt-get install -y -q xvfb libgl1-mesa-dri mesa-utils > /dev/null
+          ./gradlew :26.2:downloadAssets > /dev/null 2>&1 || (sleep 15; ./gradlew :26.2:downloadAssets > /dev/null 2>&1) || true
+          set -o pipefail
+          start=$(date +%s)
+          xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :26.2:runClientGameTest --stacktrace 2>&1 | tee gametest.log
+          echo "gametest seconds: $(( $(date +%s) - start ))" >> gametest.log
       - name: save log
         if: always()
         run: |
+          mkdir -p /tmp/gt/shots
+          echo "${{ steps.gametest.outcome }}" > /tmp/gt/outcome.txt
+          [ -f gametest.log ] && grep -E -A3 "ERROR|Exception|FAIL|Caused by|AssertionError|What went wrong|gametest seconds" gametest.log | head -300 > /tmp/gt/errors.txt || true
+          [ -f gametest.log ] && tail -150 gametest.log > /tmp/gt/tail.txt || true
+          find . -name "riftwalk-test-result.txt" -not -path "./.git/*" -exec cp {} /tmp/gt/ \; 2>/dev/null || true
+          find . -name "*.png" -path "*screenshots*" -not -path "./.git/*" -exec cp {} /tmp/gt/shots/ \; 2>/dev/null || true
+          LOG=$(find . -name "latest.log" -path "*run*" -not -path "./.git/*" | head -1); [ -n "$LOG" ] && grep -E -B2 -A8 "Exception|ERROR" "$LOG" | head -400 > /tmp/gt/latest-errors.txt || true
           git config user.name "ci"
           git config user.email "ci@users.noreply.github.com"
           grep -E -A6 "error:|^e: " build.log | head -400 > /tmp/compile.txt || true
@@ -40,8 +58,9 @@ jobs:
           git checkout --orphan ci-log
           git rm -rf --cached . > /dev/null
           cp /tmp/compile.txt /tmp/tail.txt /tmp/libs.txt .
+          cp -r /tmp/gt gt
           echo "${{ github.sha }} ${{ job.status }}" > status.txt
-          git add compile.txt tail.txt libs.txt status.txt
+          git add compile.txt tail.txt libs.txt status.txt gt
           git commit -m "build log ${{ github.run_number }}"
           git push -f origin ci-log
       - name: upload jars

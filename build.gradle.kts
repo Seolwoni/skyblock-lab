@@ -112,6 +112,23 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
+// Automated in-game tests: ./gradlew :26.2:runClientGameTest starts a real client and runs src/gametest.
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "riftwalk-gametest"
+        enableGameTests = false
+        enableClientGameTests = true
+        eula = true
+    }
+}
+
+sourceSets.named("gametest") {
+    java.setSrcDirs(listOf(rootProject.file("src/gametest/java")))
+    (extensions.getByName("kotlin") as SourceDirectorySet).setSrcDirs(emptyList<File>())
+    resources.setSrcDirs(listOf(rootProject.file("src/gametest/resources")))
+}
+
 afterEvaluate {
     bundled.resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
         val id = artifact.moduleVersion.id

@@ -55,7 +55,8 @@ configure<LoomGradleExtensionAPI> {
 
     afterEvaluate {
         runs.configureEach {
-            jvmArguments.add("-XX:+AllowEnhancedClassRedefinition")
+            // JetBrains-runtime-only flag: the CI game test runs on a normal JDK.
+            if (! name.contains("GameTest", ignoreCase = true)) jvmArguments.add("-XX:+AllowEnhancedClassRedefinition")
         }
     }
 }
