@@ -41,7 +41,7 @@ object AssistBridge {
 
     /**
      * Walks to [goal] with Assist Path (A*, no breaking or placing). Call every tick; returns RUN, DONE or FAIL.
-     * A new goal starts a new plan. Movement runs at Assist's fastest pace with the human-like delays off.
+     * A new goal starts a new plan. Walking uses Assist Core's smooth movement with the player's Assist settings.
      */
     fun walkTo(mc: Minecraft, p: LocalPlayer, goal: BlockPos, range: Int = 1): Int {
         if (! pathLoaded) return FAIL
@@ -53,20 +53,16 @@ object AssistBridge {
                 )
                 walkerGoal = goal
             }
-            val oldPace = com.seolwoni.assistcore.util.Human.pace
-            val oldHuman = com.seolwoni.assistcore.util.Human.humanLike
-            com.seolwoni.assistcore.util.Human.pace = 2
-            com.seolwoni.assistcore.util.Human.humanLike = false
-            val result = try {
-                (walker as com.seolwoni.assistpath.walk.PathWalker).tick(mc, p)
-            } finally {
-                com.seolwoni.assistcore.util.Human.pace = oldPace
-                com.seolwoni.assistcore.util.Human.humanLike = oldHuman
-            }
+            // Assist's own pace and human-like movement are kept as the player set them.
+            val result = (walker as com.seolwoni.assistpath.walk.PathWalker).tick(mc, p)
             if (result != RUN) reset()
             result
         }.getOrElse { reset(); FAIL }
     }
+
+    /** Assist Core's eased head turn. True once within [tolerance] degrees. */
+    fun turn(p: LocalPlayer, yaw: Float, pitch: Float, tolerance: Float): Boolean =
+        runCatching { com.seolwoni.assistcore.util.Body.turnTo(p, yaw, pitch, tolerance) }.getOrDefault(true)
 
     fun failReason(): String? = runCatching { (walker as? com.seolwoni.assistpath.walk.PathWalker)?.failReason() }.getOrNull()
 

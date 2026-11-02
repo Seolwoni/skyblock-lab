@@ -75,6 +75,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val useAssistPath by ToggleSetting("Use Assist Path", true).section("Assist").withDescription(
         "With Assist Core + Assist Path installed: when the straight walk is blocked, or the target is far, finds a way around with Assist Path (no breaking or placing)"
     )
+    private val smoothTurning by ToggleSetting("Smooth Turning", true).withDescription(
+        "With Assist Core installed: turns with Assist's ease-in/ease-out head movement instead of snapping. Actions wait until the aim has arrived"
+    )
     private val assistLog by ToggleSetting("Assist Journal", true).withDescription("Writes runs (room, why it stopped) to the Assist usage log")
     private val showPlan by ToggleSetting("Show Plan", true).section("Debug").withDescription("Draws the next point, etherwarp and action in the world, even before you start - check the route is read right")
     private val statusHud by ToggleSetting("Status HUD", true).withDescription("Room, step, phase and next action on screen (move it in the HUD editor)")
@@ -269,8 +272,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                     wait = actionDelay
                 }
                 else {
-                    PlayerUtils.rotateTo(Vec3.atCenterOf(t))
-                    mc.options.keyAttack.isDown = true
+                    mc.options.keyAttack.isDown = turnTo(Vec3.atCenterOf(t))
                     if (++timer > 60) {
                         mc.options.keyAttack.isDown = false
                         s.mines.remove(t)
@@ -308,23 +310,21 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             return
         }
         if (doTnt.value) s.tnts.firstOrNull { eye.distanceTo(Vec3.atCenterOf(it)) <= REACH }?.let { t ->
-            s.tnts.remove(t)
-            val slot = PlayerUtils.findHotbarSlot { it.skyblockId.contains("SUPERBOOM") } ?: return
+            val slot = PlayerUtils.findHotbarSlot { it.skyblockId.contains("SUPERBOOM") } ?: return run { s.tnts.remove(t) }
             PlayerUtils.swapToSlot(slot)
-            aimThen(Vec3.atCenterOf(t), use = true)
+            if (aimThen(Vec3.atCenterOf(t), use = true)) s.tnts.remove(t)
             return
         }
         if (doLevers.value) s.levers.firstOrNull { eye.distanceTo(Vec3.atCenterOf(it)) <= REACH }?.let { l ->
-            s.levers.remove(l)
-            aimThen(Vec3.atCenterOf(l), use = true)
+            if (aimThen(Vec3.atCenterOf(l), use = true)) s.levers.remove(l)
             return
         }
         if (doPearls.value) s.pearls.firstOrNull { horizontal(pos, it.first) < 0.8 && abs(pos.y - it.first.y) < 1.5 }?.let { pearl ->
-            s.pearls.remove(pearl)
-            val slot = PlayerUtils.findHotbarSlot { it.skyblockId == "ENDER_PEARL" || it.hoverName.string.contains("Ender Pearl") } ?: return
+            val slot = PlayerUtils.findHotbarSlot { it.skyblockId == "ENDER_PEARL" || it.hoverName.string.contains("Ender Pearl") } ?: return run { s.pearls.remove(pearl) }
             PlayerUtils.swapToSlot(slot)
             releaseMovement()
-            PlayerUtils.rotate(pearl.second.yaw, pearl.second.pitch)
+            if (! turn(pearl.second.yaw, pearl.second.pitch, 1f)) return
+            s.pearls.remove(pearl)
             if (zeroTick) {
                 useNow()
                 wait = 10
@@ -351,7 +351,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                 val alreadySneaking = mc.player!!.isShiftKeyDown
                 PlayerUtils.toggleSneak(true)
                 val aim = etherAim(ether, mc.player!!.inventory.getItem(slot))
-                PlayerUtils.rotate(aim.yaw, aim.pitch)
+                if (! turn(aim.yaw, aim.pitch, 1f)) return
                 etherTarget = ether
                 status = "etherwarp to ${ether.x}, ${ether.y}, ${ether.z}"
                 if (zeroTick && alreadySneaking) {
@@ -400,7 +400,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             }
         }
         val yaw = Math.toDegrees(atan2(goal.z - pos.z, goal.x - pos.x)).toFloat() - 90f
-        PlayerUtils.rotate(yaw, if (speed.value == 3) p.xRot else 10f)
+        turn(yaw, if (speed.value == 3) p.xRot else 10f, 6f)
         mc.options.keyUp.isDown = true
         mc.options.keySprint.isDown = sprint.value
         val needJump = autoJump.value && p.onGround() && ((goal.y - pos.y > 0.6 && horizontal(pos, goal) < 2.5) || p.horizontalCollision)
@@ -432,7 +432,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                 releaseMovement()
                 val bat = mc.player!!.level().getEntitiesOfClass(Bat::class.java, mc.player!!.boundingBox.inflate(8.0)).minByOrNull { it.distanceTo(mc.player!!) }
                 if (bat != null && timer % 3 == 0) {
-                    PlayerUtils.rotateTo(bat.boundingBox.center)
+                    if (! turnTo(bat.boundingBox.center)) return
                     if (zeroTick) {
                         sendRotation()
                         mc.gameMode?.attack(mc.player!!, bat)
@@ -470,8 +470,8 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
 
         releaseMovement()
         if (weaponSlot.value in 1 .. 9) PlayerUtils.swapToSlot(weaponSlot.value - 1)
-        PlayerUtils.rotateTo(target.boundingBox.center)
         status = "fighting ${target.name.string}"
+        if (! turnTo(target.boundingBox.center, 4f)) return true
         if (hitCooldown > 0) return true
         hitCooldown = hitDelay.value
         if (zeroTick) {
@@ -501,13 +501,17 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         }
         if (hitCooldown > 0) return true
         hitCooldown = castDelay.value
-        if (inBlast) {
-            PlayerUtils.rotate(p.yRot, 90f)
+        val aimed = if (inBlast) {
             status = "casting on ${target.name.string}"
+            turn(p.yRot, 90f, 3f)
         }
         else {
-            PlayerUtils.rotateTo(target.position().add(0.0, 0.2, 0.0))
             status = "teleporting to ${target.name.string}"
+            turnTo(target.position().add(0.0, 0.2, 0.0), 2f)
+        }
+        if (! aimed) {
+            hitCooldown = 0 // cast as soon as the aim arrives
+            return true
         }
         if (zeroTick) useNow() else pendingCast = true
         return true
@@ -556,17 +560,32 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     }
 
     /** Rotate now, click on a later tick (the server needs the new rotation first). */
-    private fun aimThen(target: Vec3, use: Boolean) {
+    /** Aims at [target], then uses / hits it. Returns false while still turning (call again next tick). */
+    private fun aimThen(target: Vec3, use: Boolean): Boolean {
         releaseMovement()
-        PlayerUtils.rotateTo(target)
+        if (! turnTo(target)) return false
         if (zeroTick) {
             sendRotation()
             if (use) PlayerUtils.rightClick() else PlayerUtils.leftClick()
-            return
+            return true
         }
         actionUse = use
         phase = Phase.ACTION_AIM
         wait = actionDelay
+        return true
+    }
+
+    /** Snaps, or with Smooth Turning turns like Assist Core does. True once looking within [tolerance] degrees. */
+    private fun turn(yaw: Float, pitch: Float, tolerance: Float = 2f): Boolean {
+        val p = mc.player ?: return false
+        if (smoothTurning.value && AssistBridge.coreLoaded) return AssistBridge.turn(p, yaw, pitch, tolerance)
+        PlayerUtils.rotate(yaw, pitch)
+        return true
+    }
+
+    private fun turnTo(target: Vec3, tolerance: Float = 2f): Boolean {
+        val rot = MathUtils.calcYawPitch(target)
+        return turn(rot.yaw, rot.pitch, tolerance)
     }
 
     /** 0-Tick: tell the server the new look direction right away, so a click in this same tick uses it. */
