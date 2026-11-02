@@ -5,7 +5,12 @@ import com.github.noamm9.config.types.DropdownSetting
 import com.github.noamm9.config.types.KeybindSetting
 import com.github.noamm9.config.types.SliderSetting
 import com.github.noamm9.config.types.ToggleSetting
+import com.github.noamm9.event.impl.RenderWorldEvent
 import com.github.noamm9.event.impl.TickEvent
+import com.github.noamm9.utils.render.Render2D.drawString
+import com.github.noamm9.utils.render.world.Render3D.renderBlock
+import com.github.noamm9.utils.render.world.Render3D.renderLine
+import java.awt.Color
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.utils.ChatUtils.modMessage
@@ -48,6 +53,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val doLevers by ToggleSetting("Flip Levers", true)
     private val doSecret by ToggleSetting("Collect Secret", true).withDescription("Opens chests/levers/skulls and hits bats at the end of each step")
     private val chatInfo by ToggleSetting("Chat Messages", true)
+    private val showPlan by ToggleSetting("Show Plan", true).section("Debug").withDescription("Draws the next point, etherwarp and action in the world, even before you start - check the route is read right")
+    private val statusHud by ToggleSetting("Status HUD", true).withDescription("Room, step, phase and next action on screen (move it in the HUD editor)")
+    private val checkEther by ToggleSetting("Check Etherwarp Landing", true).withDescription("Before warping, tries a few aim points on the block and picks one whose predicted landing is the route's block")
 
     private const val REACH = 4.4
 
@@ -77,6 +85,8 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private var etherTarget: BlockPos? = null
     private var stuckTicks = 0
     private var secretTimer = 0
+    private var status = "idle"
+    private var lastEtherCheck: Boolean? = null
     private var lastPos: Vec3? = null
 
     override fun init() {
@@ -87,6 +97,50 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             if (running) runCatching(::tick).onFailure { stop("error: ${it.message}") }
         }
         register<WorldChangeEvent> { if (running) stop("world changed") }
+
+        register<RenderWorldEvent> {
+            if (! showPlan.value) return@register
+            val s = currentStepForPreview() ?: return@register
+            val p = mc.player ?: return@register
+            val next = s.path.getOrNull(pathIndex)
+            if (next != null) {
+                event.ctx.renderBlock(next.below(), Color(0, 220, 255), fill = false, phase = true)
+                event.ctx.renderLine(p.position().add(0.0, 0.1, 0.0), Vec3(next.x + 0.5, next.y + 0.1, next.z + 0.5), Color(0, 220, 255), 2, phase = true)
+            }
+            s.ethers.forEach { event.ctx.renderBlock(it, Color(170, 0, 255, 90), fill = true, outline = true, phase = true) }
+            etherTarget?.takeIf { running && phase in setOf(Phase.ETHER_AIM, Phase.ETHER_WAIT) }?.let {
+                event.ctx.renderBlock(it, Color(255, 0, 255), fill = false, phase = true, lineWidth = 4)
+            }
+            (s.mines + s.tnts + s.levers).forEach { event.ctx.renderBlock(it, Color(255, 200, 0), fill = false, phase = true) }
+            s.secretPos?.let { event.ctx.renderBlock(it, Color(0, 255, 80), fill = false, phase = true, lineWidth = 3) }
+        }
+
+        hudElement("Auto Routes Status", { statusHud.value }) { ctx, example ->
+            val s = if (example) null else currentStepForPreview()
+            val lines = if (example) listOf("§bAuto Routes §aRUNNING", "§7Room: §fBalcony-4  §7step §f1", "§7Path §f2/3  §7phase §fETHER_WAIT", "§7etherwarp landing: §aok")
+            else listOf(
+                "§bAuto Routes " + if (running) "§aRUNNING" else "§7idle",
+                "§7Room: §f${Main.currentRoom?.name ?: "-"}  §7step §f${(Main.currentRoom?.currentSecretIndex ?: -1) + 1}",
+                "§7Path §f${minOf(pathIndex, s?.path?.size ?: 0)}/${s?.path?.size ?: 0}  §7phase §f$phase",
+                "§7" + status + (lastEtherCheck?.let { if (it) "  §aether ok" else "  §cether miss" } ?: ""),
+            )
+            lines.forEachIndexed { i, l -> ctx.drawString(l, 0, i * 10) }
+            return@hudElement lines.maxOf { mc.font.width(it.replace(Regex("§."), "")) } to lines.size * 10
+        }
+    }
+
+    /** The step being run, or (when idle) the step that would run, so the plan can be checked before starting. */
+    private fun currentStepForPreview(): Step? {
+        if (running) return step
+        if (! RouteBridge.routeActive()) return null
+        val room = Main.currentRoom ?: return null
+        val raw = room.currentSecretWaypoints ?: return null
+        if (raw !== stepRef) {
+            stepRef = raw
+            step = runCatching { parse(raw, room.name) }.getOrNull()
+            pathIndex = 0
+        }
+        return step
     }
 
     override fun onDisable() {
@@ -98,6 +152,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         if (! RouteBridge.routeActive()) return info("&cNo route to follow here.")
         running = true
         stepRef = null
+        phase = Phase.MOVE
         info("&aFollowing route. Press the key again to stop.")
     }
 
@@ -257,8 +312,10 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                 releaseMovement()
                 val alreadySneaking = mc.player!!.isShiftKeyDown
                 PlayerUtils.toggleSneak(true)
-                PlayerUtils.rotateTo(Vec3(ether.x + 0.5, ether.y + 0.98, ether.z + 0.5))
+                val aim = etherAim(ether, mc.player!!.inventory.getItem(slot))
+                PlayerUtils.rotate(aim.yaw, aim.pitch)
                 etherTarget = ether
+                status = "etherwarp to ${ether.x}, ${ether.y}, ${ether.z}"
                 if (zeroTick && alreadySneaking) {
                     useNow()
                     phase = Phase.ETHER_WAIT
@@ -284,7 +341,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private fun walkTowards(pos: Vec3, goal: Vec3) {
         val p = mc.player!!
         val yaw = Math.toDegrees(atan2(goal.z - pos.z, goal.x - pos.x)).toFloat() - 90f
-        PlayerUtils.rotate(yaw, if (speed.value == 2) p.xRot else 10f)
+        PlayerUtils.rotate(yaw, if (speed.value == 3) p.xRot else 10f)
         mc.options.keyUp.isDown = true
         mc.options.keySprint.isDown = sprint.value
         val needJump = autoJump.value && p.onGround() && ((goal.y - pos.y > 0.6 && horizontal(pos, goal) < 2.5) || p.horizontalCollision)
@@ -293,7 +350,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val moved = lastPos?.distanceTo(pos) ?: 1.0
         lastPos = pos
         stuckTicks = if (moved < 0.02) stuckTicks + 1 else 0
-        if (stuckTicks > 40) stop("stuck - can't reach the next point")
+        if (stuckTicks in 12 .. 30 && p.onGround()) mc.options.keyJump.isDown = true
+        if (stuckTicks > 40) stop("stuck - can't reach ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}")
+        status = "walk to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}"
     }
 
     private fun collectSecret(s: Step, pos: Vec3) {
@@ -356,6 +415,30 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         sendRotation()
         mc.gameMode?.useItem(p, InteractionHand.MAIN_HAND)
         p.swing(InteractionHand.MAIN_HAND)
+    }
+
+    /**
+     * Picks where to look so the etherwarp lands on [target]: tries the top face centre and a few points around it,
+     * using Noamm's etherwarp prediction (same raycast rules as the server), sneaking eye height.
+     */
+    private fun etherAim(target: BlockPos, stack: ItemStack): MathUtils.Rotation {
+        val centre = Vec3(target.x + 0.5, target.y + 0.98, target.z + 0.5)
+        val fallback = MathUtils.calcYawPitch(centre)
+        if (! checkEther.value) return fallback.also { lastEtherCheck = null }
+        val p = mc.player ?: return fallback
+        val dist = EtherwarpHelper.getEtherwarpDistance(stack) ?: 57.0
+        val offsets = listOf(0.0, 0.25, - 0.25, 0.4, - 0.4)
+        for (dx in offsets) for (dz in offsets) {
+            val rot = MathUtils.calcYawPitch(centre.add(dx, 0.0, dz))
+            val look = Vec3.directionFromRotation(rot.pitch, rot.yaw)
+            val landing = EtherwarpHelper.getEtherPos(p.position(), look, dist)
+            if (landing.succeeded && landing.pos == target) {
+                lastEtherCheck = true
+                return rot
+            }
+        }
+        lastEtherCheck = false
+        return fallback
     }
 
     private fun releaseMovement() {
