@@ -99,6 +99,21 @@ public class SmokeTest implements FabricClientGameTest {
 			});
 			context.waitTicks(20);
 
+			// 5. All features off / back on restores exactly the same set
+			String master = context.computeOnClient(mc -> {
+				java.util.Set<String> before = new java.util.HashSet<>();
+				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled) before.add(f.getJsonName());
+				com.github.noamm9.features.MasterSwitch.INSTANCE.toggle();
+				int stillOn = 0;
+				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled && !(f instanceof ClickGui)) stillOn++;
+				com.github.noamm9.features.MasterSwitch.INSTANCE.toggle();
+				java.util.Set<String> after = new java.util.HashSet<>();
+				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled) after.add(f.getJsonName());
+				return "on before " + before.size() + ", on while off " + stillOn + ", restored " + before.equals(after);
+			});
+			log.add("all on/off: " + master);
+			if (!master.contains("on while off 0") || !master.endsWith("restored true")) failures.add("all on/off did not work: " + master);
+
 			boolean alive = context.computeOnClient(mc -> mc.player != null && mc.level != null);
 			if (!alive) failures.add("player or level gone after toggling features");
 		} catch (Throwable t) {
