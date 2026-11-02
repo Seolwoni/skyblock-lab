@@ -2,7 +2,6 @@ package com.github.noamm9.utils.render
 
 import com.github.noamm9.NoammAddons.MOD_ID
 import com.github.noamm9.NoammAddons.mc
-import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.FontDescription
 import net.minecraft.network.chat.MutableComponent
@@ -16,6 +15,12 @@ import net.minecraft.resources.Identifier
  */
 object UiFont {
     @JvmField var active = false
+
+    /** Minecraft's 16 chat colours by code. */
+    private val COLORS = mapOf(
+        '0' to 0x000000, '1' to 0x0000AA, '2' to 0x00AA00, '3' to 0x00AAAA, '4' to 0xAA0000, '5' to 0xAA00AA, '6' to 0xFFAA00, '7' to 0xAAAAAA,
+        '8' to 0x555555, '9' to 0x5555FF, 'a' to 0x55FF55, 'b' to 0x55FFFF, 'c' to 0xFF5555, 'd' to 0xFF55FF, 'e' to 0xFFFF55, 'f' to 0xFFFFFF
+    )
 
     private val REGULAR = FontDescription.Resource(Identifier.fromNamespaceAndPath(MOD_ID, "riftwalk"))
     private val BOLD = FontDescription.Resource(Identifier.fromNamespaceAndPath(MOD_ID, "riftwalk_bold"))
@@ -50,13 +55,12 @@ object UiFont {
         while (i < text.length) {
             val ch = text[i]
             if (ch == '§' && i + 1 < text.length) {
-                val fmt = ChatFormatting.getByCode(text[i + 1].lowercaseChar())
+                val code = text[i + 1].lowercaseChar()
                 flush()
-                when {
-                    fmt == null -> {}
-                    fmt == ChatFormatting.RESET -> { color = null; bold = false }
-                    fmt == ChatFormatting.BOLD -> bold = true
-                    fmt.isColor -> { color = fmt.color; bold = false }
+                when (code) {
+                    'r' -> { color = null; bold = false }
+                    'l' -> bold = true
+                    else -> COLORS[code]?.let { color = it; bold = false }
                 }
                 i += 2
                 continue
