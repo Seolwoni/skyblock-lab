@@ -57,6 +57,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val doTnt by ToggleSetting("Place Superbooms", true).withDescription("Uses Superboom TNT on the route's crypt/wall spots")
     private val doPearls by ToggleSetting("Throw Pearls", true).withDescription("Throws ender pearls at the recorded angle")
     private val doLevers by ToggleSetting("Flip Levers", true)
+    private val climbAotv by ToggleSetting("Climb With AOTV", true).withDescription(
+        "When the next point is above you (a shaft, a ledge, after falling in a hole): etherwarps onto it if the landing checks out, otherwise teleports up with the AOTV"
+    )
     private val doSecret by ToggleSetting("Collect Secret", true).withDescription("Opens chests/levers/skulls and hits bats at the end of each step")
     private val chatInfo by ToggleSetting("Chat Messages", true)
     private val clearMode by DropdownSetting("Clear", 1, listOf("Off", "Star mobs + minibosses", "Whole room")).section("Combat").withDescription(
@@ -88,11 +91,11 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
 
     private const val REACH = 4.4
 
-    private enum class Phase { MOVE, ETHER_AIM, ETHER_WAIT, ACTION_AIM, MINING, PEARL_WAIT, SECRET, DONE }
+    private enum class Phase { MOVE, ETHER_AIM, ETHER_WAIT, ACTION_AIM, MINING, PEARL_WAIT, AOTV_WAIT, SECRET, DONE }
 
     private class Step(
         val path: List<BlockPos>,
-        val ethers: Set<BlockPos>,
+        val ethers: MutableSet<BlockPos>,
         val mines: MutableList<BlockPos>,
         val tnts: MutableList<BlockPos>,
         val levers: MutableList<BlockPos>,
@@ -121,6 +124,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private var settleKey: Pair<Int, Int>? = null
     private var settleLeft = 0
     private var fightTarget: Entity? = null
+    private val AOTV_IDS = setOf("ASPECT_OF_THE_VOID", "ASPECT_OF_THE_END")
+    private var climbTries = 0
+    private var aotvFromY = 0.0
     private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
     private val MINIBOSSES = setOf("Shadow Assassin", "Lost Adventurer", "Frozen Adventurer", "Angry Archaeologist", "King Midas", "Diamond Guy")
     private var lastEtherCheck: Boolean? = null
@@ -234,6 +240,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             wait = 0
             stuckTicks = 0
             secretTimer = 0
+            climbTries = 0
         }
         val s = step ?: return
         if (wait > 0) {
@@ -283,6 +290,15 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                         s.mines.remove(t)
                         phase = Phase.MOVE
                     }
+                }
+            }
+
+            Phase.AOTV_WAIT -> {
+                val p0 = aotvFromY
+                timer++
+                if (p.y > p0 + 1.0 || timer > 12) {
+                    phase = Phase.MOVE
+                    wait = actionDelay
                 }
             }
 
@@ -376,7 +392,11 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         if (horizontal(pos, goal) < 0.55 && abs(pos.y - goal.y) < 1.6) {
             pathIndex++
             stuckTicks = 0
+            climbTries = 0
             return
+        }
+        if (climbAotv.value && ether == null && goal.y - pos.y > 1.3 && (horizontal(pos, goal) < 4.0 || stuckTicks > 10) && mc.player!!.onGround()) {
+            if (climb(s, pos, goal)) return
         }
         walkTowards(pos, goal)
     }
@@ -627,6 +647,45 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     }
 
     /**
+     * Gets up to [goal] when walking can't: etherwarp onto the block under it if the landing is predicted,
+     * otherwise an AOTV teleport (no sneak) towards it. Returns true if it started something this tick.
+     */
+    private fun climb(s: Step, pos: Vec3, goal: Vec3): Boolean {
+        val p = mc.player ?: return false
+        if (++climbTries > 4 * 20) { // about 4 tries (each try is turning + waiting)
+            stop("can't get up to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}")
+            return true
+        }
+        val under = BlockPos.containing(goal.x, goal.y - 0.5, goal.z)
+        val etherSlot = PlayerUtils.findHotbarSlot { EtherwarpHelper.getEtherwarpDistance(it) != null }
+        if (etherSlot != null && under !in s.ethers && ! p.level().getBlockState(under).isAir) {
+            etherAim(under, p.inventory.getItem(etherSlot))
+            if (lastEtherCheck == true) {
+                s.ethers += under // the normal etherwarp step takes it from here
+                status = "etherwarp up to ${under.x}, ${under.y}, ${under.z}"
+                return true
+            }
+        }
+        val aotvSlot = PlayerUtils.findHotbarSlot { it.skyblockId in AOTV_IDS } ?: return false
+        PlayerUtils.swapToSlot(aotvSlot)
+        releaseMovement()
+        PlayerUtils.toggleSneak(false)
+        if (mc.player!!.isShiftKeyDown) return true // let the un-sneak reach the server first
+        val dx = goal.x - pos.x
+        val dz = goal.z - pos.z
+        val yaw = Math.toDegrees(atan2(dz, dx)).toFloat() - 90f
+        val flat = sqrt(dx * dx + dz * dz)
+        val pitch = - Math.toDegrees(atan2(goal.y + 0.2 - (pos.y + p.eyeHeight), flat)).toFloat()
+        status = "AOTV up to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}"
+        if (! turn(yaw, pitch.coerceIn(- 90f, 90f), 2f)) return true
+        aotvFromY = pos.y
+        if (zeroTick) useNow() else PlayerUtils.rightClick()
+        phase = Phase.AOTV_WAIT
+        timer = 0
+        return true
+    }
+
+    /**
      * Picks where to look so the etherwarp lands on [target]: tries the top face centre and a few points around it,
      * using Noamm's etherwarp prediction (same raycast rules as the server), sneaking eye height.
      */
@@ -709,7 +768,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val secret = o.getAsJsonObject("secret")
         return Step(
             path = blocks("locations"),
-            ethers = blocks("etherwarps").toSet(),
+            ethers = blocks("etherwarps").toMutableSet(),
             mines = blocks("mines").toMutableList(),
             tnts = blocks("tnts").toMutableList(),
             levers = blocks("interacts").toMutableList(),
