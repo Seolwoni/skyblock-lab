@@ -19,6 +19,9 @@ object ClickGui: Feature("A feature used to change the ClickGui configuration.",
     val accentColor by ColorSetting("Accent Color", Color(155, 108, 240), false).withDescription("The accent color used by the whole ClickGui.")
     val guiStyle by DropdownSetting("GUI Style", 0, listOf("SkyHanni", "Classic")).withDescription("SkyHanni: one window with search, a category list and option cards with descriptions. Classic: the original NoammAddons panels.")
     val customFont by ToggleSetting("Smooth Font", true).withDescription("Riftwalk menu uses the Pretendard font instead of Minecraft's pixel font")
+    private val masterKey by KeybindSetting("All Features On/Off Key").section("All Features")
+        .withDescription("Turns every feature off, and the same key turns the ones that were on back on")
+    val masterSaved by com.github.noamm9.config.types.TextInputSetting("All Off Saved", "").hidden()
     val serverMode by DropdownSetting("Server Mode", 0, listOf("Hypixel only", "Treat as Hypixel", "Always in dungeon")).section("Private Server").withDescription(
         "Hypixel only: dungeon features turn on only on Hypixel. Treat as Hypixel: any server counts, dungeons are detected from the scoreboard / tab list like on Hypixel. Always in dungeon: dungeon features stay on everywhere (for test worlds without a SkyBlock scoreboard)"
     )
@@ -37,6 +40,11 @@ object ClickGui: Feature("A feature used to change the ClickGui configuration.",
     override fun init() {
         register<KeyboardEvent.KeyPressed> {
             if (mc.gui.screen() != null || event.action != InputConstants.PRESS) return@register
+            if (masterKey.matches(event.keyEvent.key, mouse = false)) {
+                com.github.noamm9.features.MasterSwitch.toggle()
+                event.isCanceled = true
+                return@register
+            }
             if (! openKeybind.matches(event.keyEvent.key, mouse = false)) return@register
 
             GuiUtils.setScreen(createScreen())

@@ -50,8 +50,9 @@ object Secrets: Feature(), IFeatureWindow {
     @JvmStatic val skull by ToggleSetting("Skulls").withDescription("Full block Skull hitbox.")
     @JvmStatic val mushroom by ToggleSetting("Mushroom").withDescription("Full block Mushroom hitbox.")
 
+    private val closeChest by ToggleSetting("Close Chest", true).section("Secret Chests")
+        .withDescription("Secret chests in dungeon rooms close the moment they open (the secret still counts). Boss room and other menus are left alone.")
     private val secretsTb by ToggleSetting("Secrets Triggerbot").section("Triggerbot")
-    private val closeChest by ToggleSetting("Close Chest").withDescription("Automatically closes the secret chest for you.")
     private val clickDelay by SliderSetting("Interact Delay", 200, 0, 700, 1, "ms").showIf { secretsTb.value }
     private val shit by MultiCheckboxSetting(
         "TB Options", mutableMapOf(

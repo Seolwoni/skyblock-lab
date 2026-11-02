@@ -157,8 +157,9 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
         titleButtons().forEach { (label, rect) ->
             val hovered = inside(mx, my, rect)
-            Style.roundRect(ctx, rect[0], rect[1], rect[2], rect[3], 3f, if (hovered) cardHover else Color(42, 38, 52))
-            ctx.drawCenteredString(label, rect[0] + rect[2] / 2f, rect[1] + 5f, if (hovered) Style.accentColor else textSoft)
+            val warn = label == "All On" // everything is off right now
+            Style.roundRect(ctx, rect[0], rect[1], rect[2], rect[3], 3f, if (warn) Color(120, 40, 50) else if (hovered) cardHover else Color(42, 38, 52))
+            ctx.drawCenteredString(label, rect[0] + rect[2] / 2f, rect[1] + 5f, if (warn) Color.WHITE else if (hovered) Style.accentColor else textSoft)
         }
     }
 
@@ -169,6 +170,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
             "✕" to floatArrayOf(right - 16f, y, 16f, 16f),
             "HUD" to floatArrayOf(right - 16f - 4f - 34f, y, 34f, 16f),
             "Classic" to floatArrayOf(right - 16f - 4f - 34f - 4f - 46f, y, 46f, 16f),
+            (if (com.github.noamm9.features.MasterSwitch.allOff) "All On" else "All Off") to floatArrayOf(right - 16f - 4f - 34f - 4f - 46f - 4f - 48f, y, 48f, 16f),
         )
     }
 
@@ -399,6 +401,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                 "✕" -> onClose()
                 "HUD" -> { saveAndClear(); GuiUtils.setScreen(HudEditorScreen()) }
                 "Classic" -> { saveAndClear(); GuiUtils.setScreen(ClickGuiScreen()) }
+                "All Off", "All On" -> com.github.noamm9.features.MasterSwitch.toggle()
             }
             return true
         }
