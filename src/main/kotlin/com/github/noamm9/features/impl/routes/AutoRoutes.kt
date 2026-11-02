@@ -60,6 +60,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val climbAotv by ToggleSetting("Climb With AOTV", true).withDescription(
         "When the next point is above you (a shaft, a ledge, after falling in a hole): etherwarps onto it if the landing checks out, otherwise teleports up with the AOTV"
     )
+    private val fastTravel by ToggleSetting("Fast Travel", true).withDescription(
+        "Instead of walking to a point more than 6 blocks away: etherwarps onto it when the landing checks out, otherwise teleports with the AOTV when it's far enough (9.5+ blocks)"
+    )
     private val doSecret by ToggleSetting("Collect Secret", true).withDescription("Opens chests/levers/skulls and hits bats at the end of each step")
     private val chatInfo by ToggleSetting("Chat Messages", true)
     private val clearMode by DropdownSetting("Clear", 1, listOf("Off", "Star mobs + minibosses", "Whole room")).section("Combat").withDescription(
@@ -73,6 +76,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val killMinis by ToggleSetting("Kill Minibosses", true).hideIf { clearMode.value == 0 }.withDescription("Shadow Assassin, Lost / Frozen Adventurer, Angry Archaeologist, King Midas, Diamond Guy")
     private val attackRange by SliderSetting("Attack Range", 3.0, 2.0, 3.0, 0.1, " blocks").withDescription("Normal hand reach at most")
     private val detourRange by SliderSetting("Detour Range", 6.0, 0.0, 12.0, 0.5, " blocks").withDescription("How far it leaves the route to chase a target (0 = only hit what is already in reach)")
+    private val fightBack by ToggleSetting("Fight Back", true).withDescription("When something hits you, kills the closest mob within 3 blocks first (any mob, not just starred)")
     private val hitDelay by SliderSetting("Hit Delay", 2, 1, 10, 1, " ticks").withDescription("Ticks between hits")
     private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) to hold while fighting. 0 = keep the current item")
     private val useAssistPath by ToggleSetting("Use Assist Path", true).section("Assist").withDescription(
@@ -120,6 +124,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private var status = "idle"
     private var hitCooldown = 0
     private var pendingCast = false
+    private var retaliating = false
     private var assistFailedGoal: BlockPos? = null
     private var settleKey: Pair<Int, Int>? = null
     private var settleLeft = 0
@@ -127,6 +132,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val AOTV_IDS = setOf("ASPECT_OF_THE_VOID", "ASPECT_OF_THE_END")
     private var climbTries = 0
     private var aotvFromY = 0.0
+    private var aotvFrom: Vec3 = Vec3.ZERO
     private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
     private val MINIBOSSES = setOf("Shadow Assassin", "Lost Adventurer", "Frozen Adventurer", "Angry Archaeologist", "King Midas", "Diamond Guy")
     private var lastEtherCheck: Boolean? = null
@@ -296,7 +302,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             Phase.AOTV_WAIT -> {
                 val p0 = aotvFromY
                 timer++
-                if (p.y > p0 + 1.0 || timer > 12) {
+                if (abs(p.y - p0) > 1.0 || p.position().distanceTo(aotvFrom) > 3.0 || timer > 12) {
                     phase = Phase.MOVE
                     wait = actionDelay
                 }
@@ -395,8 +401,15 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             climbTries = 0
             return
         }
-        if (climbAotv.value && ether == null && goal.y - pos.y > 1.3 && (horizontal(pos, goal) < 4.0 || stuckTicks > 10) && mc.player!!.onGround()) {
-            if (climb(s, pos, goal)) return
+        val flat = horizontal(pos, goal)
+        if (ether == null && mc.player!!.onGround()) {
+            if (climbAotv.value && goal.y - pos.y > 1.3 && (flat < 4.0 || stuckTicks > 10)) {
+                if (++climbTries > 80) return stop("can't get up to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}")
+                if (leap(s, pos, goal, allowAotv = true)) return
+            }
+            else if (fastTravel.value && flat > 6.0 && abs(goal.y - pos.y) < 8.0) {
+                if (leap(s, pos, goal, allowAotv = flat >= 9.5)) return
+            }
         }
         walkTowards(pos, goal)
     }
@@ -477,9 +490,11 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
 
     /** Kills the nearest star mob / miniboss in detour range. Returns true while busy fighting. */
     private fun fight(): Boolean {
-        if (clearMode.value == 0) return false
         val p = mc.player ?: return false
-        val target = if (clearMode.value == 2) findRoomTarget(p) else findTarget(p)
+        val attacker = if (fightBack.value && p.hurtTime > 0 || (fightBack.value && fightTarget?.let { it.isAlive && it.distanceTo(p) < 4f && retaliating } == true)) findAttacker(p) else null
+        retaliating = attacker != null
+        if (clearMode.value == 0 && attacker == null) return false
+        val target = attacker ?: if (clearMode.value == 2) findRoomTarget(p) else findTarget(p)
         fightTarget = target
         if (target == null) return false
 
@@ -557,6 +572,12 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val r2 = blastRadius.value * blastRadius.value
         return mobs.maxWithOrNull(compareBy<LivingEntity> { m -> mobs.count { it.distanceToSqr(m) <= r2 } }.thenBy { - p.distanceToSqr(it) })
     }
+
+    /** The closest hostile-looking mob within 3 blocks (something that can be hitting us). */
+    private fun findAttacker(p: Player): Entity? = p.level().getEntitiesOfClass(LivingEntity::class.java, p.boundingBox.inflate(3.5)) { e ->
+        e.isAlive && e.health > 0f && e !is ArmorStand && e !is Bat && e != p && (e !is Player || e.gameProfile.name in MINIBOSSES) &&
+            e.distanceTo(p) <= 3.5f
+    }.minByOrNull { it.distanceToSqr(p) }
 
     private fun AABB.clipNearest(from: Vec3) = Vec3(from.x.coerceIn(minX, maxX), from.y.coerceIn(minY, maxY), from.z.coerceIn(minZ, maxZ))
 
@@ -650,22 +671,19 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
      * Gets up to [goal] when walking can't: etherwarp onto the block under it if the landing is predicted,
      * otherwise an AOTV teleport (no sneak) towards it. Returns true if it started something this tick.
      */
-    private fun climb(s: Step, pos: Vec3, goal: Vec3): Boolean {
+    private fun leap(s: Step, pos: Vec3, goal: Vec3, allowAotv: Boolean): Boolean {
         val p = mc.player ?: return false
-        if (++climbTries > 4 * 20) { // about 4 tries (each try is turning + waiting)
-            stop("can't get up to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}")
-            return true
-        }
         val under = BlockPos.containing(goal.x, goal.y - 0.5, goal.z)
         val etherSlot = PlayerUtils.findHotbarSlot { EtherwarpHelper.getEtherwarpDistance(it) != null }
         if (etherSlot != null && under !in s.ethers && ! p.level().getBlockState(under).isAir) {
             etherAim(under, p.inventory.getItem(etherSlot))
             if (lastEtherCheck == true) {
                 s.ethers += under // the normal etherwarp step takes it from here
-                status = "etherwarp up to ${under.x}, ${under.y}, ${under.z}"
+                status = "etherwarp to ${under.x}, ${under.y}, ${under.z}"
                 return true
             }
         }
+        if (! allowAotv) return false
         val aotvSlot = PlayerUtils.findHotbarSlot { it.skyblockId in AOTV_IDS } ?: return false
         PlayerUtils.swapToSlot(aotvSlot)
         releaseMovement()
@@ -676,9 +694,10 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val yaw = Math.toDegrees(atan2(dz, dx)).toFloat() - 90f
         val flat = sqrt(dx * dx + dz * dz)
         val pitch = - Math.toDegrees(atan2(goal.y + 0.2 - (pos.y + p.eyeHeight), flat)).toFloat()
-        status = "AOTV up to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}"
+        status = "AOTV to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}"
         if (! turn(yaw, pitch.coerceIn(- 90f, 90f), 2f)) return true
         aotvFromY = pos.y
+        aotvFrom = pos
         if (zeroTick) useNow() else PlayerUtils.rightClick()
         phase = Phase.AOTV_WAIT
         timer = 0
