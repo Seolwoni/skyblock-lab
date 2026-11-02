@@ -9,8 +9,8 @@ import com.seolwoni.skyblocklab.Config;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 
@@ -26,14 +26,14 @@ public final class Esp {
 
 	/** The outline color for this entity, or null if it should not be highlighted by us. */
 	public static Integer color(Entity e) {
-		if (!Config.get().espEnabled) return null;
+		if (!Config.get().modEnabled || !Config.get().espEnabled) return null;
 		return colors.get(e.getId());
 	}
 
 	public static void tick(Minecraft mc) {
 		Config c = Config.get();
 		LocalPlayer p = mc.player;
-		if (!c.espEnabled || p == null) {
+		if (!c.modEnabled || !c.espEnabled || p == null) {
 			if (!colors.isEmpty()) colors = new HashMap<>();
 			return;
 		}
@@ -44,8 +44,8 @@ public final class Esp {
 		List<Entity> all = p.level().getEntities(p, area);
 
 		for (Entity e : all) {
-			EntityType<?> type = e.getType();
-			if (type == EntityType.ARMOR_STAND) {
+			String type = type(e);
+			if (type.equals("armor_stand")) {
 				// Hypixel shows mob names on an armor stand above the real mob.
 				if (!e.hasCustomName()) continue;
 				String tag = e.getCustomName().getString();
@@ -57,13 +57,17 @@ public final class Esp {
 				if (mob != null) next.putIfAbsent(mob.getId(), col);
 				continue;
 			}
-			if (c.espWithers && type == EntityType.WITHER) next.put(e.getId(), c.colorWither);
-			else if (c.espBats && type == EntityType.BAT) next.put(e.getId(), c.colorBat);
-			else if (c.espPlayers && type == EntityType.PLAYER) next.put(e.getId(), c.colorPlayer);
+			if (c.espWithers && type.equals("wither")) next.put(e.getId(), c.colorWither);
+			else if (c.espBats && type.equals("bat")) next.put(e.getId(), c.colorBat);
+			else if (c.espPlayers && type.equals("player")) next.put(e.getId(), c.colorPlayer);
 			else if (matchesName(c, e.getName().getString())) next.put(e.getId(), c.colorOther);
-			else if (c.espAllMobs && e instanceof LivingEntity && type != EntityType.PLAYER) next.putIfAbsent(e.getId(), c.colorOther);
+			else if (c.espAllMobs && e instanceof LivingEntity && !type.equals("player")) next.putIfAbsent(e.getId(), c.colorOther);
 		}
 		colors = next;
+	}
+
+	private static String type(Entity e) {
+		return BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
 	}
 
 	private static boolean matchesName(Config c, String name) {
@@ -80,7 +84,7 @@ public final class Esp {
 		Entity best = null;
 		double bestD = Double.MAX_VALUE;
 		for (Entity e : all) {
-			if (!(e instanceof LivingEntity) || e.getType() == EntityType.ARMOR_STAND || e.getType() == EntityType.PLAYER && e.isInvisible()) continue;
+			if (!(e instanceof LivingEntity) || type(e).equals("armor_stand") || type(e).equals("player") && e.isInvisible()) continue;
 			double dx = e.getX() - stand.getX(), dz = e.getZ() - stand.getZ();
 			double dy = stand.getY() - e.getY();
 			if (Math.abs(dx) > 1.2 || Math.abs(dz) > 1.2 || dy < -0.5 || dy > 4) continue;

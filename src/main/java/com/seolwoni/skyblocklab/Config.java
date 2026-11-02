@@ -19,6 +19,9 @@ public class Config {
 	private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("skyblocklab.json");
 	private static Config instance = new Config();
 
+	/** Master switch for everything. */
+	public boolean modEnabled = true;
+
 	// ESP (glowing outline through walls)
 	public boolean espEnabled = true;
 	public boolean espStarMobs = true;

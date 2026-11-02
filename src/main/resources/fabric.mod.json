@@ -8,7 +8,8 @@
 	"license": "All-Rights-Reserved",
 	"environment": "client",
 	"entrypoints": {
-		"client": ["com.seolwoni.skyblocklab.SkyblockLab"]
+		"client": ["com.seolwoni.skyblocklab.SkyblockLab"],
+		"modmenu": ["com.seolwoni.skyblocklab.compat.ModMenuIntegration"]
 	},
 	"mixins": ["skyblocklab.mixins.json"],
 	"depends": {
@@ -16,5 +17,8 @@
 		"minecraft": "~26.2",
 		"java": ">=25",
 		"fabric-api": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
 	}
 }

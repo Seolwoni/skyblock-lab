@@ -29,6 +29,11 @@ tasks.withType(JavaCompile).configureEach {
 	it.options.encoding = "UTF-8"
 }
 
+jar {
+	// Mod Menu API stubs are only for compiling; the real classes come from Mod Menu itself.
+	exclude 'com/terraformersmc/**'
+}
+
 java {
 	sourceCompatibility = JavaVersion.VERSION_25
 	targetCompatibility = JavaVersion.VERSION_25

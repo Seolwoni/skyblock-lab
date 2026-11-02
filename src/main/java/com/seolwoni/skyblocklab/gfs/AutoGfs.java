@@ -20,7 +20,7 @@ public final class AutoGfs {
 
 	public static void onChat(Minecraft mc, String text) {
 		Config c = Config.get();
-		if (!c.gfsEnabled || !c.gfsOnDungeonStart) return;
+		if (!c.modEnabled || !c.gfsEnabled || !c.gfsOnDungeonStart) return;
 		String t = text.replaceAll("§.", "");
 		if (t.startsWith("[NPC] Mort: Here, I found this map")) refillNow(mc);
 	}
@@ -33,7 +33,7 @@ public final class AutoGfs {
 			return;
 		}
 		long now = System.currentTimeMillis();
-		if (c.gfsEnabled && c.gfsIntervalSec > 0 && now - lastInterval > c.gfsIntervalSec * 1000L) {
+		if (c.modEnabled && c.gfsEnabled && c.gfsIntervalSec > 0 && now - lastInterval > c.gfsIntervalSec * 1000L) {
 			lastInterval = now;
 			if (queue.isEmpty()) refillNow(mc);
 		}
@@ -47,7 +47,7 @@ public final class AutoGfs {
 	public static void refillNow(Minecraft mc) {
 		Config c = Config.get();
 		LocalPlayer p = mc.player;
-		if (p == null || !c.gfsEnabled) return;
+		if (p == null || !c.modEnabled || !c.gfsEnabled) return;
 		queue.clear();
 		add(p, c.gfsPearls, "Ender Pearl", "ENDER_PEARL", c.gfsPearlTarget);
 		add(p, c.gfsLeaps, "Spirit Leap", "SPIRIT_LEAP", c.gfsLeapTarget);

@@ -32,7 +32,7 @@ public final class AutoTerminal {
 	public static void tick(Minecraft mc) {
 		Config c = Config.get();
 		Screen s = SkyblockLab.currentScreen;
-		if (!c.termEnabled || mc.player == null || mc.gameMode == null || !(s instanceof AbstractContainerScreen<?> cs)) {
+		if (!c.modEnabled || !c.termEnabled || mc.player == null || mc.gameMode == null || !(s instanceof AbstractContainerScreen<?> cs)) {
 			screen = null;
 			pending.clear();
 			return;
