@@ -78,6 +78,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val smoothTurning by ToggleSetting("Smooth Turning", true).withDescription(
         "With Assist Core installed: turns with Assist's ease-in/ease-out head movement instead of snapping. Actions wait until the aim has arrived"
     )
+    private val aimPause by SliderSetting("Aim Pause", 2, 0, 10, 1, " ticks").withDescription(
+        "A short pause after the aim arrives, before clicking (varies by one tick each time). 0 = click right away"
+    )
     private val assistLog by ToggleSetting("Assist Journal", true).withDescription("Writes runs (room, why it stopped) to the Assist usage log")
     private val showPlan by ToggleSetting("Show Plan", true).section("Debug").withDescription("Draws the next point, etherwarp and action in the world, even before you start - check the route is read right")
     private val statusHud by ToggleSetting("Status HUD", true).withDescription("Room, step, phase and next action on screen (move it in the HUD editor)")
@@ -115,6 +118,8 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private var hitCooldown = 0
     private var pendingCast = false
     private var assistFailedGoal: BlockPos? = null
+    private var settleKey: Pair<Int, Int>? = null
+    private var settleLeft = 0
     private var fightTarget: Entity? = null
     private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
     private val MINIBOSSES = setOf("Shadow Assassin", "Lost Adventurer", "Frozen Adventurer", "Angry Archaeologist", "King Midas", "Diamond Guy")
@@ -272,7 +277,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                     wait = actionDelay
                 }
                 else {
-                    mc.options.keyAttack.isDown = turnTo(Vec3.atCenterOf(t))
+                    mc.options.keyAttack.isDown = turnTo(Vec3.atCenterOf(t)) || mc.options.keyAttack.isDown
                     if (++timer > 60) {
                         mc.options.keyAttack.isDown = false
                         s.mines.remove(t)
@@ -400,7 +405,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             }
         }
         val yaw = Math.toDegrees(atan2(goal.z - pos.z, goal.x - pos.x)).toFloat() - 90f
-        turn(yaw, if (speed.value == 3) p.xRot else 10f, 6f)
+        turn(yaw, if (speed.value == 3) p.xRot else 10f, 6f, settle = false)
         mc.options.keyUp.isDown = true
         mc.options.keySprint.isDown = sprint.value
         val needJump = autoJump.value && p.onGround() && ((goal.y - pos.y > 0.6 && horizontal(pos, goal) < 2.5) || p.horizontalCollision)
@@ -576,16 +581,35 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     }
 
     /** Snaps, or with Smooth Turning turns like Assist Core does. True once looking within [tolerance] degrees. */
-    private fun turn(yaw: Float, pitch: Float, tolerance: Float = 2f): Boolean {
+    private fun turn(yaw: Float, pitch: Float, tolerance: Float = 2f, settle: Boolean = true): Boolean {
         val p = mc.player ?: return false
-        if (smoothTurning.value && AssistBridge.coreLoaded) return AssistBridge.turn(p, yaw, pitch, tolerance)
-        PlayerUtils.rotate(yaw, pitch)
+        val arrived = if (smoothTurning.value && AssistBridge.coreLoaded) AssistBridge.turn(p, yaw, pitch, tolerance)
+        else {
+            PlayerUtils.rotate(yaw, pitch)
+            true
+        }
+        if (! arrived) {
+            settleKey = null
+            return false
+        }
+        if (! settle || aimPause.value <= 0) return true
+
+        // Same aim (within ~3 degrees) waits once; a new aim waits again.
+        val key = Math.round(yaw / 3f) to Math.round(pitch / 3f)
+        if (key != settleKey) {
+            settleKey = key
+            settleLeft = (aimPause.value + kotlin.random.Random.nextInt(- 1, 2)).coerceAtLeast(0)
+        }
+        if (settleLeft > 0) {
+            settleLeft--
+            return false
+        }
         return true
     }
 
-    private fun turnTo(target: Vec3, tolerance: Float = 2f): Boolean {
+    private fun turnTo(target: Vec3, tolerance: Float = 2f, settle: Boolean = true): Boolean {
         val rot = MathUtils.calcYawPitch(target)
-        return turn(rot.yaw, rot.pitch, tolerance)
+        return turn(rot.yaw, rot.pitch, tolerance, settle)
     }
 
     /** 0-Tick: tell the server the new look direction right away, so a click in this same tick uses it. */
