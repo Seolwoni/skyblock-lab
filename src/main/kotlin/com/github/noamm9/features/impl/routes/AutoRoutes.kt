@@ -32,6 +32,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import xyz.yourboykyle.secretroutes.Main
+import xyz.yourboykyle.secretroutes.dungeons.detection.DungeonScanner
 import xyz.yourboykyle.secretroutes.utils.RoomDirectionUtils
 import xyz.yourboykyle.secretroutes.utils.RoomRotationUtils
 import xyz.yourboykyle.secretroutes.utils.RotationUtils
@@ -58,8 +59,15 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val doLevers by ToggleSetting("Flip Levers", true)
     private val doSecret by ToggleSetting("Collect Secret", true).withDescription("Opens chests/levers/skulls and hits bats at the end of each step")
     private val chatInfo by ToggleSetting("Chat Messages", true)
-    private val killStars by ToggleSetting("Kill Star Mobs", true).section("Combat").withDescription("Stops to kill starred (✯) mobs near the route")
-    private val killMinis by ToggleSetting("Kill Minibosses", true).withDescription("Shadow Assassin, Lost / Frozen Adventurer, Angry Archaeologist, King Midas, Diamond Guy")
+    private val clearMode by DropdownSetting("Clear", 1, listOf("Off", "Star mobs + minibosses", "Whole room")).section("Combat").withDescription(
+        "Whole room: kills every mob in the room you are in before doing its secrets. Star mobs: only stops for starred mobs and minibosses near the route"
+    )
+    private val useHype by ToggleSetting("Use Hyperion", true).withDescription("Wither Impact (Hyperion / Astraea / Scylla / Valkyrie): teleports into the pack and casts looking down. Falls back to hitting if none is in the hotbar")
+    private val hypeTeleport by ToggleSetting("Teleport Into Mobs", true).withDescription("Casts towards a pack up to 10 blocks away to get there instantly, instead of walking")
+    private val castDelay by SliderSetting("Cast Delay", 3, 1, 20, 1, " ticks").withDescription("Ticks between Wither Impact casts (watch your mana)")
+    private val blastRadius by SliderSetting("Blast Radius", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("Wither Impact damage radius, used to decide when a pack is close enough")
+    private val killStars by ToggleSetting("Kill Star Mobs", true).hideIf { clearMode.value == 0 }.withDescription("Stops to kill starred (✯) mobs near the route")
+    private val killMinis by ToggleSetting("Kill Minibosses", true).hideIf { clearMode.value == 0 }.withDescription("Shadow Assassin, Lost / Frozen Adventurer, Angry Archaeologist, King Midas, Diamond Guy")
     private val attackRange by SliderSetting("Attack Range", 3.0, 2.0, 3.0, 0.1, " blocks").withDescription("Normal hand reach at most")
     private val detourRange by SliderSetting("Detour Range", 6.0, 0.0, 12.0, 0.5, " blocks").withDescription("How far it leaves the route to chase a target (0 = only hit what is already in reach)")
     private val hitDelay by SliderSetting("Hit Delay", 2, 1, 10, 1, " ticks").withDescription("Ticks between hits")
@@ -98,7 +106,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private var secretTimer = 0
     private var status = "idle"
     private var hitCooldown = 0
+    private var pendingCast = false
     private var fightTarget: Entity? = null
+    private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
     private val MINIBOSSES = setOf("Shadow Assassin", "Lost Adventurer", "Frozen Adventurer", "Angry Archaeologist", "King Midas", "Diamond Guy")
     private var lastEtherCheck: Boolean? = null
     private var lastPos: Vec3? = null
@@ -166,7 +176,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     }
 
     private fun start() {
-        if (! RouteBridge.routeActive()) return info("&cNo route to follow here.")
+        if (! RouteBridge.routeActive() && ! (clearMode.value == 2 && DungeonScanner.currentRoom != null)) return info("&cNo route or room here.")
         running = true
         stepRef = null
         phase = Phase.MOVE
@@ -193,7 +203,10 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private fun tick() {
         val p = mc.player ?: return stop("no player")
         if (mc.gui.screen() != null) return releaseKeys()
-        if (! RouteBridge.routeActive()) return stop("finished (no more steps)")
+        if (hitCooldown > 0) hitCooldown--
+        val busyFlying = phase == Phase.ETHER_AIM || phase == Phase.ETHER_WAIT || phase == Phase.PEARL_WAIT || phase == Phase.MINING
+        if (! busyFlying && wait <= 0 && fight()) return
+        if (! RouteBridge.routeActive()) return stop(if (clearMode.value == 2) "room cleared, no route left" else "finished (no more steps)")
 
         val room = Main.currentRoom ?: return
         val raw = room.currentSecretWaypoints ?: return
@@ -211,9 +224,6 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             wait--
             return
         }
-
-        if (hitCooldown > 0) hitCooldown--
-        if ((phase == Phase.MOVE || phase == Phase.SECRET) && fight()) return
 
         when (phase) {
             Phase.MOVE -> move(s, p.position())
@@ -413,11 +423,14 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
 
     /** Kills the nearest star mob / miniboss in detour range. Returns true while busy fighting. */
     private fun fight(): Boolean {
-        if (! killStars.value && ! killMinis.value) return false
+        if (clearMode.value == 0) return false
         val p = mc.player ?: return false
-        val target = findTarget(p)
+        val target = if (clearMode.value == 2) findRoomTarget(p) else findTarget(p)
         fightTarget = target
         if (target == null) return false
+
+        val hypeSlot = if (useHype.value) PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } else null
+        if (hypeSlot != null) return hypeFight(p, target, hypeSlot)
 
         val dist = p.eyePosition.distanceTo(target.boundingBox.clipNearest(p.eyePosition))
         if (dist > attackRange.value) {
@@ -439,6 +452,52 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         }
         else PlayerUtils.leftClick() // rotation from last tick is already on the server
         return true
+    }
+
+    /** Wither Impact: teleport into the pack (if far), then cast looking straight down so the blast covers us. */
+    private fun hypeFight(p: Player, target: Entity, slot: Int): Boolean {
+        PlayerUtils.swapToSlot(slot)
+        val dist = p.position().distanceTo(target.position())
+        val inBlast = dist <= blastRadius.value - 1.0
+        if (! inBlast && ! (hypeTeleport.value && dist <= 11.0)) {
+            walkTowards(p.position(), target.position())
+            status = "walking to ${target.name.string}"
+            return true
+        }
+        releaseMovement()
+        if (pendingCast) { // rotation went out last tick, now cast
+            PlayerUtils.rightClick()
+            pendingCast = false
+            return true
+        }
+        if (hitCooldown > 0) return true
+        hitCooldown = castDelay.value
+        if (inBlast) {
+            PlayerUtils.rotate(p.yRot, 90f)
+            status = "casting on ${target.name.string}"
+        }
+        else {
+            PlayerUtils.rotateTo(target.position().add(0.0, 0.2, 0.0))
+            status = "teleporting to ${target.name.string}"
+        }
+        if (zeroTick) useNow() else pendingCast = true
+        return true
+    }
+
+    /** The mob to go for when clearing the whole room: the one with the most other mobs around it, then the closest. */
+    private fun findRoomTarget(p: Player): Entity? {
+        val room = DungeonScanner.currentRoom ?: return findTarget(p)
+        val centres = room.roomComponents.map { it.vec2() }.toSet()
+        val area = p.boundingBox.inflate(48.0, 20.0, 48.0)
+        val mobs = p.level().getEntitiesOfClass(LivingEntity::class.java, area) { e ->
+            e.isAlive && e.health > 0f && e !is ArmorStand && e !is Bat && e != p &&
+                e.javaClass.simpleName != "WitherBoss" &&
+                (e !is Player || e.gameProfile.name in MINIBOSSES || e.name.string in MINIBOSSES) &&
+                DungeonScanner.getRoomCentre(e.blockX, e.blockZ) in centres
+        }
+        if (mobs.isEmpty()) return null
+        val r2 = blastRadius.value * blastRadius.value
+        return mobs.maxWithOrNull(compareBy<LivingEntity> { m -> mobs.count { it.distanceToSqr(m) <= r2 } }.thenBy { - p.distanceToSqr(it) })
     }
 
     private fun AABB.clipNearest(from: Vec3) = Vec3(from.x.coerceIn(minX, maxX), from.y.coerceIn(minY, maxY), from.z.coerceIn(minZ, maxZ))
