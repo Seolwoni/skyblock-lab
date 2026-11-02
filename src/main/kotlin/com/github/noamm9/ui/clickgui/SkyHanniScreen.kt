@@ -138,12 +138,11 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val sy = y + 4f
         Style.roundRect(ctx, sx, sy, sw, 18f, 3f, field)
         if (search.listening) ctx.drawRect(sx + 3f, sy + 17f, sw - 6f, 1f, Style.accentColor)
-        search.x = sx + 14f
+        search.x = sx + 6f
         search.y = sy
-        search.width = sw - 18f
+        search.width = sw - 12f
         search.height = 18f
-        ctx.drawString("⌕", sx + 5f, sy + 5f, if (search.listening) Style.accentColor else textFaint, shadow = false)
-        if (query.isEmpty() && !search.listening) ctx.drawString("Search ${FeatureManager.features.size} features  (Ctrl+F)", sx + 15f, sy + 5f, textFaint, shadow = false)
+        if (query.isEmpty() && !search.listening) ctx.drawString("Search ${FeatureManager.features.size} features  (Ctrl+F)", sx + 7f, sy + 5f, textFaint, shadow = false)
         else search.draw(ctx, mx, my)
 
         titleButtons().forEach { (label, rect) ->
@@ -257,7 +256,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
     private fun featureCardHeight(feature: Feature, w: Float): Float {
         val lines = wrap(feature.description.orEmpty().replace("\\n", " "), w - CARD_PAD * 2 - 60f).size.coerceAtLeast(0)
-        return 18f + lines * LINE_H + CARD_PAD
+        // Room for the switch on top and the "N settings" link at the bottom.
+        return maxOf(18f + lines * LINE_H + CARD_PAD, if (hasSettings(feature) && selected != feature) 32f else 22f)
     }
 
     private fun optionHeight(entry: Entry.Option, w: Float): Float {
