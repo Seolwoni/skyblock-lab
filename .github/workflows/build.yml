@@ -33,6 +33,7 @@ jobs:
           for j in build/libs/*-26.2-cheat.jar; do
             echo "== $j" >> /tmp/libs.txt
             unzip -l "$j" | grep -c "xyz/yourboykyle/secretroutes/.*class" >> /tmp/libs.txt || true
+            echo "assist stubs in jar: $(unzip -l "$j" | grep -c "com/seolwoni/")" >> /tmp/libs.txt
             unzip -l "$j" | grep -E "features/impl/routes|secretroutes.mixins|assets/secretroutesmod/(rooms|secretlocations)" >> /tmp/libs.txt || true
             unzip -p "$j" fabric.mod.json >> /tmp/libs.txt || true
           done
