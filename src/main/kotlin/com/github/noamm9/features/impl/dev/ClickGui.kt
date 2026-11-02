@@ -19,6 +19,11 @@ object ClickGui: Feature("A feature used to change the ClickGui configuration.",
     val accentColor by ColorSetting("Accent Color", Color(155, 108, 240), false).withDescription("The accent color used by the whole ClickGui.")
     val guiStyle by DropdownSetting("GUI Style", 0, listOf("SkyHanni", "Classic")).withDescription("SkyHanni: one window with search, a category list and option cards with descriptions. Classic: the original NoammAddons panels.")
     val customFont by ToggleSetting("Smooth Font", true).withDescription("Riftwalk menu uses the Pretendard font instead of Minecraft's pixel font")
+    val serverMode by DropdownSetting("Server Mode", 0, listOf("Hypixel only", "Treat as Hypixel", "Always in dungeon")).section("Private Server").withDescription(
+        "Hypixel only: dungeon features turn on only on Hypixel. Treat as Hypixel: any server counts, dungeons are detected from the scoreboard / tab list like on Hypixel. Always in dungeon: dungeon features stay on everywhere (for test worlds without a SkyBlock scoreboard)"
+    )
+    val forcedFloor by DropdownSetting("Floor", 13, listOf("F1", "F2", "F3", "F4", "F5", "F6", "F7", "M1", "M2", "M3", "M4", "M5", "M6", "M7")).showIf { serverMode.value == 2 }
+        .withDescription("The floor the dungeon features assume in Always in dungeon mode")
     val panelSorting by DropdownSetting("Sorting", 1, listOf("A-Z Sorting", "Width Sorting", "No Sorting")).withDescription("The order of the features in the panels.")
 
     val editGuiButton by ButtonSetting("Open HUD Editor") {

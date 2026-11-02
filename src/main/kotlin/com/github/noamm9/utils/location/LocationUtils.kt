@@ -16,7 +16,8 @@ import net.minecraft.network.protocol.game.*
 import kotlin.jvm.optionals.getOrNull
 
 object LocationUtils: ISelfInit, Shortcuts {
-    @JvmStatic val onHypixel get() = mc.player?.connection?.serverBrand()?.lowercase()?.contains("hypixel") == true
+    @JvmStatic val onHypixel get() = com.github.noamm9.features.impl.dev.ClickGui.serverMode.value >= 1 ||
+        mc.player?.connection?.serverBrand()?.lowercase()?.contains("hypixel") == true
 
     @JvmField var inSkyblock = false
     @JvmField var world: WorldType? = null
@@ -35,6 +36,7 @@ object LocationUtils: ISelfInit, Shortcuts {
     override fun init() {
         EventBus.register<MainThreadPacketReceivedEvent.Post>(EventPriority.HIGHEST) {
             if ("dev" in NoammAddons.debugFlags) return@register setDevModeValues()
+            if (com.github.noamm9.features.impl.dev.ClickGui.serverMode.value == 2) return@register setForcedValues()
             if (! onHypixel) return@register
 
             if (event.packet is ClientboundPlayerInfoUpdatePacket) {
@@ -95,6 +97,19 @@ object LocationUtils: ISelfInit, Shortcuts {
         F7Phase = null
         world = null
         serverId = null
+    }
+
+    /** Riftwalk "Always in dungeon" server mode: like dev mode, with the floor picked in the settings. */
+    private fun setForcedValues() {
+        if (mc.level == null || mc.player == null) return
+        val floor = com.github.noamm9.features.impl.dev.ClickGui.run { forcedFloor.options[forcedFloor.value] }
+        inSkyblock = true
+        inDungeon = true
+        dungeonFloor = floor
+        dungeonFloorNumber = floor.last().digitToIntOrNull() ?: 0
+        F7Phase = getPhase(player.y)
+        P3Section = findP3Section(player.x, player.y, player.z)
+        inBoss = isInBossRoom(player.x, player.y, player.z)
     }
 
     private fun setDevModeValues() {
