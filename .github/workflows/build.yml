@@ -60,6 +60,17 @@ jobs:
           start=$(date +%s)
           xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew :26.2:runClientGameTest --stacktrace 2>&1 | tee gametest.log
           echo "gametest seconds: $(( $(date +%s) - start ))" >> gametest.log
+      - name: build assist mods
+        if: contains(github.event.head_commit.message, '[assist]')
+        continue-on-error: true
+        run: |
+          mkdir -p /tmp/assist
+          for r in assist-core assist-path; do
+            git clone -q --depth 1 "https://github.com/Seolwoni/$r" "/tmp/src-$r"
+            (cd "/tmp/src-$r" && chmod +x gradlew && ./gradlew build -x test --stacktrace > "/tmp/assist/$r-build.log" 2>&1) || echo "$r build failed"
+            find "/tmp/src-$r/build/libs" -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-dev.jar" -exec cp {} /tmp/assist/ \;
+          done
+          ls -la /tmp/assist
       - name: save log
         if: always()
         run: |
@@ -87,6 +98,8 @@ jobs:
           cp /tmp/compile.txt /tmp/tail.txt /tmp/libs.txt .
           cp -r /tmp/gt gt
           mkdir -p jar && cp build/libs/Riftwalk-*-26.2.jar jar/ 2>/dev/null || true
+          cp /tmp/assist/*.jar jar/ 2>/dev/null || true
+          mkdir -p gt && cp /tmp/assist/*-build.log gt/ 2>/dev/null || true
           echo "${{ github.sha }} ${{ job.status }}" > status.txt
           git add compile.txt tail.txt libs.txt status.txt gt jar
           git commit -m "build log ${{ github.run_number }}"
