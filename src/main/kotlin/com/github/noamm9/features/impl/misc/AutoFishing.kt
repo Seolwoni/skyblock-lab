@@ -1156,8 +1156,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             status = "Hyperion on ${close.size}"
             if (hypeBeat > 0) { hypeBeat--; return }
             when (hypeStage) {
-                0 -> { // take the Hyperion out, glance at the creature first
-                    hold(hype)
+                0 -> { // glance at the creature first (still holding the rod)
                     val m = close.minByOrNull { it.distanceToSqr(p) } ?: return
                     val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(m.boundingBox.center, 0.5))
                     if (abs(wrap(rot.yaw - p.yRot)) > 15f && ! turn(p, rot.yaw, rot.pitch, 10f)) return
@@ -1167,8 +1166,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 1 -> { // then look down so the blast covers everything around us
                     if (castDownPitch == 0f) castDownPitch = 78f + RANDOM.nextFloat() * 11f
                     if (! turn(p, p.yRot, castDownPitch, 3f)) return
+                    val swapped = p.inventory.selectedSlot != hype
+                    hold(hype) // the Hyperion comes out once we're looking down
                     hypeStage = 2
-                    hypeBeat = delay(2, 7) // a beat with the aim settled before clicking
+                    hypeBeat = if (swapped) delay(3, 8) else delay(2, 7) // a beat with it in hand before clicking
                 }
                 else -> { // cast; between casts keep looking down, each cast a little different
                     if (hitCooldown > 0) return
