@@ -121,6 +121,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val showMarkers by ToggleSetting("Show Markers", true).section("Display").withDescription("A box where the hook lands and a highlight on your sea creatures (works with Kill Sea Creatures off too)")
     private val creatureTracer by ToggleSetting("Creature Tracer", true).withDescription("A line from the middle of your screen to each of your sea creatures")
 
+    private val standCentre by ToggleSetting("Stand In Block Centre", true).section("Safety").withDescription("Before casting and before fighting, steps (sneaking, so it can't walk off an edge) to the exact middle of a safe block: solid ground under it, no lava in or under it")
     private val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
     private val chatInfo by ToggleSetting("Chat Messages", true)
     private val statusHud by ToggleSetting("Status HUD", true)
@@ -148,6 +149,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var manaWait = 0
     private var fightTicks = 0
     private var blastBlocked = false
+    private var centreTicks = 0
+    private var centreTarget: Vec3? = null
     private val ignored = HashSet<Int>()
     private var groundTicks = 0
     private var groundFails = 0
@@ -462,6 +465,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     private fun stop(reason: String?) {
+        if (running) releaseCentre()
+        centreTarget = null
         running = false
         hop = null
         AutoRoutes.releaseAll()
@@ -674,6 +679,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         when (state) {
             State.CAST -> {
                 if (moveLen > 0) return // don't cast in the middle of a head movement
+                if (! centered(p)) { status = "stepping to the middle of the block"; return }
                 val free = freeSlots(p)
                 if (autoSell.value && free <= sellWhenFree.value && sellFails < 3 && sellables(p).isNotEmpty()) {
                     state = State.SELL
@@ -1420,6 +1426,59 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         repath = 0
     }
 
+    /** A block you can safely stand in: solid, non-lava ground under it, room for the body, no lava in it. */
+    private fun safeStand(lvl: net.minecraft.world.level.Level, b: BlockPos): Boolean {
+        fun solid(x: BlockPos) = ! lvl.getBlockState(x).getCollisionShape(lvl, x).isEmpty
+        fun lava(x: BlockPos) = lvl.getFluidState(x).`is`(FluidTags.LAVA)
+        val under = b.below()
+        return solid(under) && ! lava(under) && ! solid(b) && ! solid(b.above()) && ! lava(b) && ! lava(b.above())
+    }
+
+    /**
+     * Keeps us in the exact middle of a safe block. Moves with WASD relative to where we're already looking
+     * (no turning), sneaking so it can never walk off an edge. True once we're there.
+     */
+    private fun centered(p: LocalPlayer): Boolean {
+        if (! standCentre.value || ! p.onGround()) return true
+        val lvl = p.level()
+        val here = BlockPos.containing(p.position())
+        var target = centreTarget
+        if (target == null || BlockPos.containing(target).distManhattan(here) > 2) {
+            val pick = (listOf(here) + listOf(here.north(), here.south(), here.east(), here.west(),
+                here.north().east(), here.north().west(), here.south().east(), here.south().west()))
+                .filter { safeStand(lvl, it) }
+                .minByOrNull { Vec3.atBottomCenterOf(it).distanceToSqr(p.position()) }
+                ?: return true // nowhere better nearby: stay
+            target = Vec3.atBottomCenterOf(pick)
+            centreTarget = target
+        }
+        val dx = target.x - p.x
+        val dz = target.z - p.z
+        if (dx * dx + dz * dz < 0.1 * 0.1 || ++centreTicks > 100) {
+            releaseCentre()
+            centreTicks = 0
+            return true
+        }
+        val yr = Math.toRadians(p.yRot.toDouble())
+        val f = dx * - kotlin.math.sin(yr) + dz * kotlin.math.cos(yr) // along where we look
+        val r = dx * - kotlin.math.cos(yr) + dz * - kotlin.math.sin(yr) // to our right
+        ownMoveTicks = 20
+        mc.options.keyShift.isDown = true
+        mc.options.keyUp.isDown = f > 0.05
+        mc.options.keyDown.isDown = f < - 0.05
+        mc.options.keyRight.isDown = r > 0.05
+        mc.options.keyLeft.isDown = r < - 0.05
+        return false
+    }
+
+    private fun releaseCentre() {
+        mc.options.keyShift.isDown = false
+        mc.options.keyUp.isDown = false
+        mc.options.keyDown.isDown = false
+        mc.options.keyRight.isDown = false
+        mc.options.keyLeft.isDown = false
+    }
+
     /**
      * True when a Wither Impact with this look can't drop us into lava: follows the 10-block teleport until
      * something blocks the body, then checks there's solid ground (not lava) under where we'd end up.
@@ -1626,6 +1685,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             if (abs(wrap(rot.yaw - p.yRot)) > 22f || abs(rot.pitch - p.xRot) > 18f) turn(p, rot.yaw, rot.pitch, 9f)
             return
         }
+        if (! centered(p)) { status = "stepping to the middle of the block"; return }
         if (hype != null) {
             status = "Hyperion on ${close.size}"
             if (hypeBeat > 0) { hypeBeat--; return }
