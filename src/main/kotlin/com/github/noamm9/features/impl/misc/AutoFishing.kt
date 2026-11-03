@@ -44,8 +44,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     private val reelMin by SliderSetting("Reel Delay Min", 2, 1, 17, 1, " ticks").section("Timing").withDescription("Shortest wait after the bite before reeling in")
     private val reelMax by SliderSetting("Reel Delay Max", 9, 1, 17, 1, " ticks").withDescription("Longest wait after the bite (17 at most, so the fish doesn't get away)")
-    private val castMin by SliderSetting("Cast Delay Min", 4, 1, 60, 1, " ticks").withDescription("Shortest wait before casting again")
-    private val castMax by SliderSetting("Cast Delay Max", 18, 1, 60, 1, " ticks")
+    private val castMin by SliderSetting("Cast Delay Min", 6, 1, 60, 1, " ticks").withDescription("Shortest wait before casting again")
+    private val castMax by SliderSetting("Cast Delay Max", 34, 1, 80, 1, " ticks")
+    private val hesitate by SliderSetting("Hesitation", 12, 0, 40, 1, "%").withDescription("Chance that a cast comes a little later than usual (0.3-1 s more)")
+    private val aimWobble by SliderSetting("Cast Aim Wobble", 0.5, 0.0, 2.0, 0.1, "°").withDescription("Each cast is aimed a tiny bit differently, like a hand that never lands on the exact same spot")
     private val timingModel by DropdownSetting("Timing Model", 2, listOf("Even", "Reel Assist", "Human")).withDescription(
         "Even: any tick in the range equally. Reel Assist: mostly the lower third with the odd slow reaction. Human: skewed reaction times, a rhythm that drifts over minutes, each delay leaning on the last one, slight fatigue over time, no tick count twice in a row"
     )
@@ -67,6 +69,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val killCreatures by ToggleSetting("Kill Sea Creatures", true).section("Sea Creatures")
     private val killRange by SliderSetting("Detect Range", 14.0, 4.0, 24.0, 0.5, " blocks").withDescription("A sea creature that comes up within this range is killed right away")
     private val blastRange by SliderSetting("Hyperion Reach", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("Casts once a creature is this close (the blast hits around you)")
+    private val noticeMin by SliderSetting("Notice Delay Min", 8, 0, 40, 1, " ticks").withDescription("How long it takes to notice a sea creature that came up, before reacting")
+    private val noticeMax by SliderSetting("Notice Delay Max", 26, 0, 60, 1, " ticks")
     private val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")
     private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) of the weapon. 0 = Hyperion / Astraea / Scylla / Valkyrie if found")
     private val hitDelay by SliderSetting("Hit Delay", 4, 1, 20, 1, " ticks")
@@ -78,7 +82,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val hopMax by SliderSetting("AOTV Gap Max", 18, 2, 60, 1, " ticks")
     private val walkSome by SliderSetting("Walk Instead", 15, 0, 80, 5, "%").withDescription("Chance to walk a stretch instead of hopping with the AOTV")
     private val hotspotRange by SliderSetting("Search Range", 64, 16, 160, 8, " blocks").withDescription("How far it looks for a Hotspot")
-    private val hotspotRadius by SliderSetting("Hotspot Size", 3.0, 1.0, 6.0, 0.5, " blocks").withDescription("How close to the Hotspot's centre the hook has to land; it adjusts the aim until it does")
+    private val hotspotRadius by SliderSetting("Hotspot Size", 2.5, 1.0, 6.0, 0.5, " blocks").withDescription("How close to the Hotspot's centre the hook has to land; it adjusts the aim until it does")
     private val stayHome by ToggleSetting("Return To Spot", true).withDescription("Walks back to the fishing spot if you get pushed away from it")
 
     private val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe").withDescription(
@@ -135,6 +139,27 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var ownMoveTicks = 0
     private var expectedSlot = - 1
 
+    // safe walking (own path, avoids lava / water)
+    private var path: List<BlockPos> = emptyList()
+    private var pathIndex = 0
+    private var pathGoal: Vec3? = null
+    private var lastSafe: Vec3? = null
+    private var lavaTicks = 0
+    private var hopWait = 0
+    private var repath = 0
+
+    // aiming the cast
+    private var aimTarget: Vec3? = null
+    /** This cast's small hand wobble on top of the aim. */
+    private var wobYaw = 0f
+    private var wobPitch = 0f
+
+    // noticing sea creatures
+    private val noticeAt = HashMap<Int, Int>()
+    private var tickCount = 0
+    private var fightWait = 0
+    private var castDownPitch = 0f
+
     override fun init() {
         register<TickEvent.Start> {
             if (toggleKey.isPressed() && mc.gui.screen() == null) {
@@ -171,6 +196,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         anchorYaw = p.yRot
         anchorPitch = p.xRot
         timing = com.github.noamm9.utils.HumanTiming()
+        wobYaw = 0f; wobPitch = 0f
+        aimTarget = null
+        noticeAt.clear()
+        path = emptyList()
         offYaw = 0f; offPitch = 0f; moveLen = 0
         nextMoveIn = nextMoveDelay()
         running = true
@@ -229,6 +258,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (lookAtCatch.value && justCaughtSomething) t += timing.uniform(8, 25)
         justCaughtSomething = false
         t += timing.maybeBreak(breakChance.value, 40, 120)
+        if (RANDOM.nextInt(100) < hesitate.value) t += timing.uniform(6, 20)
         return t
     }
 
@@ -258,12 +288,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     /** The small eased head movements around the bobber while waiting. Also follows the player's own camera moves. */
     private fun lookMovement(p: LocalPlayer) {
         if (! lookJitter.value) return
-        val expYaw = anchorYaw + offYaw
-        val expPitch = anchorPitch + offPitch
+        val expYaw = anchorYaw + offYaw + wobYaw
+        val expPitch = anchorPitch + offPitch + wobPitch
         if (abs(wrap(p.yRot - expYaw)) > 0.3f || abs(p.xRot - expPitch) > 0.3f) {
             // the player turned the camera: fish where they look now
-            anchorYaw = p.yRot - offYaw
-            anchorPitch = p.xRot - offPitch
+            anchorYaw = p.yRot - offYaw - wobYaw
+            anchorPitch = p.xRot - offPitch - wobPitch
         }
         if (moveLen > 0) {
             moveTick++
@@ -271,8 +301,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             val ease = t * t * (3 - 2 * t)
             offYaw = fromYaw + (toYaw - fromYaw) * ease
             offPitch = fromPitch + (toPitch - fromPitch) * ease
-            p.yRot = anchorYaw + offYaw
-            p.xRot = (anchorPitch + offPitch).coerceIn(- 90f, 90f)
+            p.yRot = anchorYaw + offYaw + wobYaw
+            p.xRot = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
             if (t >= 1f) moveLen = 0
             return
         }
@@ -316,6 +346,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             if (sc is AbstractContainerScreen<*> && sc !is InventoryScreen) return failStop("a menu opened by itself (${sc.title.string})")
         }
 
+        tickCount++
+        if (! p.isInLava && ! p.isInWater && p.onGround()) { lastSafe = p.position(); lavaTicks = 0 }
+        if (p.isInLava) return escapeLava(p)
+
         when (state) {
             State.FIND -> return findHotspot(p)
             State.TRAVEL -> return travel(p)
@@ -326,12 +360,17 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (stayHome.value && home != null && state != State.FIGHT && p.position().distanceTo(home) > 3.0) {
             if (p.fishing != null) rod()?.let { hold(it); use(p) }
             state = State.TRAVEL
+            path = emptyList()
             status = "pushed away, going back"
             return
         }
 
         // sea creatures first, the moment one comes up
-        val mobs = if (killCreatures.value && mc.gui.screen() == null) creatures(p) else emptyList()
+        val seen = if (killCreatures.value && mc.gui.screen() == null) creatures(p) else emptyList()
+        // a person needs a moment to notice something new: each creature gets its own notice time
+        for (m in seen) noticeAt.getOrPut(m.id) { tickCount + delay(noticeMin.value, noticeMax.value) }
+        if (noticeAt.size > 200) noticeAt.keys.retainAll(seen.map { it.id }.toSet())
+        val mobs = seen.filter { (noticeAt[it.id] ?: 0) <= tickCount }
         if (state == State.FIGHT || mobs.isNotEmpty()) {
             if (mobs.isEmpty()) {
                 state = State.CAST
@@ -340,9 +379,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 status = "back to fishing"
                 return
             }
-            if (state != State.FIGHT && p.fishing != null) rod()?.let { hold(it); use(p) } // pull the line in first
+            if (state != State.FIGHT) {
+                if (p.fishing != null) rod()?.let { hold(it); use(p) } // pull the line in first
+                fightWait = delay(3, 10) // then a beat before turning round
+            }
             justCaughtSomething = true
             state = State.FIGHT
+            if (fightWait > 0) { fightWait--; status = "noticed a sea creature"; return }
             fight(p, mobs)
             return
         }
@@ -350,10 +393,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         // back to the fishing spot (eased) after a fight
         if (returning) {
             status = "looking back at the ${fluidName()}"
-            if (! turn(p, anchorYaw + offYaw, anchorPitch + offPitch, 0.8f)) return
+            if (! turn(p, anchorYaw + offYaw + wobYaw, anchorPitch + offPitch + wobPitch, 0.8f)) return
+            p.yRot = anchorYaw + offYaw + wobYaw // land exactly, so it isn't taken for a camera move
+            p.xRot = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
             returning = false
         }
-        if (state == State.WAIT_BITE || state == State.CAST) lookMovement(p)
+        if (state == State.WAIT_BITE) lookMovement(p)
 
         if (wait > 0) {
             wait--
@@ -365,6 +410,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         when (state) {
             State.CAST -> {
                 if (moveLen > 0) return // don't cast in the middle of a head movement
+                // settle on this cast's aim (with its wobble) first, then land on it exactly
+                val ty = anchorYaw + offYaw + wobYaw
+                val tp = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
+                if (! turn(p, ty, tp, 0.35f)) return
+                p.yRot = ty
+                p.xRot = tp
                 hold(rod)
                 if (hook != null) { // a line is still out: pull it in first
                     use(p)
@@ -372,6 +423,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     return
                 }
                 use(p)
+                nextCastAim(p)
                 state = State.WAIT_BITE
                 timer = 0
                 inFluidTicks = 0
@@ -521,6 +573,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         stand = spot
         aimTries = 0
         travelStuck = 0
+        path = emptyList()
         state = State.TRAVEL
         info("&7Hotspot found &8(${p.position().distanceTo(hs.position()).toInt()} blocks)&7, going there.")
     }
@@ -541,6 +594,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 if (! level.getFluidState(below).isEmpty) continue
                 if (! level.getBlockState(feet).getCollisionShape(level, feet).isEmpty || ! level.getFluidState(feet).isEmpty) continue
                 if (! level.getBlockState(feet.above()).getCollisionShape(level, feet.above()).isEmpty) continue
+                if (nearLava(feet, 1)) continue // never stand right at a lava edge
                 val eye = Vec3(feet.x + 0.5, feet.y + 1.62, feet.z + 0.5)
                 val clip = level.clip(net.minecraft.world.level.ClipContext(eye, hs.position().add(0.0, 0.3, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
                 if (clip.type != net.minecraft.world.phys.HitResult.Type.MISS && clip.location.distanceTo(hs.position()) > 1.5) continue
@@ -555,51 +609,287 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     private fun travel(p: LocalPlayer) {
         val goal = stand ?: return run { state = State.FIND }
-        ownMoveTicks = 20 // our own AOTV / walking: not the server's doing
+        ownMoveTicks = 20 // our own walking / AOTV: not the server's doing
         expectedSlot = - 1
-        if (--stretchLeft <= 0) { // decide per stretch of ~2-4 s whether to hop or walk
-            hopThisStretch = RANDOM.nextInt(100) >= walkSome.value
-            stretchLeft = timing.uniform(40, 80)
+        if (horizontalDist(p.position(), goal) < 0.6 && abs(p.y - goal.y) < 1.5) {
+            stopWalking()
+            path = emptyList()
+            arrive(p)
+            return
         }
-        when (AutoRoutes.travelTick(goal, 0.6, { delay(hopMin.value, hopMax.value) }, hopThisStretch)) {
-            AutoRoutes.Travel.ARRIVED -> {
-                AutoRoutes.releaseAll()
-                val hs = hotspot
-                if (hs != null) {
-                    val rot = MathUtils.calcYawPitch(hs.position().add(0.0, 0.2, 0.0))
-                    anchorYaw = rot.yaw
-                    anchorPitch = (rot.pitch - 8f).coerceIn(- 30f, 60f) // a little above it: the hook flies in an arc
+        if (pathGoal != goal || path.isEmpty() || --repath <= 0) {
+            pathGoal = goal
+            path = findPath(p, BlockPos.containing(goal.x, goal.y + 0.1, goal.z)) ?: run {
+                stopWalking()
+                if (++travelStuck > 3) {
+                    hotspot?.let { badHotspots += it.id }
+                    hotspot = null
+                    state = State.FIND
+                    status = "no safe way there"
                 }
-                offYaw = 0f; offPitch = 0f; moveLen = 0
-                returning = true
-                state = State.CAST
-                wait = castWait()
-                status = "at the spot"
+                return
             }
-            AutoRoutes.Travel.STUCK -> if (++travelStuck > 5) {
-                hotspot?.let { badHotspots += it.id }
-                hotspot = null
-                state = State.FIND
-                status = "couldn't get there"
-            }
-            AutoRoutes.Travel.MOVING -> status = "going to ${if (hotspot != null) "the hotspot" else "the spot"} (${p.position().distanceTo(goal).toInt()}m)"
+            pathIndex = 0
+            repath = 100
         }
+        status = "going to ${if (hotspot != null) "the hotspot" else "the spot"} (${p.position().distanceTo(goal).toInt()}m)"
+        walkPath(p)
     }
 
-    /** Is the hook inside the hotspot? If not, nudge the aim towards it for the next cast (up to 8 tries, then accept). */
+    private fun arrive(p: LocalPlayer) {
+        val hs = hotspot
+        if (hs != null) aimAt(p, hs) else aimTarget = null
+        offYaw = 0f; offPitch = 0f; moveLen = 0
+        returning = true
+        state = State.CAST
+        wait = castWait()
+        status = "at the spot"
+    }
+
+    private fun horizontalDist(a: Vec3, b: Vec3) = kotlin.math.sqrt((a.x - b.x) * (a.x - b.x) + (a.z - b.z) * (a.z - b.z))
+
+    private fun stopWalking() {
+        mc.options.keyUp.isDown = false
+        mc.options.keyJump.isDown = false
+        mc.options.keySprint.isDown = false
+    }
+
+    private fun isLava(pos: BlockPos) = mc.level?.getFluidState(pos)?.`is`(FluidTags.LAVA) == true
+    private fun isFluid(pos: BlockPos) = mc.level?.getFluidState(pos)?.isEmpty == false
+
+    /** Lava within [r] blocks around (and just below) the feet. */
+    private fun nearLava(feet: BlockPos, r: Int): Boolean {
+        for (dx in - r .. r) for (dz in - r .. r) for (dy in - 2 .. 0) if (isLava(feet.offset(dx, dy, dz))) return true
+        return false
+    }
+
+    private fun standable(feet: BlockPos): Boolean {
+        val level = mc.level ?: return false
+        val below = feet.below()
+        if (level.getBlockState(below).getCollisionShape(level, below).isEmpty || isFluid(below)) return false
+        if (! level.getBlockState(feet).getCollisionShape(level, feet).isEmpty || isFluid(feet)) return false
+        val head = feet.above()
+        return level.getBlockState(head).getCollisionShape(level, head).isEmpty && ! isFluid(head)
+    }
+
+    /** A* over standable blocks: never steps into or next to lava, keeps a block's distance from edges when it can. */
+    private fun findPath(p: LocalPlayer, goal: BlockPos): List<BlockPos>? {
+        val start = p.blockPosition()
+        if (start.distManhattan(goal) > 160) return null
+        data class N(val pos: BlockPos, val g: Double, val f: Double)
+        val open = java.util.PriorityQueue<N>(compareBy { it.f })
+        val came = HashMap<BlockPos, BlockPos>()
+        val best = HashMap<BlockPos, Double>()
+        fun h(b: BlockPos) = kotlin.math.sqrt(b.distSqr(goal))
+        open += N(start, 0.0, h(start))
+        best[start] = 0.0
+        var expanded = 0
+        val dirs = listOf(1 to 0, - 1 to 0, 0 to 1, 0 to - 1, 1 to 1, 1 to - 1, - 1 to 1, - 1 to - 1)
+        while (open.isNotEmpty() && expanded++ < 6000) {
+            val cur = open.poll()
+            if (cur.pos.distManhattan(goal) <= 1 && abs(cur.pos.y - goal.y) <= 1) {
+                val out = ArrayList<BlockPos>()
+                var c: BlockPos? = cur.pos
+                while (c != null) { out += c; c = came[c] }
+                out.reverse()
+                return out
+            }
+            if (cur.g > (best[cur.pos] ?: Double.MAX_VALUE)) continue
+            for ((dx, dz) in dirs) {
+                for (dy in intArrayOf(0, 1, - 1, - 2, - 3)) {
+                    val n = cur.pos.offset(dx, dy, dz)
+                    if (! standable(n)) continue
+                    if (dx != 0 && dz != 0 && (! standable(cur.pos.offset(dx, 0, 0)) || ! standable(cur.pos.offset(0, 0, dz)))) continue
+                    if (dy == 1 && ! mc.level!!.getBlockState(cur.pos.above(2)).getCollisionShape(mc.level!!, cur.pos.above(2)).isEmpty) continue
+                    if (nearLava(n, 0)) continue
+                    val step = (if (dx != 0 && dz != 0) 1.414 else 1.0) + (if (dy != 0) 0.5 else 0.0) + (if (nearLava(n, 1)) 6.0 else 0.0)
+                    val g = cur.g + step
+                    if (g < (best[n] ?: Double.MAX_VALUE)) {
+                        best[n] = g
+                        came[n] = cur.pos
+                        open += N(n, g, g + h(n))
+                    }
+                    break // one height per direction (the first that fits)
+                }
+            }
+        }
+        return null
+    }
+
+    /** Walks the path node to node with eased turns; hops along long safe straight stretches with the AOTV. */
+    private fun walkPath(p: LocalPlayer) {
+        if (pathIndex >= path.size) return
+        // skip nodes we've already passed
+        while (pathIndex < path.size - 1 && horizontalDist(p.position(), Vec3.atBottomCenterOf(path[pathIndex])) < 0.7) pathIndex++
+        val node = path[pathIndex]
+        val target = Vec3.atBottomCenterOf(node)
+
+        // safety: never walk into a block that has lava in it or under it
+        val ahead = BlockPos.containing(p.x + p.deltaMovement.x * 4, p.y - 0.5, p.z + p.deltaMovement.z * 4)
+        if (isLava(ahead) || isLava(ahead.above()) || (mc.level!!.getBlockState(ahead).isAir && isLava(ahead.below()))) {
+            stopWalking()
+            repath = 0
+            status = "lava ahead, finding another way"
+            return
+        }
+
+        if (hopWait > 0) hopWait--
+        if (tryHop(p)) return
+
+        val yaw = Math.toDegrees(kotlin.math.atan2(target.z - p.z, target.x - p.x)).toFloat() - 90f
+        turn(p, yaw, 8f + RANDOM.nextFloat() * 6f, 12f)
+        val dy = node.y - p.blockPosition().y
+        mc.options.keyUp.isDown = abs(wrap(yaw - p.yRot)) < 50f
+        mc.options.keyJump.isDown = p.onGround() && (dy > 0 || p.horizontalCollision)
+        mc.options.keySprint.isDown = path.size - pathIndex > 4 && ! nearLava(p.blockPosition(), 2)
+    }
+
+    /** AOTV to a path node 9-12 blocks ahead when the stretch is straight, level, in sight and away from lava. */
+    private fun tryHop(p: LocalPlayer): Boolean {
+        if (hopWait > 0 || ! p.onGround() || RANDOM.nextInt(100) < walkSome.value) return false
+        val slot = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" } ?: return false
+        val from = p.position()
+        var pick = - 1
+        for (i in pathIndex until path.size) {
+            val d = horizontalDist(from, Vec3.atBottomCenterOf(path[i]))
+            if (d > 12.0) break
+            if (abs(path[i].y - p.blockPosition().y) > 1) break
+            if (d >= 9.0) pick = i
+        }
+        if (pick < 0) return false
+        val node = path[pick]
+        if (nearLava(node, 1)) return false
+        // every node on the way has to sit on the straight line (no corner to cut over a gap)
+        val end = Vec3.atBottomCenterOf(node)
+        for (i in pathIndex .. pick) {
+            val c = Vec3.atBottomCenterOf(path[i])
+            val t = ((c.x - from.x) * (end.x - from.x) + (c.z - from.z) * (end.z - from.z)) / ((end.x - from.x).let { it * it } + (end.z - from.z).let { it * it }).coerceAtLeast(0.01)
+            val px = from.x + (end.x - from.x) * t
+            val pz = from.z + (end.z - from.z) * t
+            if (kotlin.math.sqrt((c.x - px) * (c.x - px) + (c.z - pz) * (c.z - pz)) > 1.2) return false
+        }
+        val aim = end.add(0.0, 1.0, 0.0)
+        val clip = p.level().clip(net.minecraft.world.level.ClipContext(p.eyePosition, aim, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
+        if (clip.type != net.minecraft.world.phys.HitResult.Type.MISS) return false
+        hold(slot)
+        stopWalking()
+        val rot = MathUtils.calcYawPitch(aim)
+        if (! turn(p, rot.yaw, rot.pitch, 2f)) return true
+        use(p)
+        hopWait = delay(hopMin.value, hopMax.value)
+        pathIndex = pick
+        return true
+    }
+
+    /** In lava: jump and walk back to the last safe ground; stop if it doesn't work out. */
+    private fun escapeLava(p: LocalPlayer) {
+        ownMoveTicks = 20
+        if (p.fishing != null) rod()?.let { hold(it); use(p) }
+        val back = lastSafe
+        status = "in lava, getting out"
+        mc.options.keyJump.isDown = true
+        if (back != null) {
+            val yaw = Math.toDegrees(kotlin.math.atan2(back.z - p.z, back.x - p.x)).toFloat() - 90f
+            PlayerUtils.rotate(yaw, 0f)
+            mc.options.keyUp.isDown = true
+        }
+        if (++lavaTicks > 80) {
+            stopWalking()
+            failStop("fell into lava and couldn't get out")
+            return
+        }
+        state = State.TRAVEL
+        repath = 0
+    }
+
+    // ------------------------------------------------------------------ aiming the cast
+
+    /** The fluid surface height at (or just below) [pos]. */
+    private fun surfaceY(pos: BlockPos): Double {
+        for (dy in 2 downTo - 6) {
+            val b = pos.offset(0, dy, 0)
+            if (isFluid(b) && ! isFluid(b.above())) return b.y + 0.88
+        }
+        return pos.y.toDouble()
+    }
+
+    /**
+     * Where a hook cast from here with this yaw / pitch comes down on a surface at [surface] (vanilla throw:
+     * 0.6 blocks/tick along the look, 0.92 drag, 0.03 gravity). Null if it hits a block on the way.
+     */
+    private fun landing(p: LocalPlayer, yaw: Float, pitch: Float, surface: Double): Vec3? {
+        val r = Math.PI / 180.0
+        val f2 = kotlin.math.cos(- yaw * r - Math.PI)
+        val f3 = kotlin.math.sin(- yaw * r - Math.PI)
+        val f4 = - kotlin.math.cos(- pitch * r)
+        val f5 = kotlin.math.sin(- pitch * r)
+        var pos = Vec3(p.x - f3 * 0.3, p.eyeY, p.z - f2 * 0.3)
+        var v = Vec3(- f3, (- (f5 / f4)).coerceIn(- 5.0, 5.0), - f2)
+        v = v.scale(0.6 / v.length())
+        val level = p.level()
+        repeat(120) {
+            val next = pos.add(v)
+            val hit = level.clip(net.minecraft.world.level.ClipContext(pos, next, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
+            if (hit.type != net.minecraft.world.phys.HitResult.Type.MISS) return null
+            if (next.y <= surface && v.y < 0) return next
+            pos = next
+            v = Vec3(v.x * 0.92, v.y * 0.92 - 0.03, v.z * 0.92)
+        }
+        return null
+    }
+
+    /** Finds the yaw / pitch whose throw lands on [target]. */
+    private fun solveAim(p: LocalPlayer, target: Vec3): Pair<Float, Float>? {
+        val surface = surfaceY(BlockPos.containing(target))
+        val yaw = Math.toDegrees(kotlin.math.atan2(target.z - p.z, target.x - p.x)).toFloat() - 90f
+        var best: Float? = null
+        var bestErr = Double.MAX_VALUE
+        var pitch = - 55f
+        while (pitch <= 50f) {
+            val land = landing(p, yaw, pitch, surface)
+            if (land != null) {
+                val err = horizontalDist(land, target)
+                if (err < bestErr) { bestErr = err; best = pitch }
+            }
+            pitch += 0.25f
+        }
+        return best?.let { yaw to it }
+    }
+
+    private fun aimAt(p: LocalPlayer, hs: ArmorStand) {
+        aimTarget = Vec3(hs.x, hs.y, hs.z)
+        aimTries = 0
+        val sol = solveAim(p, aimTarget!!)
+        if (sol != null) {
+            anchorYaw = sol.first
+            anchorPitch = sol.second
+        }
+        else {
+            val rot = MathUtils.calcYawPitch(hs.position())
+            anchorYaw = rot.yaw
+            anchorPitch = (rot.pitch - 8f).coerceIn(- 30f, 60f)
+        }
+        nextCastAim(p)
+    }
+
+    /** This cast's aim: the solved aim plus a small hand wobble. */
+    private fun nextCastAim(@Suppress("UNUSED_PARAMETER") p: LocalPlayer) {
+        val w = aimWobble.value.toFloat()
+        wobYaw = (RANDOM.nextFloat() * 2 - 1) * w
+        wobPitch = (RANDOM.nextFloat() * 2 - 1) * w * 0.6f
+    }
+
+    /** Is the hook inside the hotspot? If not, move the aim point by the miss and solve the throw again (8 tries). */
     private fun landedIn(p: LocalPlayer, hook: FishingHook, hs: ArmorStand): Boolean {
         val off = hook.position().subtract(hs.position())
         if (kotlin.math.sqrt(off.x * off.x + off.z * off.z) <= hotspotRadius.value || aimTries >= 8) return true
         aimTries++
-        val eye = p.eyePosition
-        fun flat(v: Vec3) = kotlin.math.sqrt((v.x - eye.x) * (v.x - eye.x) + (v.z - eye.z) * (v.z - eye.z))
-        val tooFar = flat(hook.position()) - flat(hs.position())
-        anchorPitch = (anchorPitch + (tooFar * 1.6).toFloat().coerceIn(- 6f, 6f)).coerceIn(- 45f, 70f)
-        val yawHook = Math.toDegrees(kotlin.math.atan2(hook.z - eye.z, hook.x - eye.x)).toFloat()
-        val yawHs = Math.toDegrees(kotlin.math.atan2(hs.z - eye.z, hs.x - eye.x)).toFloat()
-        anchorYaw += wrap(yawHs - yawHook).coerceIn(- 10f, 10f)
+        val base = aimTarget ?: Vec3(hs.x, hs.y, hs.z)
+        aimTarget = Vec3(base.x - off.x * 0.85, base.y, base.z - off.z * 0.85)
+        solveAim(p, aimTarget!!)?.let { (y, pi) -> anchorYaw = y; anchorPitch = pi }
+        nextCastAim(p)
         returning = true
-        status = "hook landed outside the hotspot, adjusting aim ($aimTries)"
+        status = "hook landed beside the hotspot, re-aiming ($aimTries)"
         return false
     }
 
@@ -626,15 +916,18 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (close.isEmpty()) {
             val far = mobs.minByOrNull { it.distanceToSqr(p) } ?: return
             status = "waiting for ${far.name.string}"
-            val rot = MathUtils.calcYawPitch(far.boundingBox.center)
-            turn(p, rot.yaw, rot.pitch, 3f)
+            // keep an eye on it loosely: only turn when it's well off to the side, and not onto its exact middle
+            val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(far.boundingBox.center, 0.6))
+            if (abs(wrap(rot.yaw - p.yRot)) > 22f || abs(rot.pitch - p.xRot) > 18f) turn(p, rot.yaw, rot.pitch, 9f)
             return
         }
         if (hype != null) {
             hold(hype)
             status = "Hyperion on ${close.size}"
             // look straight down so the blast covers everything around us
-            if (! turn(p, p.yRot, 90f, 3f) || hitCooldown > 0) return
+            if (castDownPitch == 0f) castDownPitch = 80f + RANDOM.nextFloat() * 9f
+            if (! turn(p, p.yRot, castDownPitch, 3f) || hitCooldown > 0) return
+            castDownPitch = 0f
             hitCooldown = hitDelay.value
             ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
             use(p)
@@ -643,7 +936,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (weaponSlot.value in 1 .. 9) hold(weaponSlot.value - 1)
         val target = close.minByOrNull { it.distanceToSqr(p) } ?: return
         status = "fighting ${target.name.string}"
-        val rot = MathUtils.calcYawPitch(target.boundingBox.center)
+        val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(target.boundingBox.center, 0.25))
         if (! turn(p, rot.yaw, rot.pitch, 4f) || hitCooldown > 0) return
         hitCooldown = hitDelay.value
         mc.gameMode?.attack(p, target)
