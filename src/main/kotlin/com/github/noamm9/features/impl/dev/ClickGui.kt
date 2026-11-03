@@ -19,6 +19,23 @@ object ClickGui: Feature("A feature used to change the ClickGui configuration.",
     val accentColor by ColorSetting("Accent Color", Color(139, 92, 246), false).withDescription("The accent color used by the whole ClickGui.")
     val guiStyle by DropdownSetting("GUI Style", 0, listOf("SkyHanni", "Classic")).withDescription("SkyHanni: one window with search, a category list and option cards with descriptions. Classic: the original NoammAddons panels.")
     val customFont by ToggleSetting("Smooth Font", true).withDescription("Riftwalk menu uses the Pretendard font instead of Minecraft's pixel font")
+    val riftClickSound by ToggleSetting("Riftwalk Click Sound", true)
+        .withDescription("Menu clicks make a soft mechanical keyboard \"du-geok\" sound instead of Minecraft's button click")
+    val hudPanels by ToggleSetting("HUD Panels", true).section("HUD Look")
+        .withDescription("Draws a soft dark rounded panel with an accent strip behind every HUD element")
+    val hudFont by ToggleSetting("Smooth HUD Font", true)
+        .withDescription("HUD text uses the same smooth font as the menu instead of Minecraft's pixel font")
+    val hudColors by ToggleSetting("Theme HUD Colours", true)
+        .withDescription("Softens the bright Minecraft colours in HUD text into Void Rift tones (green stays green, red stays red)")
+    val themeColorsButton by ButtonSetting("Apply Theme Colours") {
+        var n = 0
+        com.github.noamm9.features.FeatureManager.features.forEach { f ->
+            if (f === ClickGui) return@forEach
+            f.configSettings.filterIsInstance<ColorSetting>().forEach { it.reset(); n ++ }
+        }
+        com.github.noamm9.ui.notification.NotificationManager.push("Riftwalk", "&fReset &d$n &fcolours to the Void Rift defaults")
+    }.withDescription("Puts every ESP, waypoint and highlight colour back to its default, which now follows the Void Rift theme. Your own colour changes are overwritten.")
+
     private val masterKey by KeybindSetting("All Features On/Off Key").section("All Features")
         .withDescription("Turns every feature off, and the same key turns the ones that were on back on")
     val masterSaved by com.github.noamm9.config.types.TextInputSetting("All Off Saved", "").hidden()

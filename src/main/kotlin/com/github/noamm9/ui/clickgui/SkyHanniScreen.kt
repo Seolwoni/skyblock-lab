@@ -26,6 +26,7 @@ import com.github.noamm9.utils.render.Render2D.drawHorizontalGradient
 import com.github.noamm9.utils.render.Render2D.drawRect
 import com.github.noamm9.utils.render.Render2D.drawVerticalGradient
 import com.github.noamm9.utils.render.Render2D.drawString
+import com.github.noamm9.utils.render.Render2D.drawTexture
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.Screen
@@ -69,15 +70,18 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         private val logoFrom = Color(139, 92, 246)
         private val logoTo = Color(236, 72, 153)
 
-        /** Small glyph shown before each category (drawn from the fallback font). */
-        private fun iconOf(cat: CategoryType) = when (cat) {
-            CategoryType.GENERAL -> "⚙"
-            CategoryType.DUNGEON -> "☠"
-            CategoryType.FLOOR7 -> "⚔"
-            CategoryType.VISUAL -> "✦"
-            CategoryType.MISC -> "✿"
-            CategoryType.ROUTES -> "➶"
-            CategoryType.DEV -> "✎"
+        /** Icon texture per category (white, tinted when drawn). */
+        private val icons = CategoryType.entries.associateWith {
+            net.minecraft.resources.Identifier.fromNamespaceAndPath(com.github.noamm9.NoammAddons.MOD_ID, "textures/gui/icons/${it.name.lowercase()}.png")
+        }
+
+        /** Draws a category icon [size] GUI pixels wide at x, y, tinted with [color]. */
+        fun drawCategoryIcon(ctx: GuiGraphicsExtractor, cat: CategoryType, x: Float, y: Float, size: Float, color: Color) {
+            ctx.pose().pushMatrix()
+            ctx.pose().translate(x, y)
+            ctx.pose().scale(size / 64f, size / 64f)
+            ctx.drawTexture(icons.getValue(cat), 0, 0, 64, 64, color)
+            ctx.pose().popMatrix()
         }
 
         private fun titleOf(cat: CategoryType) = if (cat == CategoryType.FLOOR7) "Floor 7" else cat.name.lowercase().replaceFirstChar { it.uppercase() }
@@ -196,8 +200,17 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val sw = 240f
         val sx = x + (winW() - sw) / 2f
         val sy = y + 4f
+        val focus = anim("searchFocus", 180).also { it.update(if (search.listening) 1f else 0f) }.value
+        if (focus > 0.01f) {
+            Style.roundRect(ctx, sx - 3f, sy - 3f, sw + 6f, 24f, 6f, Style.accentColor.withAlpha((30 * focus).toInt()))
+            Style.roundRect(ctx, sx - 1f, sy - 1f, sw + 2f, 20f, 4f, Style.mix(Style.accentColor, Style.accent2, 0.5f).withAlpha((200 * focus).toInt()))
+        }
         Style.roundRect(ctx, sx, sy, sw, 18f, 3f, field)
-        if (search.listening) ctx.drawRect(sx + 3f, sy + 17f, sw - 6f, 1f, Style.accentColor)
+        if (query.isNotEmpty()) {
+            val hits = entries.count { it is Entry.FeatureCard || it is Entry.Option }
+            val label = "$hits"
+            ctx.drawString(label, sx + sw - 7f - uiWidth(label), sy + 5f, if (hits > 0) accentLight() else Color(251, 113, 133), shadow = false)
+        }
         search.x = sx + 6f
         search.y = sy
         search.width = sw - 12f
@@ -388,9 +401,11 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                         Style.roundRect(ctx, x, y, w, eh, 4f, Style.mix(Style.mix(cardOff, card, on), cardHover, hov))
                         Style.drawGlow(ctx, x + 2f, y + 1f, 26f, eh - 2f, Style.accentColor, on)
                         ctx.drawRect(x, y + 1f, 2f, eh - 2f, Style.mix(line, Style.accentColor, on))
+                        highlight(ctx, f.name, x + CARD_PAD + 3f, y + 6f, "§l")
                         ctx.drawString("§l${f.name}", x + CARD_PAD + 3f, y + 6f, if (f.enabled) textMain else textSoft)
                         var ly = y + 18f
                         for (l in wrap(f.description.orEmpty().replace("\\n", " "), w - CARD_PAD * 2 - 60f)) {
+                            highlight(ctx, l, x + CARD_PAD + 3f, ly, "")
                             ctx.drawString(l, x + CARD_PAD + 3f, ly, if (f.enabled) textDim else textFaint, shadow = false)
                             ly += LINE_H
                         }
@@ -435,6 +450,21 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         ctx.disableScissor()
         visibleWidgets = shown
         scroll.drawScrollbar(ctx, x + w + 2f, top, 2f, h, mx, my)
+    }
+
+    /** Soft purple -> pink marker behind the part of [text] that matches the search. */
+    private fun highlight(ctx: GuiGraphicsExtractor, text: String, x: Float, y: Float, fmt: String) {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        var from = 0
+        while (true) {
+            val i = text.indexOf(q, from, ignoreCase = true)
+            if (i < 0) return
+            val hx = x + uiWidth(fmt + text.substring(0, i))
+            val hw = uiWidth(fmt + text.substring(i, i + q.length))
+            Style.gradientPill(ctx, hx - 1.5f, y - 1.5f, hw + 3f, 11f, Style.accentColor.withAlpha(110), Style.accent2.withAlpha(110))
+            from = i + q.length
+        }
     }
 
     /** The accent, lifted towards white for text on dark backgrounds. */
@@ -591,7 +621,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     private fun drawIcon(ctx: GuiGraphicsExtractor, cat: CategoryType, x: Float, y: Float, strength: Float) {
         val t = cat.ordinal / (CategoryType.entries.size - 1f)
         val c = Style.mix(textFaint, Style.mix(Style.accentColor, Style.accent2, t), strength)
-        ctx.drawString(iconOf(cat), x, y, c, shadow = false)
+        drawCategoryIcon(ctx, cat, x, y - 0.5f, 9f, c)
     }
 
     /** "Riftwalk" in the smooth bold font, purple -> pink letter by letter. Returns where it ends. */

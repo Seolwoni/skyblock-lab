@@ -35,7 +35,7 @@ object DungeonWaypoints: Feature("Add a custom waypoint with /ndw add while look
     private val keyWaypoints by ToggleSetting("Redstone Key Waypoints", true).showIf { secretWaypoints.value }
     private val leverWaypoints by ToggleSetting("Lever Waypoints", true).showIf { secretWaypoints.value }
 
-    private val chestColor by ColorSetting("Chest Color", Color.MAGENTA, false).showIf { chestWaypoints.value && secretWaypoints.value }.section("Colors")
+    private val chestColor by ColorSetting("Chest Color", Color(236, 72, 153), false).showIf { chestWaypoints.value && secretWaypoints.value }.section("Colors")
     private val itemColor by ColorSetting("Item Color", Utils.favoriteColor, false).showIf { itemWaypoints.value && secretWaypoints.value }
     private val batColor by ColorSetting("Bat Color", Color.GREEN, false).showIf { batWaypoints.value && secretWaypoints.value }
     private val essenceColor by ColorSetting("Essence Color", Color.BLACK, false).showIf { essenceWaypoints.value && secretWaypoints.value }

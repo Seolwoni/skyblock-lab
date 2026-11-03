@@ -19,6 +19,8 @@ object RiftChat {
         'c' to 0xFB7185, 'd' to 0xF472B6, 'e' to 0xFDE68A, 'f' to BASE,
     )
 
+    fun colorOf(code: Char): Int? = palette[code.lowercaseChar()]
+
     /** "[RW] ›" with every letter stepping from violet to pink. */
     val prefix: MutableComponent by lazy {
         Component.empty().apply {

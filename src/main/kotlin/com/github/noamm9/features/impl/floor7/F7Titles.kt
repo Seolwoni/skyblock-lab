@@ -151,6 +151,7 @@ object F7Titles: Feature(name = "F7 Titles", description = "Custom Titles for F7
                 showTitle("&cNecron Dead!!")
             }
         }
+        hudElements.forEach { it.themedPanel = false } // big centred titles look better without a panel
     }
 
     private val timerRenderer = EventBus.listener<RenderOverlayEvent> {

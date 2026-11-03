@@ -27,6 +27,9 @@ abstract class HudElement {
         scale = defaultScale
     }
 
+    /** False for elements that draw their own background (scoreboard, titles, route status...). */
+    var themedPanel = true
+
     var isDragging = false
     private var dragX = 0f
     private var dragY = 0f
@@ -63,9 +66,25 @@ abstract class HudElement {
         ctx.pose().translate(x, y)
         ctx.pose().scale(scale, scale)
 
-        draw(ctx, example).run {
-            width = first.toFloat()
-            height = second.toFloat()
+        val gui = com.github.noamm9.features.impl.dev.ClickGui
+        if (! example && themedPanel && gui.hudPanels.value && width > 0f && height > 0f) {
+            val left = if (centered()) - width / 2f else 0f
+            Style.roundRect(ctx, left - 4f, - 3f, width + 8f, height + 6f, 3.5f, Color(15, 11, 23, 165))
+            Style.roundRect(ctx, left - 4f, 0f, 1.5f, height, 0.75f, Style.accentColor.withAlpha(220))
+        }
+
+        val prevFont = com.github.noamm9.utils.render.UiFont.active
+        val prevThemed = com.github.noamm9.utils.render.UiFont.themed
+        com.github.noamm9.utils.render.UiFont.active = gui.hudFont.value
+        com.github.noamm9.utils.render.UiFont.themed = gui.hudColors.value
+        try {
+            draw(ctx, example).run {
+                width = first.toFloat()
+                height = second.toFloat()
+            }
+        } finally {
+            com.github.noamm9.utils.render.UiFont.active = prevFont
+            com.github.noamm9.utils.render.UiFont.themed = prevThemed
         }
 
         ctx.pose().popMatrix()

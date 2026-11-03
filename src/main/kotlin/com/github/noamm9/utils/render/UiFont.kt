@@ -15,6 +15,8 @@ import net.minecraft.resources.Identifier
  */
 object UiFont {
     @JvmField var active = false
+    /** Use the Void Rift palette for § colours (HUDs) instead of Minecraft's own. */
+    @JvmField var themed = false
 
     /** Minecraft's 16 chat colours by code. */
     private val COLORS = mapOf(
@@ -30,7 +32,7 @@ object UiFont {
     }
 
     /** [text] may contain § (or &) codes. */
-    fun component(text: String): Component = cache.getOrPut(text) { build(text.replace('&', '§')) }
+    fun component(text: String): Component = cache.getOrPut(if (themed) "\u0000$text" else text) { build(text.replace('&', '§')) }
 
     fun width(text: String): Int = mc.font.width(component(text))
 
@@ -60,7 +62,7 @@ object UiFont {
                 when (code) {
                     'r' -> { color = null; bold = false }
                     'l' -> bold = true
-                    else -> COLORS[code]?.let { color = it; bold = false }
+                    else -> (if (themed) com.github.noamm9.utils.RiftChat.colorOf(code) else COLORS[code])?.let { color = it; bold = false }
                 }
                 i += 2
                 continue

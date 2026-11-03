@@ -33,8 +33,8 @@ object BloodCamp: Feature("Features for Blood Room."), IFeatureWindow {
     private val bloodCamp by ToggleSetting("Blood Camp Helper", true).section("Blood Camp Helper")
     private val decimalPlaces by SliderSetting("Decimal Places", 1, 0, 2, 1).showIf { bloodCamp.value }.withDescription("The number of decimal places shown on blood mob timers")
     private val timerColor by ColorSetting("Timer Color", Color.WHITE).showIf { bloodCamp.value }
-    private val boxColor by ColorSetting("Box Color", Color(255, 0, 255)).showIf { bloodCamp.value }
-    private val lineColor by ColorSetting("Line Color", Color.CYAN).showIf { bloodCamp.value }
+    private val boxColor by ColorSetting("Box Color", Color(236, 72, 153)).showIf { bloodCamp.value }
+    private val lineColor by ColorSetting("Line Color", Color(167, 107, 250)).showIf { bloodCamp.value }
 
     private val killTimer by ToggleSetting("Move Timer").withDescription("Displays a HUD counting down to when the blood mobs are ready to be killed.").section("Alerts")
     private val killTitle by ToggleSetting("Kill Title").withDescription("Displays a Title when the blood mobs are ready to be killed. &bNOTE: Not always accurate, you will get better move times by learning when to kill the mobs yourself.")

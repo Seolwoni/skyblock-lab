@@ -25,7 +25,7 @@ import java.awt.Color
 object InventorySearch: Feature("Lets you search in inventory and support math") {
     private val ignoreCaps by ToggleSetting("Ignore Caps", true)
     private val searchLore by ToggleSetting("Search Lore", true)
-    val highlightColor by ColorSetting("Highlight Color", Color.RED)
+    val highlightColor by ColorSetting("Highlight Color", Color(236, 72, 153))
 
     private var searchQuery = ""
     private var expressionResult: Double? = null
@@ -51,7 +51,7 @@ object InventorySearch: Feature("Lets you search in inventory and support math")
             val localMouseX = (Resolution.getMouseX() - searchHud.x) / searchHud.scale
             val localMouseY = (Resolution.getMouseY() - searchHud.y) / searchHud.scale
 
-            context.drawRect(- WIDTH / 2, 0f, WIDTH, HEIGHT, Color(15, 15, 15, 200))
+            Style.roundRect(context, - WIDTH / 2f, 0f, WIDTH.toFloat(), HEIGHT.toFloat(), 4f, Color(15, 11, 23, 220))
             val color = if (searchHandler.listening) Style.accentColor else Color(255, 255, 255, 30)
             context.drawRect(- WIDTH / 2, HEIGHT - 1, WIDTH, 1f, color)
 
@@ -64,6 +64,7 @@ object InventorySearch: Feature("Lets you search in inventory and support math")
             x = Resolution.width / 2f
             y = Resolution.height - 30f - HEIGHT / 2f
         }
+        searchHud.themedPanel = false
 
         register<ScreenEvent.PostRender> {
             if (mc.gui.screen() !is AbstractContainerScreen<*>) return@register

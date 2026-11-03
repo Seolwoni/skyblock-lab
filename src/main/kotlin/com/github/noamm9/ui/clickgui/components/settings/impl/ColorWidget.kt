@@ -13,6 +13,7 @@ import com.github.noamm9.utils.render.Render2D.drawRect
 import com.github.noamm9.utils.render.Render2D.drawString
 import com.github.noamm9.utils.render.Render2D.drawVerticalGradient
 import com.github.noamm9.utils.render.Render2D.scissor
+import com.github.noamm9.utils.render.RenderHelper.width
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import java.awt.Color
@@ -83,13 +84,19 @@ class ColorWidget(config: ColorSetting): Widget<Color>(config) {
         Style.drawHoverBar(ctx, x.toFloat(), y.toFloat(), 20f, hoverAnim.value)
         Style.drawNudgedText(ctx, name, x + 8f, y + 6f, hoverAnim.value)
 
-        val previewX = x + width - 18f
+        // round swatch with a ring that lights up on hover / while open
+        val previewX = x + width - 20f
+        val ring = maxOf(hoverAnim.value, openAnim.value)
+        Style.roundRect(ctx, previewX - 1.5f, y + 4.5f, 11f, 11f, 5.5f, Style.mix(Color(255, 255, 255, 40), Style.accent2, ring))
         if (cfg.withAlpha) drawCheckerboard(ctx, previewX, y + 6f, 8f, 8f, 2)
-        ctx.drawRect(previewX, y + 6f, 8f, 8f, value)
+        Style.roundRect(ctx, previewX, y + 6f, 8f, 8f, 4f, value)
+        val hex = "#" + hexText.take(6)
+        ctx.drawString(hex, previewX - 6f - hex.width(), y + 6f, Color(138, 127, 163).withAlpha((90 + 165 * ring).toInt()), shadow = false)
 
         ctx.scissor(x, y, width, height)
 
-        if (expanded) {
+        if (openAnim.value > 0.01f) {
+            Style.roundRect(ctx, x + 4f, y + 21f, width - 8f, (height - 22f).coerceAtLeast(0f), 4f, Color(11, 8, 18, (200 * openAnim.value).toInt()))
             val pickerY = y + 25f
             val pickerSize = 80f
             handleInputs(mouseX, mouseY, pickerY, pickerSize)
@@ -105,8 +112,8 @@ class ColorWidget(config: ColorSetting): Widget<Color>(config) {
 
             val hexY = pickerY + pickerSize + 5f
             val hexW = width - 20f
-            ctx.drawRect(x + 10f, hexY, hexW, 12f, Color(10, 10, 10, 200))
-            if (hexFocused) ctx.drawRect(x + 10f, hexY + 11f, hexW, 1f, Style.accentColor)
+            if (hexFocused) Style.roundRect(ctx, x + 9f, hexY - 1f, hexW + 2f, 14f, 4f, Style.accentColor)
+            Style.roundRect(ctx, x + 10f, hexY, hexW, 12f, 3f, Color(21, 15, 32))
 
             val cursor = if (hexFocused && (System.currentTimeMillis() / 500) % 2 == 0L) "|" else ""
             ctx.drawString("Hex: §7#$hexText$cursor", x + 14f, hexY + 2f)

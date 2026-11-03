@@ -129,5 +129,12 @@ object Style {
         ctx.drawRect(x + (w * end) - (kSize / 2f), y + (h / 2f) - (kSize / 2f), kSize, kSize)
     }
 
-    fun playClickSound(pitch: Float) = SoundUtils.playSound(SoundEvents.UI_BUTTON_CLICK, 0.25f, pitch)
+    /** Riftwalk's own "du-geok" keyboard clack (assets/noammaddons/sounds/click.ogg). */
+    private val riftClick by lazy {
+        net.minecraft.sounds.SoundEvent.createVariableRangeEvent(net.minecraft.resources.Identifier.fromNamespaceAndPath(com.github.noamm9.NoammAddons.MOD_ID, "ui.click"))
+    }
+
+    fun playClickSound(pitch: Float) =
+        if (ClickGui.riftClickSound.value) SoundUtils.playSound(riftClick, 0.55f, pitch)
+        else SoundUtils.playSound(SoundEvents.UI_BUTTON_CLICK, 0.25f, pitch)
 }

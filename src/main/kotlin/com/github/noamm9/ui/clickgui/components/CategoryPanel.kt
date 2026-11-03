@@ -16,6 +16,9 @@ import com.github.noamm9.utils.ColorUtils.withAlpha
 import com.github.noamm9.utils.GuiUtils
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
 import com.github.noamm9.utils.render.Render2D.drawRect
+import com.github.noamm9.utils.render.Render2D.drawString
+import com.github.noamm9.utils.render.Render2D.drawHorizontalGradient
+import com.github.noamm9.utils.render.Render2D.drawVerticalGradient
 import com.github.noamm9.utils.render.Render2D.scissor
 import com.github.noamm9.utils.render.RenderHelper.width
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -28,9 +31,9 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
         const val BUTTON_HEIGHT = 16
         const val MAX_DISPLAY_HEIGHT = 350
 
-        private val headerBg = Color(20, 20, 20, 230)
-        private val bodyBg = Color(15, 15, 15, 180)
-        private val hoverColor = Color(255, 255, 255, 30)
+        private val headerBg = Color(32, 22, 50, 240)
+        private val bodyBg = Color(15, 11, 23, 215)
+        private val hoverColor = Color(255, 255, 255, 18)
     }
 
     private val features = FeatureManager.getFeaturesByCategory(category)
@@ -57,9 +60,16 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
 
         openAnim.update(if (collapsed && features.size == filteredFeatures.size) 0f else 1f)
 
-        context.drawRect(x, y, WIDTH, HEADER_HEIGHT, headerBg)
-        context.drawRect(x, y, WIDTH, 2, Style.accentColor)
-        context.drawCenteredString("§l${if (category != CategoryType.FLOOR7) category.name else "Floor 7"}", x + WIDTH / 2, y + 7)
+        Style.drawShadow(context, x.toFloat(), y.toFloat(), WIDTH.toFloat(), HEADER_HEIGHT.toFloat(), 4f, 0.6f)
+        Style.roundRect(context, x.toFloat(), y.toFloat(), WIDTH.toFloat(), HEADER_HEIGHT.toFloat(), 4f, headerBg)
+        context.drawRect(x, y + HEADER_HEIGHT - 4, WIDTH, 4, headerBg)
+        Style.gradientPill(context, x.toFloat(), (y + HEADER_HEIGHT - 1).toFloat(), WIDTH.toFloat(), 1f, Style.accentColor, Style.accent2)
+        val title = "§l${if (category != CategoryType.FLOOR7) category.name.lowercase().replaceFirstChar { it.uppercase() } else "Floor 7"}"
+        val iconColor = Style.mix(Style.accentColor, Style.accent2, category.ordinal / (CategoryType.entries.size - 1f))
+        val tw = title.width()
+        val left = x + WIDTH / 2f - (tw + 13f) / 2f
+        com.github.noamm9.ui.clickgui.SkyHanniScreen.drawCategoryIcon(context, category, left, y + 6.5f, 9f, iconColor)
+        context.drawString(title, left + 13f, y + 7, Color(237, 231, 255))
 
         if (openAnim.value > 0.01f || features.size != filteredFeatures.size) {
             val totalContentHeight = filteredFeatures.size * BUTTON_HEIGHT
@@ -82,7 +92,7 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
                     context.drawRect(x, currentY, WIDTH, BUTTON_HEIGHT, bodyBg)
 
                     if (feature.enabled) {
-                        context.drawRect(x, currentY, WIDTH, BUTTON_HEIGHT, Style.accentColor.withAlpha(100))
+                        context.drawHorizontalGradient(x, currentY, WIDTH, BUTTON_HEIGHT, Style.accentColor.withAlpha(110), Style.accent2.withAlpha(40))
                         context.drawRect(x, currentY, 2, BUTTON_HEIGHT, Style.accentColor)
                     }
 
@@ -90,7 +100,7 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
                         context.drawRect(x, currentY, WIDTH, BUTTON_HEIGHT, hoverColor)
                     }
 
-                    context.drawCenteredString(feature.name, x + WIDTH / 2, currentY + 4)
+                    context.drawCenteredString(feature.name, x + WIDTH / 2, currentY + 4, if (feature.enabled) Color.WHITE else Color(196, 184, 224))
 
                     if (isHovered && ! screen.isMouseOverConfigWindow(mouseX, mouseY)) {
                         TooltipManager.hover(feature.description, mouseX, mouseY)
@@ -104,7 +114,7 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
                 val barHeight = (visibleHeight.toFloat() / totalContentHeight.toFloat()) * visibleHeight
                 val barY = (y + HEADER_HEIGHT) + ((scrollOffset / maxScroll) * (visibleHeight - barHeight))
 
-                context.drawRect(x + WIDTH - 2, barY, 2, barHeight)
+                context.drawVerticalGradient(x + WIDTH - 2, barY, 2, barHeight, Style.accentColor, Style.accent2)
             }
         }
     }

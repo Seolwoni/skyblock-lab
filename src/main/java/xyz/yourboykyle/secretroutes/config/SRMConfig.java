@@ -92,7 +92,7 @@ public class SRMConfig {
     // Visual
     public LineType lineType = LineType.LINES;
     public int width = 5;
-    public Color lineColor = new Color(255, 0, 0);
+    public Color lineColor = new Color(236, 72, 153);
     public boolean renderLinesThroughWalls = true;
     public ParticleType particles = ParticleType.FLAME;
     public double particleDensity = 2.0;
@@ -100,7 +100,7 @@ public class SRMConfig {
     public int tickInterval = 1;
     public boolean playerWaypointLine = false;
     public int playerToSecretLineWidth = 4;
-    public Color playerToSecretLineColor = new Color(255, 0, 0);
+    public Color playerToSecretLineColor = new Color(236, 72, 153);
     public boolean playerToEtherwarp = false;
     public int playerToEtherwarpLineWidth = 4;
     public boolean autoSkipEtherwarps = true;
@@ -111,14 +111,14 @@ public class SRMConfig {
     public float etherwarpAimSoundPitch = 1.6f;
     public int etherwarpAimSoundRearmDelay = 400;
     public boolean useEtherwarpColorForLine = true;
-    public Color playerToEtherwarpLineColor = new Color(128, 0, 128);
+    public Color playerToEtherwarpLineColor = new Color(139, 92, 246);
 
     // Colours and toggles
     public boolean renderEtherwarps = true;
     public boolean etherwarpFullBlock = false;
     public float etherwarpBoxLineWidth = 7f;
-    public Color etherWarp = new Color(128, 0, 128);
-    public Color secondStepEtherWarp = new Color(95, 61, 97);
+    public Color etherWarp = new Color(139, 92, 246);
+    public Color secondStepEtherWarp = new Color(96, 64, 160);
     public boolean renderMines = true;
     public boolean mineFullBlock = false;
     public float mineBoxLineWidth = 5f;

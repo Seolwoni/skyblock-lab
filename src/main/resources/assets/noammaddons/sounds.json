@@ -1,0 +1,6 @@
+{
+  "ui.click": {
+    "subtitle": "Riftwalk click",
+    "sounds": ["noammaddons:click"]
+  }
+}

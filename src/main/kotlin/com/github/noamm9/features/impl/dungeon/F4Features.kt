@@ -26,7 +26,7 @@ object F4Features: Feature(name = "F4 Features", description = "Spirit bear spaw
     private val spiritBearHud by ToggleSetting("Spirit Bear HUD", true).withDescription("Shows the required mobs to spawn the Spirit Bear and a spawn timer for when he's about to spawn.")
 
     private val espThornColor by ColorSetting("Thorn Color", Color(255, 0, 0, 50)).section("Colors")
-    private val espSpiritBearColor by ColorSetting("Bear Color", Color(255, 0, 255, 50))
+    private val espSpiritBearColor by ColorSetting("Bear Color", Color(236, 72, 153, 60))
     private val boxSpiritBowColor by ColorSetting("Box Color", Color(0, 255, 255, 50))
 
     private val inM4boss get() = LocationUtils.inBoss && LocationUtils.dungeonFloorNumber == 4

@@ -33,6 +33,8 @@ object Scoreboard: Feature("Draws a custom scoreboard instead of the vanilla one
     @Suppress("RemoveRedundantQualifierName")
     private val hud = object: HudElement() {
         override val name = "Scoreboard"
+
+        init { themedPanel = false }
         override val toggle get() = Scoreboard.enabled
 
         override fun draw(ctx: GuiGraphicsExtractor, example: Boolean): Pair<Float, Float> {
