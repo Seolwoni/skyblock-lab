@@ -59,7 +59,7 @@ object AutoFishing: Feature("Fishes by itself: casts, reels in on the bite, reca
     private var kills = 0
     private var status = "idle"
     private var lastMobIds = emptySet<Int>()
-    /** Creature id -> ticks it has been out of reach; given up on after 15 s so fishing goes on. */
+    /** Creature id -> ticks it has been out of reach; given up on after 5 s so fishing goes on. */
     private val waiting = HashMap<Int, Int>()
     private val ignored = HashSet<Int>()
 
@@ -231,11 +231,11 @@ object AutoFishing: Feature("Fishes by itself: casts, reels in on the bite, reca
 
     private fun fight(p: Player, mobs: List<LivingEntity>) {
         val hype = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
-        // a creature that never comes within reach (stuck in the water) is left alone after 15 s
+        // a creature that never comes within reach (stuck in the water) is left alone after 5 s
         val reach = if (hype != null) blastRange.value else 3.2
         for (m in mobs) {
             if (p.distanceTo(m) <= reach) waiting.remove(m.id)
-            else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > 300) {
+            else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > 100) {
                 ignored += m.id
                 waiting.remove(m.id)
             }
