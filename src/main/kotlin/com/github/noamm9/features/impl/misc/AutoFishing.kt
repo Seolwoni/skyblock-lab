@@ -108,7 +108,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }.withDescription("Empties the sell list")
 
     private val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe").withDescription(
-        "Stops (doesn't try to hide anything): when the server teleports or turns you, changes your held item, or opens a menu by itself"
+        "Stops (doesn't try to hide anything): when the server teleports or turns you, your view jumps 70 degrees or more in an instant, your held item is changed, or a menu opens by itself"
     )
     private val longBreaks by ToggleSetting("Long Breaks", true).section("Breaks").withDescription("Every so often reels in and takes a proper break, looking around now and then, like a person getting a drink")
     private val breakEveryMin by SliderSetting("Break Every Min", 25, 5, 120, 1, " min").showIf { longBreaks.value }
@@ -167,6 +167,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var travelStuck = 0
     private var ownMoveTicks = 0
     private var expectedSlot = - 1
+    private var lastLookYaw: Float? = null
+    private var lastLookPitch = 0f
 
     // safe walking (own path, avoids lava / water)
     private var path: List<BlockPos> = emptyList()
@@ -379,6 +381,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         anchorYaw = p.yRot
         anchorPitch = p.xRot
         timing = com.github.noamm9.utils.HumanTiming()
+        lastLookYaw = null
         wobYaw = 0f; wobPitch = 0f
         aimTarget = null
         noticeAt.clear()
@@ -535,6 +538,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (stopHealth.value > 0 && p.health / p.maxHealth * 100f < stopHealth.value) return stop("health is low")
         if (hitCooldown > 0) hitCooldown--
         if (ownMoveTicks > 0) ownMoveTicks--
+        // a sudden big jump in where we look (more than any turn of ours can do in a tick): stop
+        if (failsafe.value && lastLookYaw != null && ownMoveTicks <= 0) {
+            val dy = abs(wrap(p.yRot - lastLookYaw!!))
+            val dp = abs(p.xRot - lastLookPitch)
+            if (kotlin.math.sqrt(dy * dy + dp * dp) >= 70f) return failStop("your view suddenly turned ${kotlin.math.sqrt(dy * dy + dp * dp).toInt()} degrees")
+        }
+        lastLookYaw = p.yRot
+        lastLookPitch = p.xRot
         timing.tick()
         if (failsafe.value) {
             if (expectedSlot >= 0 && p.inventory.selectedSlot != expectedSlot) return failStop("your held item was changed")
