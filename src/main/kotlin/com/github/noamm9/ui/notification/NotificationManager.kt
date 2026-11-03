@@ -37,19 +37,7 @@ object NotificationManager: ISelfInit {
     }
 
     override fun init() {
-        EventBus.register<ScreenEvent.PostRender> {
-            val window = mc.window
-            val ctx = event.context
-
-            val activeScale = window.screenWidth.toFloat() / ctx.guiWidth().toFloat()
-            val normalScale = window.calculateScale(mc.options.guiScale().get(), mc.isEnforceUnicode).toFloat()
-            val correction = normalScale / activeScale
-
-            ctx.pose().pushMatrix()
-            ctx.pose().scale(correction)
-            render(ctx, ctx.guiWidth() / correction, ctx.guiHeight() / correction)
-            ctx.pose().popMatrix()
-        }
+        EventBus.register<ScreenEvent.PostRender> { render(event.context) }
     }
 
     private fun smooth() = com.github.noamm9.features.impl.dev.ClickGui.customFont.value
@@ -83,10 +71,12 @@ object NotificationManager: ISelfInit {
         lastFrameTime = now
         if (notifications.isEmpty()) return
 
-        val screenW = w ?: ctx.guiWidth().toFloat()
-        val screenH = h ?: ctx.guiHeight().toFloat()
-        val mX = (mc.mouseHandler.xpos() * mc.window.guiScaledWidth / mc.window.screenWidth).toFloat()
-        val mY = (mc.mouseHandler.ypos() * mc.window.guiScaledHeight / mc.window.screenHeight).toFloat()
+        // same scale as the Riftwalk menu, so toasts match it whatever the GUI scale is
+        com.github.noamm9.ui.utils.Resolution.push(ctx)
+        val screenW = com.github.noamm9.ui.utils.Resolution.width
+        val screenH = com.github.noamm9.ui.utils.Resolution.height
+        val mX = com.github.noamm9.ui.utils.Resolution.getMouseX().toFloat()
+        val mY = com.github.noamm9.ui.utils.Resolution.getMouseY().toFloat()
 
         val prev = UiFont.active
         UiFont.active = smooth()
@@ -153,6 +143,7 @@ object NotificationManager: ISelfInit {
             }
         } finally {
             UiFont.active = prev
+            com.github.noamm9.ui.utils.Resolution.pop(ctx)
         }
     }
 

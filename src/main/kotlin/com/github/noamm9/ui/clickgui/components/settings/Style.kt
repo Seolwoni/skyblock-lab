@@ -58,9 +58,16 @@ object Style {
         gradientPill(ctx, x, y, w, h, accentColor.withAlpha(a), accent2.withAlpha(a))
     }
 
-    /** Width of [s] with every digit as wide as "0", so numbers don't wobble when they change. */
-    fun tabWidth(s: String): Float {
+    /** Digit cell: between a "1" and a "0", so changing numbers barely move without wide gaps around a 1. */
+    private fun digitCell(): Float {
         val zero = with(com.github.noamm9.utils.render.RenderHelper) { "0".width() }.toFloat()
+        val one = with(com.github.noamm9.utils.render.RenderHelper) { "1".width() }.toFloat()
+        return (zero * 2 + one) / 3f
+    }
+
+    /** Width of [s] with every digit in the same cell, so numbers don't wobble when they change. */
+    fun tabWidth(s: String): Float {
+        val zero = digitCell()
         var w = 0f
         for (ch in s) w += if (ch.isDigit()) zero else with(com.github.noamm9.utils.render.RenderHelper) { ch.toString().width() }.toFloat()
         return w
@@ -68,7 +75,7 @@ object Style {
 
     /** Draws [s] with fixed-width digits (each centred in a "0"-wide cell). */
     fun drawTabular(ctx: GuiGraphicsExtractor, s: String, x: Float, y: Float, color: Color, shadow: Boolean = false) {
-        val zero = with(com.github.noamm9.utils.render.RenderHelper) { "0".width() }.toFloat()
+        val zero = digitCell()
         var cx = x
         for (ch in s) {
             val cw = with(com.github.noamm9.utils.render.RenderHelper) { ch.toString().width() }.toFloat()

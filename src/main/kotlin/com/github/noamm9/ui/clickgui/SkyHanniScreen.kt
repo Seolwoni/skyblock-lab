@@ -283,7 +283,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         ctx.drawHorizontalGradient(x, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accentColor.withAlpha(0), Style.accentColor)
         ctx.drawHorizontalGradient(x + winW() / 2f, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accent2, Style.accent2.withAlpha(0))
         val logoEnd = drawLogo(ctx, x + 10f, y + 9f)
-        Style.drawTabular(ctx, com.github.noamm9.NoammAddons.MOD_VERSION, logoEnd + 6f, y + 9f, textFaint)
+        ctx.drawString(com.github.noamm9.NoammAddons.MOD_VERSION, logoEnd + 6f, y + 9f, textFaint, shadow = false)
 
         val sw = 240f
         val sx = x + (winW() - sw) / 2f
@@ -363,7 +363,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     ctx.drawString(label, x + 21f, y + 4f, if (open) accentLight() else textMain)
                     val all = featuresIn(key)
                     val count = if (open) "${all.count { it.enabled }}/${all.size}" else "${all.size}"
-                    Style.drawTabular(ctx, count, x + SIDEBAR_W - 8f - Style.tabWidth(count), y + 4f, if (open) accentLight() else textFaint)
+                    if (open) Style.drawTabular(ctx, count, x + SIDEBAR_W - 8f - Style.tabWidth(count), y + 4f, accentLight())
+                    else ctx.drawString(count, x + SIDEBAR_W - 8f - uiWidth(count), y + 4f, textFaint, shadow = false)
                 }
 
                 is Feature -> {
