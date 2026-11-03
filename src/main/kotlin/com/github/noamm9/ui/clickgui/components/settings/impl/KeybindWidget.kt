@@ -23,11 +23,22 @@ class KeybindWidget(config: KeybindSetting): Widget<Int>(config) {
         Style.drawHoverBar(ctx, x, y, height, hoverAnim.value)
         Style.drawNudgedText(ctx, name, x + 8f, y + 6f, hoverAnim.value)
 
+        val raw = cfg.displayName()
+        val unset = ! listening && (raw.isBlank() || raw.equals("NONE", true) || raw.equals("UNKNOWN", true))
         val bindText = when {
-            listening -> "§b..."
-            else -> "§7${cfg.displayName()}"
+            listening -> "Press a key…"
+            unset -> "Not set"
+            else -> raw
         }
-        ctx.drawString(bindText, x + width - bindText.width() - 8f, y + 6f)
+        val bw = bindText.width() + 10f
+        val bx = x + width - bw - 6f
+        if (unset) Style.roundRect(ctx, bx, y + 3f, bw, 13f, 6.5f, java.awt.Color(255, 255, 255, 10 + (12 * hoverAnim.value).toInt()))
+        else Style.valuePill(ctx, bx, y + 3f, bw, 13f, listening, hoverAnim.value)
+        ctx.drawString(bindText, bx + 5f, y + 6f, when {
+            listening -> Style.accentColor
+            unset -> java.awt.Color(138, 127, 163)
+            else -> java.awt.Color.WHITE
+        }, shadow = false)
     }
 
     override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {

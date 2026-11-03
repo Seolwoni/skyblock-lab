@@ -84,8 +84,22 @@ public class SmokeTest implements FabricClientGameTest {
 				}
 			});
 			log.add("switched on: " + toggled.size());
+			context.runOnClient(mc -> {
+				com.github.noamm9.utils.ChatUtils.INSTANCE.modMessage("&aAuto Routes &fstarted in &bBlaze Room&f.");
+				com.github.noamm9.utils.ChatUtils.INSTANCE.modMessage("&7Etherwarp landed, &e3 &7secrets left.");
+				com.github.noamm9.utils.ChatUtils.INSTANCE.modMessage("&cCould not reach the next point, stopping.");
+			});
 			context.waitTicks(100);
 			context.takeScreenshot("rw-03-everything-on");
+			try {
+				context.runOnClient(mc -> mc.gui.setScreen(new com.github.noamm9.ui.hud.HudEditorScreen()));
+				context.waitTicks(20);
+				context.takeScreenshot("rw-05-hud-editor");
+				context.runOnClient(mc -> mc.gui.setScreen(null));
+				context.waitTicks(5);
+			} catch (Throwable t) {
+				failures.add("hud editor: " + t);
+			}
 			context.runOnClient(mc -> {
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) {
 					String id = f.getClass().getSimpleName();

@@ -3,6 +3,7 @@ package com.github.noamm9.ui.utils
 import com.github.noamm9.ui.clickgui.components.settings.Style
 import com.github.noamm9.utils.ColorUtils.withAlpha
 import com.github.noamm9.utils.render.Render2D.drawRect
+import com.github.noamm9.utils.render.Render2D.drawVerticalGradient
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import java.awt.Color
 
@@ -12,6 +13,7 @@ class ScrollState(
     private val fixedThumbHeight: Float? = null
 ) {
     private val anim = Animation(duration)
+    private val hoverAnim = Animation(150)
 
     var target = 0f
         private set
@@ -67,8 +69,24 @@ class ScrollState(
         if (! canScroll) return
 
         val hovered = isHovered(mx, my)
-        ctx.drawRect(x, y, w, h, trackColor ?: Color(255, 255, 255, if (hovered) 24 else 15))
-        ctx.drawRect(x, thumbY, w, thumbH, thumbColor ?: Style.accentColor.withAlpha(if (hovered || dragging) 255 else 190))
+        hoverAnim.update(if (hovered || dragging) 1f else 0f)
+        if (trackColor != null || thumbColor != null) {
+            ctx.drawRect(x, y, w, h, trackColor ?: Color(255, 255, 255, if (hovered) 24 else 15))
+            ctx.drawRect(x, thumbY, w, thumbH, thumbColor ?: Style.accentColor.withAlpha(if (hovered || dragging) 255 else 190))
+            return
+        }
+        // thin rounded track that widens a little on hover, purple -> pink thumb
+        val hv = hoverAnim.value
+        val tw = w + hv
+        val tx = x + (w - tw) / 2f
+        Style.roundRect(ctx, tx, y, tw, h, tw / 2f, Color(255, 255, 255, (10 + 10 * hv).toInt()))
+        val a = (170 + 85 * hv).toInt()
+        val top = Style.accentColor.withAlpha(a)
+        val bottom = Style.accent2.withAlpha(a)
+        val r = tw / 2f
+        Style.roundRect(ctx, tx, thumbY, tw, r * 2, r, top)
+        if (thumbH > r * 4) ctx.drawVerticalGradient(tx, thumbY + r, tw, thumbH - r * 2, top, bottom)
+        Style.roundRect(ctx, tx, thumbY + thumbH - r * 2, tw, r * 2, r, bottom)
     }
 
     fun mouseClicked(mx: Float, my: Float): Boolean {

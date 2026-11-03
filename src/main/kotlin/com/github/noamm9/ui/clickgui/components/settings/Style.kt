@@ -46,6 +46,18 @@ object Style {
         roundRect(ctx, x + (w * progress) - (kSize / 2f), y + (h / 2f) - (kSize / 2f), kSize, kSize, 3f, Color(245, 240, 255))
     }
 
+    /** Rounded value badge (slider numbers, key binds): purple -> pink, an outlined field while editing. */
+    fun valuePill(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, editing: Boolean, hover: Float = 0f) {
+        val r = h / 2f
+        if (editing) {
+            roundRect(ctx, x - 1f, y - 1f, w + 2f, h + 2f, r + 1f, accentColor)
+            roundRect(ctx, x, y, w, h, r, Color(11, 8, 18))
+            return
+        }
+        val a = (150 + 70 * hover).toInt().coerceIn(0, 255)
+        gradientPill(ctx, x, y, w, h, accentColor.withAlpha(a), accent2.withAlpha(a))
+    }
+
     /** Linear mix of two colours, alpha included. */
     fun mix(a: Color, b: Color, t: Float): Color = a.lerpTo(b, t)
 

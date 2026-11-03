@@ -1,7 +1,7 @@
 package com.github.noamm9.ui.hud
 
 import com.github.noamm9.ui.clickgui.components.settings.Style
-import com.github.noamm9.utils.render.Render2D.drawRect
+import com.github.noamm9.utils.ColorUtils.withAlpha
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import java.awt.Color
 import kotlin.math.roundToInt
@@ -33,17 +33,27 @@ abstract class HudElement {
 
     abstract fun draw(ctx: GuiGraphicsExtractor, example: Boolean): Pair<Number, Number>
 
+    private val editorHover = com.github.noamm9.ui.utils.Animation(140, 0f)
+
     open fun drawBackground(ctx: GuiGraphicsExtractor, mx: Int, my: Int) {
         val scaledW = width * scale
         val scaledH = height * scale
         val centeredOffset = if (centered()) scaledW / 2f else 0f
         val hovered = mx >= x - centeredOffset && mx <= x - centeredOffset + scaledW && my >= y && my <= y + scaledH
+        editorHover.update(if (isDragging || hovered) 1f else 0f)
+        val hv = editorHover.value
+        val left = x - centeredOffset - 2f
+        val top = y - 2f
+        val w = scaledW + 4f
+        val h = scaledH + 4f
 
-        val borderColor = if (isDragging || hovered) Style.accentColor else Color(255, 255, 255, 40)
-
-        ctx.drawRect(x - centeredOffset, y, scaledW, scaledH, Color(10, 10, 10, 150))
-        ctx.drawRect(x - centeredOffset, y, scaledW, 1f, borderColor)
-        ctx.drawRect(x - centeredOffset, y + scaledH - 1f, scaledW, 1f, borderColor)
+        // accent outline that fades in, then the dark rounded panel on top of it
+        if (hv > 0.01f) {
+            Style.roundRect(ctx, left - 2f, top - 2f, w + 4f, h + 4f, 5f, Style.accentColor.withAlpha((45 * hv).toInt()))
+            Style.roundRect(ctx, left - 1f, top - 1f, w + 2f, h + 2f, 4f, Style.mix(Style.accentColor, Style.accent2, 0.5f).withAlpha((200 * hv).toInt()))
+        }
+        else Style.roundRect(ctx, left - 0.5f, top - 0.5f, w + 1f, h + 1f, 3.5f, Color(255, 255, 255, 22))
+        Style.roundRect(ctx, left, top, w, h, 3f, Color(15, 11, 23, (150 + 40 * hv).toInt()))
     }
 
     fun renderElement(ctx: GuiGraphicsExtractor, example: Boolean) {

@@ -14,13 +14,16 @@ import com.github.noamm9.utils.spaceCaps
 import net.minecraft.client.gui.GuiGraphicsExtractor
 
 open class Feature(
-    val description: String? = null,
+    description: String? = null,
     name: String? = null,
     toggled: Boolean = false,
     jsonName: String? = null,
 ): Shortcuts, SettingProvider, HudProvider {
     val name = name ?: this::class.simpleName.toString().spaceCaps()
     val jsonName = jsonName ?: this.name
+    private val givenDescription = description
+    /** The feature's own description, or a written fallback when it had none (see [FeatureDescriptions]). */
+    val description: String? by lazy { FeatureDescriptions.fallback(this, this.name, givenDescription) }
     @JvmField var enabled = toggled
     open val category = initCategory()
 

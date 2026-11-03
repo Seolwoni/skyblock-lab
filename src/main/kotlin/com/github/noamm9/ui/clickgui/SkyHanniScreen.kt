@@ -69,6 +69,19 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         private val logoFrom = Color(139, 92, 246)
         private val logoTo = Color(236, 72, 153)
 
+        /** Small glyph shown before each category (drawn from the fallback font). */
+        private fun iconOf(cat: CategoryType) = when (cat) {
+            CategoryType.GENERAL -> "⚙"
+            CategoryType.DUNGEON -> "☠"
+            CategoryType.FLOOR7 -> "♛"
+            CategoryType.VISUAL -> "✦"
+            CategoryType.MISC -> "✿"
+            CategoryType.ROUTES -> "➶"
+            CategoryType.DEV -> "✎"
+        }
+
+        private fun titleOf(cat: CategoryType) = if (cat == CategoryType.FLOOR7) "Floor 7" else cat.name.lowercase().replaceFirstChar { it.uppercase() }
+
         /** Remembered between openings, like SkyHanni does. */
         @JvmField var lastCategory: CategoryType = CategoryType.DUNGEON
         @JvmField var lastFeature: Feature? = null
@@ -85,8 +98,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     private var category = lastCategory
     private var selected: Feature? = lastFeature
 
-    private val sideScroll = ScrollState(minThumbHeight = 18f)
-    private val scroll = ScrollState(minThumbHeight = 18f)
+    private val sideScroll = ScrollState(260L, minThumbHeight = 18f)
+    private val scroll = ScrollState(260L, minThumbHeight = 18f)
     private val widgetCache = HashMap<Feature, List<Widget<*>>>()
 
     /** What the content area shows this frame, rebuilt every frame (cheap: only the visible feature). */
@@ -219,7 +232,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
         val rows = ArrayList<Pair<Any, String>>()
         for (cat in CategoryType.entries) {
-            rows += cat to (if (cat == CategoryType.FLOOR7) "Floor 7" else cat.name.lowercase().replaceFirstChar { it.uppercase() })
+            rows += cat to titleOf(cat)
             if (cat == category && query.isBlank()) featuresIn(cat).forEach { rows += it to it.name }
         }
 
@@ -243,7 +256,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     }
                     if (hov > 0.01f) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Color(255, 255, 255, (12 * hov).toInt()))
                     if (key != CategoryType.entries.first()) ctx.drawRect(x + 6f, y, SIDEBAR_W - 12f, 1f, line)
-                    ctx.drawString(label, x + 8f, y + 4f, if (open) accentLight() else textMain)
+                    drawIcon(ctx, key, x + 8f, y + 3.5f, if (open) 1f else 0.55f + 0.45f * hov)
+                    ctx.drawString(label, x + 21f, y + 4f, if (open) accentLight() else textMain)
                     val all = featuresIn(key)
                     val count = if (open) "${all.count { it.enabled }}/${all.size}" else "${all.size}"
                     ctx.drawString(count, x + SIDEBAR_W - 8f - uiWidth(count), y + 4f, if (open) accentLight() else textFaint, shadow = false)
@@ -291,7 +305,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
         val feature = selected
         if (feature == null) {
-            add(Entry.Header(if (category == CategoryType.FLOOR7) "Floor 7" else category.name.lowercase().replaceFirstChar { it.uppercase() }))
+            add(Entry.Header(titleOf(category)))
             featuresIn(category).forEach { add(Entry.FeatureCard(it)) }
             return@buildList
         }
@@ -350,10 +364,17 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
             val visible = y + eh >= top && y <= top + h
             when (entry) {
                 is Entry.Header -> if (visible) {
-                    ctx.drawString(entry.text, x + 2f, y + 4f, accentLight())
+                    val cat = CategoryType.entries.firstOrNull { titleOf(it) == entry.text && selected == null && query.isBlank() }
+                    var tx = x + 2f
+                    if (cat != null) {
+                        drawIcon(ctx, cat, tx, y + 3.5f, 1f)
+                        tx += 13f
+                    }
+                    ctx.drawString(entry.text, tx, y + 4f, accentLight())
                     val on = headerOnCount(entry.text)
-                    if (on != null) ctx.drawString(on, x + 8f + uiWidth(entry.text), y + 4f, textFaint, shadow = false)
-                    ctx.drawRect(x + 2f, y + 15f, w - 4f, 1f, line)
+                    if (on != null) ctx.drawString(on, tx + 6f + uiWidth(entry.text), y + 4f, textFaint, shadow = false)
+                    ctx.drawHorizontalGradient(x + 2f, y + 15f, (w - 4f) * 0.35f, 1f, Style.accentColor.withAlpha(140), line)
+                    ctx.drawRect(x + 2f + (w - 4f) * 0.35f, y + 15f, (w - 4f) * 0.65f, 1f, line)
                 }
 
                 is Entry.FeatureCard -> {
@@ -565,6 +586,13 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
     /** One animation per thing on screen (card, row, switch...), created on first use. */
     private fun anim(key: Any, ms: Long): Animation = anims.getOrPut(key) { Animation(ms, 0f) }
+
+    /** Category glyph in the purple -> pink accent, [strength] 0..1 fades it towards the dim text colour. */
+    private fun drawIcon(ctx: GuiGraphicsExtractor, cat: CategoryType, x: Float, y: Float, strength: Float) {
+        val t = cat.ordinal / (CategoryType.entries.size - 1f)
+        val c = Style.mix(textFaint, Style.mix(Style.accentColor, Style.accent2, t), strength)
+        ctx.drawString(iconOf(cat), x, y, c, shadow = false)
+    }
 
     /** "Riftwalk" in the smooth bold font, purple -> pink letter by letter. Returns where it ends. */
     private fun drawLogo(ctx: GuiGraphicsExtractor, x: Float, y: Float): Float {
