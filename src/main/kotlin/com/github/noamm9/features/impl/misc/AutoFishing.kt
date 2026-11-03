@@ -72,6 +72,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val noticeMin by SliderSetting("Notice Delay Min", 8, 0, 40, 1, " ticks").withDescription("How long it takes to notice a sea creature that came up, before reacting")
     private val noticeMax by SliderSetting("Notice Delay Max", 26, 0, 60, 1, " ticks")
     private val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")
+    private val manaCost by SliderSetting("Mana Per Cast", 300, 0, 1000, 10).withDescription("Wither Impact's mana cost for you. Below it, the Hyperion swings as a sword instead of casting (no more standing there with no mana)")
+    private val pauseMana by SliderSetting("Pause Below Mana", 35, 0, 90, 5, "%").withDescription("Stops casting the rod while mana is under this, so no new sea creatures come up until it has refilled (0 = never pause)")
     private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) of the weapon. 0 = Hyperion / Astraea / Scylla / Valkyrie if found")
     private val hitDelay by SliderSetting("Hit Delay", 4, 1, 20, 1, " ticks")
 
@@ -410,6 +412,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         when (state) {
             State.CAST -> {
                 if (moveLen > 0) return // don't cast in the middle of a head movement
+                val mf = com.github.noamm9.utils.ManaGuard.fraction
+                if (killCreatures.value && pauseMana.value > 0 && mf != null && mf * 100 < pauseMana.value && hasHype()) {
+                    status = "waiting for mana (${(mf * 100).toInt()}%)"
+                    return
+                }
                 // settle on this cast's aim (with its wobble) first, then land on it exactly
                 val ty = anchorYaw + offYaw + wobYaw
                 val tp = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
@@ -900,8 +907,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
     }
 
+    private fun hasHype() = weaponSlot.value !in 1 .. 9 && PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } != null
+
     private fun fight(p: LocalPlayer, mobs: List<LivingEntity>) {
-        val hype = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
+        val hypeSlot = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
+        // no mana: the Hyperion is still a sword, swing it instead of standing there
+        val hype = hypeSlot?.takeIf { com.github.noamm9.utils.ManaGuard.canCast(manaCost.value) }
+        if (hypeSlot != null && hype == null) hold(hypeSlot)
         val reach = if (hype != null) blastRange.value else 3.2
         for (m in mobs) {
             if (p.distanceTo(m) <= reach) waiting.remove(m.id)
@@ -933,7 +945,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
         if (weaponSlot.value in 1 .. 9) hold(weaponSlot.value - 1)
         val target = close.minByOrNull { it.distanceToSqr(p) } ?: return
-        status = "fighting ${target.name.string}"
+        status = if (hypeSlot != null && hype == null) "no mana, hitting ${target.name.string}" else "fighting ${target.name.string}"
         val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(target.boundingBox.center, 0.25))
         if (! turn(p, rot.yaw, rot.pitch, 4f) || hitCooldown > 0) return
         hitCooldown = hitDelay.value

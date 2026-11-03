@@ -70,6 +70,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     )
     private val useHype by ToggleSetting("Use Hyperion", true).withDescription("Wither Impact (Hyperion / Astraea / Scylla / Valkyrie): teleports into the pack and casts looking down. Falls back to hitting if none is in the hotbar")
     private val hypeTeleport by ToggleSetting("Teleport Into Mobs", true).withDescription("Casts towards a pack up to 10 blocks away to get there instantly, instead of walking")
+    private val manaCost by SliderSetting("Mana Per Cast", 300, 0, 1000, 10).hideIf { clearMode.value == 0 }.withDescription("Wither Impact's mana cost for you. Below it, the Hyperion is swung as a sword instead")
     private val castDelay by SliderSetting("Cast Delay", 3, 1, 20, 1, " ticks").withDescription("Ticks between Wither Impact casts (watch your mana)")
     private val blastRadius by SliderSetting("Blast Radius", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("Wither Impact damage radius, used to decide when a pack is close enough")
     private val killStars by ToggleSetting("Kill Star Mobs", true).hideIf { clearMode.value == 0 }.withDescription("Stops to kill starred (✯) mobs near the route")
@@ -634,7 +635,8 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         }
 
         val hypeSlot = if (useHype.value) PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } else null
-        if (hypeSlot != null) return hypeFight(p, target, hypeSlot)
+        if (hypeSlot != null && com.github.noamm9.utils.ManaGuard.canCast(manaCost.value)) return hypeFight(p, target, hypeSlot)
+        if (hypeSlot != null && weaponSlot.value !in 1 .. 9) PlayerUtils.swapToSlot(hypeSlot) // no mana: swing it
 
         val dist = p.eyePosition.distanceTo(target.boundingBox.clipNearest(p.eyePosition))
         if (dist > attackRange.value) {
@@ -767,10 +769,11 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val target = findRoomTarget(p) ?: return false.also { fightTarget = null }
         fightTarget = target
         val slot = if (useHype.value) PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } else null
-        if (slot != null) {
+        if (slot != null && com.github.noamm9.utils.ManaGuard.canCast(manaCost.value)) {
             hypeFight(p, target, slot)
             return true
         }
+        if (slot != null && weaponSlot.value !in 1 .. 9) PlayerUtils.swapToSlot(slot)
         val dist = p.eyePosition.distanceTo(target.boundingBox.clipNearest(p.eyePosition))
         if (dist > attackRange.value) {
             walkTowards(p.position(), target.position())
