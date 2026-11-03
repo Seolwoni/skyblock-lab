@@ -90,6 +90,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
         /** The logo intro has played this launch. */
         private var introPlayed = false
+        /** Tests: hold the intro at this point (0..1), -1 = run normally. */
+        @JvmField var introFreeze = - 1f
 
         /** Remembered between openings, like SkyHanni does. */
         @JvmField var lastCategory: CategoryType = CategoryType.DUNGEON
@@ -108,6 +110,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
     /** 0..1 through the intro, 1 when it's over (or off / skipped). */
     private fun introT(): Float {
+        if (introFreeze >= 0f) return introFreeze
         if (! introOn || introSkipped) return 1f
         if (introStart == 0L) introStart = System.currentTimeMillis()
         return ((System.currentTimeMillis() - introStart) / INTRO_MS.toFloat()).coerceIn(0f, 1f)

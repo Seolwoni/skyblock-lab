@@ -58,9 +58,11 @@ public class SmokeTest implements FabricClientGameTest {
 
 			// 3. Settings screens open and draw
 			try {
+				SkyHanniScreen.introFreeze = 0.5f;
 				context.runOnClient(mc -> mc.gui.setScreen(ClickGui.createScreen()));
-				context.waitTicks(11);
+				context.waitTicks(5);
 				context.takeScreenshot("rw-00-intro");
+				SkyHanniScreen.introFreeze = -1f;
 				context.runOnClient(mc -> mc.gui.setScreen(null));
 				context.waitTicks(5);
 			} catch (Throwable t) {

@@ -124,9 +124,18 @@ object NotificationManager: ISelfInit {
                 Style.roundRect(ctx, x, y, WIDTH, height, 6f, bg.withAlpha((bg.alpha * a).toInt()))
                 // accent stripe on the left and a top highlight, like light on glass
                 Style.roundRect(ctx, x + 4f, y + PAD, 2f, height - PAD * 2 - 2f, 1f, Style.mix(Style.accentColor, Style.accent2, 0.3f).withAlpha(alpha))
-                Style.roundRect(ctx, x + 6f, y + 0.5f, WIDTH - 12f, 1f, 0.5f, Color(255, 255, 255, (18 * a).toInt()))
+                Style.roundRect(ctx, x + 12f, y + 1f, WIDTH - 24f, 1f, 0.5f, Color(255, 255, 255, (16 * a).toInt()))
 
-                ctx.drawString("§l${n.title.replace(Regex("§[0-9a-fr]"), "")}", x + PAD + 5f, y + PAD, titleColor.withAlpha(alpha), shadow = false)
+                val title = n.title.replace(Regex("§[0-9a-fk-or]"), "")
+                if (title == "Riftwalk" && UiFont.active) {
+                    // the brand name in the same purple -> pink letters as the menu logo
+                    var tx = x + PAD + 5f
+                    title.forEachIndexed { i, ch ->
+                        ctx.drawString("§l$ch", tx, y + PAD, Style.mix(Color(139, 92, 246), Color(236, 72, 153), i / (title.length - 1f)).withAlpha(alpha), shadow = false)
+                        tx += UiFont.width("§l$ch")
+                    }
+                }
+                else ctx.drawString("§l$title", x + PAD + 5f, y + PAD, titleColor.withAlpha(alpha), shadow = false)
                 var ly = y + PAD + 12f
                 for (l in lines) {
                     ctx.drawString(l, x + PAD + 5f, ly, textColor.withAlpha(alpha), shadow = false)
