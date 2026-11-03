@@ -21,11 +21,14 @@ object ManaGuard: ISelfInit {
         }
     }
 
-    /** Current mana, or null when the action bar hasn't shown it. */
-    val mana: Int? get() = ActionBarParser.currentMana.takeIf { ActionBarParser.maxMana > 0 }
+    /** True when the action bar showed the mana in the last 3 s; an old reading is not trusted. */
+    private val fresh get() = ActionBarParser.maxMana > 0 && System.currentTimeMillis() - ActionBarParser.manaSeenAt < 3000
+
+    /** Current mana, or null when the action bar hasn't shown it lately. */
+    val mana: Int? get() = ActionBarParser.currentMana.takeIf { fresh }
 
     /** Mana as 0..1 of the maximum, or null when unknown. */
-    val fraction: Float? get() = if (ActionBarParser.maxMana > 0) ActionBarParser.currentMana / ActionBarParser.maxMana.toFloat() else null
+    val fraction: Float? get() = if (fresh) ActionBarParser.currentMana / ActionBarParser.maxMana.toFloat() else null
 
     /** True when an ability costing [cost] can be used right now. */
     fun canCast(cost: Int): Boolean {

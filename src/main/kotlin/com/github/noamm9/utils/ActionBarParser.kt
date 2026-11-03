@@ -35,6 +35,8 @@ object ActionBarParser: ISelfInit {
     var currentDefense = 0
     var currentMana = 0
     var maxMana = 0
+    /** When the action bar last actually showed the mana (ms). */
+    var manaSeenAt = 0L
     var overflowMana = 0
     var currentVitality = 0
     var maxVitality = 0
@@ -75,6 +77,7 @@ object ActionBarParser: ISelfInit {
         MANA_REGEX.find(input)?.let { match ->
             currentMana = match.groupValues[1].remove(",").toIntOrNull() ?: currentMana
             maxMana = match.groupValues[2].remove(",").toIntOrNull() ?: maxMana
+            manaSeenAt = System.currentTimeMillis()
         }
 
         OVERFLOW_REGEX.find(input).let { match ->

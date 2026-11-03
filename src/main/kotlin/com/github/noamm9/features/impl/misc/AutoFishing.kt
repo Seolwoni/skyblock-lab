@@ -144,6 +144,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var status = "idle"
     private var lastMobIds = emptySet<Int>()
     private val waiting = HashMap<Int, Int>()
+    private val inReach = HashMap<Int, Pair<Int, Float>>() // id -> ticks in reach without losing health, last health
+    private var manaWait = 0
+    private var fightTicks = 0
     private val ignored = HashSet<Int>()
     private var groundTicks = 0
     private var groundFails = 0
@@ -633,6 +636,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 fightWait = delay(3, 10) // then a beat before turning round
             }
             justCaughtSomething = true
+            if (state != State.FIGHT) fightTicks = 0
+            // never stand there forever: after 40 s of one fight, leave whatever is left and fish again
+            if (++fightTicks > 800) {
+                mobs.forEach { ignored += it.id }
+                fightTicks = 0
+                info("&7Left a fight that went on for 40 s.")
+                return
+            }
             state = State.FIGHT
             if (fightWait > 0) { fightWait--; status = "noticed a sea creature"; return }
             fight(p, mobs)
@@ -681,10 +692,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     return
                 }
                 val mf = com.github.noamm9.utils.ManaGuard.fraction
-                if (killCreatures.value && pauseMana.value > 0 && mf != null && mf * 100 < pauseMana.value && hasHype()) {
+                if (killCreatures.value && pauseMana.value > 0 && mf != null && mf * 100 < pauseMana.value && hasHype() && manaWait < 600) {
+                    manaWait++ // at most 30 s, then fish anyway
+                    if (p.inventory.selectedSlot != rod) hold(rod) // wait with the rod, not standing there with the Hyperion
                     status = "waiting for mana (${(mf * 100).toInt()}%)"
                     return
                 }
+                manaWait = 0
                 // settle on this cast's aim (with its wobble) first, then land on it exactly
                 val ty = anchorYaw + offYaw + wobYaw
                 val tp = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
@@ -1522,6 +1536,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             .firstOrNull { "❤" in it }
     }
 
+    /** "0❤" on its name tag: SkyBlock keeps a dying creature around for a moment. */
+    private fun deadTag(e: Entity) = tagOf(e)?.let { Regex("(?:^|\\s)0/[\\d,.]+[kKmMbB]?❤").containsMatchIn(it.replace(Regex("§."), "")) || it.replace(Regex("§."), "").contains(" 0❤") } == true
+
     private fun creatures(p: LocalPlayer): List<LivingEntity> {
         val r = killRange.value
         val scan = maxOf(r, 24.0)
@@ -1532,7 +1549,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         // anything actually hitting us counts too (self-defence)
         if (p.hurtTime > 0) all.filter { it.distanceTo(p) <= 3.5f && p.hasLineOfSight(it) }.forEach { mine += it.id }
         return all.filter { e ->
-            e.id !in ignored && e.distanceTo(p) <= r && (! onlyMine.value || e.id in mine)
+            e.id !in ignored && e.distanceTo(p) <= r && (! onlyMine.value || e.id in mine) && ! deadTag(e)
         }
     }
 
@@ -1544,6 +1561,15 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val hype = hypeSlot?.takeIf { com.github.noamm9.utils.ManaGuard.canCast(manaCost.value) }
         if (hypeSlot != null && hype == null) hold(hypeSlot)
         val reach = if (hype != null) blastRange.value else 3.2
+        // a creature that's in reach but never loses health (out of the blast, immune, already dead): leave it
+        val inReachLimit = maxOf(giveUp.value * 20 * 2, 200)
+        for (m in mobs) if (p.distanceTo(m) <= reach) {
+            val (t, hp) = inReach[m.id] ?: (0 to m.health)
+            val n = if (m.health < hp - 0.01f) 0 else t + 1
+            inReach[m.id] = n to m.health
+            if (n > inReachLimit) { ignored += m.id; inReach.remove(m.id) }
+        }
+        if (inReach.size > 200) inReach.keys.retainAll(mobs.map { it.id }.toSet())
         for (m in mobs) {
             if (p.distanceTo(m) <= reach) waiting.remove(m.id)
             else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > giveUp.value * 20) {
