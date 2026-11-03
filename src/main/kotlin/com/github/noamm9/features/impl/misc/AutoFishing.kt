@@ -1393,19 +1393,57 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (p.fishing != null) rod()?.let { hold(it); use(p) }
         val back = lastSafe
         status = "in lava, getting out"
+        lavaTicks++
         mc.options.keyJump.isDown = true
+        mc.options.keySprint.isDown = true
         if (back != null) {
-            val yaw = Math.toDegrees(kotlin.math.atan2(back.z - p.z, back.x - p.x)).toFloat() - 90f
-            PlayerUtils.rotate(yaw, 0f)
+            // aim at the last safe spot, a little above it so a teleport lands on top
+            val target = back.add(0.0, 1.2, 0.0)
+            val rot = MathUtils.calcYawPitch(target)
+            PlayerUtils.rotate(rot.yaw, rot.pitch)
             mc.options.keyUp.isDown = true
+            // swimming alone often can't climb out: teleport back with AOTV, else the Hyperion, every half second
+            if (lavaTicks % 10 == 4) {
+                val tp = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" }
+                    ?: PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
+                if (tp != null) { hold(tp); use(p) }
+            }
         }
-        if (++lavaTicks > 80) {
+        if (lavaTicks > 200) {
             stopWalking()
             failStop("fell into lava and couldn't get out")
             return
         }
         state = State.TRAVEL
         repath = 0
+    }
+
+    /**
+     * True when a Wither Impact with this look can't drop us into lava: follows the 10-block teleport until
+     * something blocks the body, then checks there's solid ground (not lava) under where we'd end up.
+     */
+    private fun blastSafe(p: LocalPlayer, yaw: Float, pitch: Float): Boolean {
+        val lvl = p.level()
+        val look = Vec3.directionFromRotation(pitch, yaw)
+        val eyeH = p.eyeHeight.toDouble()
+        fun solid(b: BlockPos) = ! lvl.getBlockState(b).getCollisionShape(lvl, b).isEmpty
+        var end = p.position()
+        var d = 0.25
+        while (d <= 10.0) {
+            val feet = p.eyePosition.add(look.scale(d)).subtract(0.0, eyeH, 0.0)
+            val bp = BlockPos.containing(feet)
+            if (solid(bp) || solid(bp.above())) break
+            end = feet
+            d += 0.25
+        }
+        val at = BlockPos.containing(end)
+        if (lvl.getFluidState(at).`is`(FluidTags.LAVA) || lvl.getFluidState(at.above()).`is`(FluidTags.LAVA)) return false
+        for (dy in 1 .. 4) {
+            val b = at.below(dy - 1).below()
+            if (lvl.getFluidState(b).`is`(FluidTags.LAVA)) return false
+            if (solid(b)) return true
+        }
+        return false // nothing under us: we'd fall
     }
 
     // ------------------------------------------------------------------ aiming the cast
@@ -1599,6 +1637,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 }
                 1 -> { // then look down so the blast covers everything around us
                     if (castDownPitch == 0f) castDownPitch = 78f + RANDOM.nextFloat() * 11f
+                    if (! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
                     if (! turn(p, p.yRot, castDownPitch, 3f)) return
                     val swapped = p.inventory.selectedSlot != hype
                     hold(hype) // the Hyperion comes out once we're looking down
@@ -1607,6 +1646,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 }
                 else -> { // cast; between casts keep looking down, each cast a little different
                     if (hitCooldown > 0) return
+                    if (! blastSafe(p, p.yRot, p.xRot)) { // this look would teleport us off the edge: straight down instead
+                        castDownPitch = 90f
+                        if (abs(p.xRot - 90f) > 0.5f) { hypeStage = 1; return }
+                        if (! blastSafe(p, p.yRot, 90f)) { status = "Hyperion not safe here"; return }
+                    }
                     hold(hype)
                     ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
                     use(p)
