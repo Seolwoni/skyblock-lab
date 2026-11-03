@@ -23,6 +23,13 @@ object ArrowAlign: Feature("Arrow Align Solver") {
     private val blockWrongClicks by ToggleSetting("Block Wrong Clicks").withDescription("Sneak to disable.")
     private val invertSneak by ToggleSetting("Invert Sneak").showIf { blockWrongClicks.value }
 
+    //#if CHEAT
+    private val autoAlign by com.github.noamm9.config.types.ToggleSetting("Auto Arrow Align", false).section("Auto").withDescription("Turns the frames to the solution by itself while you stand at the device (looks at each frame, then clicks)")
+    private val alignDelay by com.github.noamm9.config.types.SliderSetting("Click Delay", 3, 1, 10, 1, " ticks").withDescription("Ticks between clicks (each frame turns one step per click)").showIf { autoAlign.value }
+    private var alignCooldown = 0
+    private var alignPending: Int? = null
+    //#endif
+
     private val gridCorner = BlockPos(- 2, 120, 75)
     private val gridBox = aabb(
         gridCorner.x, gridCorner.y, gridCorner.z,
@@ -79,6 +86,28 @@ object ArrowAlign: Feature("Arrow Align Solver") {
             }
         }
 
+        //#if CHEAT
+        register<TickEvent.Start> {
+            if (! autoAlign.value || LocationUtils.F7Phase != 3 || mc.gui.screen() != null) return@register
+            if (alignCooldown > 0) { alignCooldown--; return@register }
+            val sol = solution ?: return@register
+            // the closest frame that still needs clicks, within reach
+            val index = clicksRemaining.keys.minByOrNull { i -> player.eyePosition.distanceToSqr(frameCentre(i)) } ?: return@register
+            if (player.eyePosition.distanceTo(frameCentre(index)) > 4.5) return@register
+            val rot = com.github.noamm9.utils.MathUtils.calcYawPitch(frameCentre(index))
+            com.github.noamm9.utils.PlayerUtils.rotate(rot.yaw, rot.pitch)
+            // click on the tick after the aim arrived, so the crosshair is really on the frame
+            if (alignPending != index) { alignPending = index; return@register }
+            val hit = mc.hitResult as? net.minecraft.world.phys.EntityHitResult ?: return@register
+            val frame = hit.entity as? ItemFrame ?: return@register
+            val pos = frame.blockPosition()
+            if ((pos.y - gridCorner.y) + (pos.z - gridCorner.z) * 5 != index) return@register
+            com.github.noamm9.utils.PlayerUtils.rightClick()
+            alignCooldown = alignDelay.value
+            if (sol.getOrNull(index) == null) alignPending = null
+        }
+        //#endif
+
         register<PlayerInteractEvent.RIGHT_CLICK.ENTITY> {
             if (LocationUtils.F7Phase != 3) return@register
             val entity = event.entity as? ItemFrame ?: return@register
@@ -129,6 +158,8 @@ object ArrowAlign: Feature("Arrow Align Solver") {
             }
         }
     }
+
+    private fun frameCentre(index: Int) = net.minecraft.world.phys.Vec3(gridCorner.x + 0.06, gridCorner.y + (index % 5) + 0.5, gridCorner.z + (index / 5) + 0.5)
 
     private fun reset() {
         frameRotations.fill(- 1)

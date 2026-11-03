@@ -77,8 +77,19 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val attackRange by SliderSetting("Attack Range", 3.0, 2.0, 3.0, 0.1, " blocks").withDescription("Normal hand reach at most")
     private val detourRange by SliderSetting("Detour Range", 6.0, 0.0, 12.0, 0.5, " blocks").withDescription("How far it leaves the route to chase a target (0 = only hit what is already in reach)")
     private val fightBack by ToggleSetting("Fight Back", true).withDescription("When something hits you, kills the closest mob within 3 blocks first (any mob, not just starred)")
+    private val hypePriority by ToggleSetting("Prioritise Star Mobs", true).hideIf { clearMode.value == 0 }.withDescription(
+        "When picking where to cast, a starred mob or miniboss counts as 3 normal mobs"
+    )
+    private val hypeLead by ToggleSetting("Lead Moving Mobs", true).hideIf { clearMode.value == 0 }.withDescription(
+        "Aims the teleport at where the pack will be a few ticks from now, not where it is"
+    )
     private val hitDelay by SliderSetting("Hit Delay", 2, 1, 10, 1, " ticks").withDescription("Ticks between hits")
     private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) to hold while fighting. 0 = keep the current item")
+    private val recover by ToggleSetting("Recover When Stuck", true).section("Recovery").withDescription(
+        "Instead of stopping when stuck: jumps, teleports up/forward with the AOTV, then re-finds the closest point of the route. Stops only after several failed tries"
+    )
+    private val etherRetries by SliderSetting("Etherwarp Retries", 3, 1, 8, 1).withDescription("Failed etherwarps to the same block before walking / AOTV-ing there instead")
+    private val skipStuckSecret by ToggleSetting("Skip Unreachable Secret", true).withDescription("If a secret can't be collected in 10 seconds, move on instead of stopping (Auto Dungeon goes to the next room)")
     private val useAssistPath by ToggleSetting("Use Assist Path", true).section("Assist").withDescription(
         "With Assist Core + Assist Path installed: when the straight walk is blocked, or the target is far, finds a way around with Assist Path (no breaking or placing)"
     )
@@ -137,6 +148,20 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val MINIBOSSES = setOf("Shadow Assassin", "Lost Adventurer", "Frozen Adventurer", "Angry Archaeologist", "King Midas", "Diamond Guy")
     private var lastEtherCheck: Boolean? = null
     private var lastPos: Vec3? = null
+    private var recoveries = 0
+    private val etherFails = HashMap<BlockPos, Int>()
+    private val ignored = HashMap<Int, Int>() // entity id -> ticks left
+    private var castsOnTarget = 0
+    private var targetHealth = - 1f
+    private var targetId = - 1
+
+    /** Set by Auto Dungeon: clear the whole room whatever Clear is set to. */
+    @JvmField var forceClear = false
+    /** Why the last run stopped (read by Auto Dungeon). */
+    var lastStopReason: String? = null
+        private set
+    val isRunning get() = running
+    private val clearValue get() = if (forceClear) 2 else clearMode.value
 
     override fun init() {
         register<TickEvent.Start> {
@@ -205,8 +230,28 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         if (running) stop(null)
     }
 
+    /** Starts following the room (used by the key and by Auto Dungeon). Returns false if there is nothing to do here. */
+    fun startRun(quiet: Boolean = false): Boolean {
+        if (! RouteBridge.routeActive() && ! (clearValue == 2 && DungeonScanner.currentRoom != null)) return false
+        if (running) return true
+        running = true
+        stepRef = null
+        phase = Phase.MOVE
+        recoveries = 0
+        etherFails.clear()
+        lastStopReason = null
+        if (! quiet) info("&aFollowing route. Press the key again to stop.")
+        if (assistLog.value) AssistBridge.logStart("Auto Routes in ${Main.currentRoom?.name ?: DungeonScanner.currentRoom?.getName() ?: "?"}")
+        return true
+    }
+
+    /** Stops from outside (Auto Dungeon). */
+    fun stopRun(reason: String?) {
+        if (running) stop(reason)
+    }
+
     private fun start() {
-        if (! RouteBridge.routeActive() && ! (clearMode.value == 2 && DungeonScanner.currentRoom != null)) return info("&cNo route or room here.")
+        if (! RouteBridge.routeActive() && ! (clearValue == 2 && DungeonScanner.currentRoom != null)) return info("&cNo route or room here.")
         running = true
         stepRef = null
         phase = Phase.MOVE
@@ -215,6 +260,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     }
 
     private fun stop(reason: String?) {
+        lastStopReason = reason
         if (running && assistLog.value) AssistBridge.logEnd(reason ?: "stopped", "room ${Main.currentRoom?.name ?: "-"}")
         running = false
         AssistBridge.reset()
@@ -237,9 +283,10 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val p = mc.player ?: return stop("no player")
         if (mc.gui.screen() != null) return releaseKeys()
         if (hitCooldown > 0) hitCooldown--
+        if (ignored.isNotEmpty()) ignored.entries.removeIf { e -> e.setValue(e.value - 1); e.value <= 0 }
         val busyFlying = phase == Phase.ETHER_AIM || phase == Phase.ETHER_WAIT || phase == Phase.PEARL_WAIT || phase == Phase.MINING
         if (! busyFlying && wait <= 0 && fight()) return
-        if (! RouteBridge.routeActive()) return stop(if (clearMode.value == 2) "room cleared, no route left" else "finished (no more steps)")
+        if (! RouteBridge.routeActive()) return stop(if (clearValue == 2) "room cleared, no route left" else "finished (no more steps)")
 
         val room = Main.currentRoom ?: return
         val raw = room.currentSecretWaypoints ?: return
@@ -277,6 +324,13 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                     wait = actionDelay
                 }
                 else if (timer > etherTimeout.value) {
+                    val n = (etherFails[t] ?: 0) + 1
+                    etherFails[t] = n
+                    if (n >= etherRetries.value) {
+                        s.ethers.remove(t) // walk / AOTV there instead
+                        PlayerUtils.toggleSneak(false)
+                        if (assistLog.value) AssistBridge.logEvent("etherwarp to ${t.x}, ${t.y}, ${t.z} failed $n times, walking instead")
+                    }
                     phase = Phase.MOVE // aim again
                 }
             }
@@ -373,6 +427,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             return
         }
 
+        resync(s, pos)
         val target = s.path[pathIndex]
         val ether = if (target in s.ethers) target else target.below().takeIf { it in s.ethers }
         if (ether != null && pos.distanceTo(standOn(ether)) > 1.2) {
@@ -453,7 +508,22 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         lastPos = pos
         stuckTicks = if (moved < 0.02) stuckTicks + 1 else 0
         if (stuckTicks in 12 .. 30 && p.onGround()) mc.options.keyJump.isDown = true
-        if (stuckTicks > 40) stop("stuck - can't reach ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}")
+        if (stuckTicks > 40 && ! running) {
+            travelStuck = true
+            stuckTicks = 0
+            return
+        }
+        if (stuckTicks > 40) {
+            if (! recover.value || ++recoveries > 4) return stop("stuck - can't reach ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}")
+            stuckTicks = 0
+            status = "stuck, recovering (${recoveries}/4)"
+            if (assistLog.value) AssistBridge.logEvent("stuck near ${pos.x.toInt()}, ${pos.y.toInt()}, ${pos.z.toInt()}, recovery $recoveries")
+            assistFailedGoal = null
+            // 1: AOTV towards the goal (or straight up if it's above), 2+: also forget etherwarps here and re-find the route
+            val s = step
+            if (s != null && leap(s, pos, goal.add(0.0, if (goal.y > pos.y + 1) 0.0 else 1.0, 0.0), allowAotv = true)) return
+            if (s != null && recoveries >= 2) resync(s, pos, force = true)
+        }
         status = "walk to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}"
     }
 
@@ -488,7 +558,37 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                 }
             }
         }
-        if (timer > 200) stop("couldn't get the secret")
+        if (timer > 200) {
+            if (skipStuckSecret.value) {
+                releaseMovement()
+                phase = Phase.DONE
+                status = "secret unreachable, skipped"
+                return stop("skipped an unreachable secret")
+            }
+            stop("couldn't get the secret")
+        }
+    }
+
+    /**
+     * Back on track after a fall or a knock-back: if the next point is far but another point further along
+     * (or the one before) is close, continue from there.
+     */
+    private fun resync(s: Step, pos: Vec3, force: Boolean = false) {
+        if (s.path.isEmpty() || pathIndex >= s.path.size) return
+        val cur = s.path[pathIndex]
+        val curDist = pos.distanceTo(Vec3(cur.x + 0.5, cur.y.toDouble(), cur.z + 0.5))
+        if (! force && curDist < 10.0) return
+        val from = (pathIndex - 1).coerceAtLeast(0)
+        val best = (from until s.path.size).minByOrNull { i ->
+            val b = s.path[i]
+            pos.distanceTo(Vec3(b.x + 0.5, b.y.toDouble(), b.z + 0.5)) + (i - pathIndex).coerceAtLeast(0) * 0.25
+        } ?: return
+        val bestDist = s.path[best].let { pos.distanceTo(Vec3(it.x + 0.5, it.y.toDouble(), it.z + 0.5)) }
+        if (best != pathIndex && bestDist + 3.0 < curDist) {
+            pathIndex = best
+            stuckTicks = 0
+            status = "back on route at point ${best + 1}"
+        }
     }
 
     // ------------------------------------------------------------------ combat
@@ -498,8 +598,8 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val p = mc.player ?: return false
         val attacker = if (fightBack.value && p.hurtTime > 0 || (fightBack.value && fightTarget?.let { it.isAlive && it.distanceTo(p) < 4f && retaliating } == true)) findAttacker(p) else null
         retaliating = attacker != null
-        if (clearMode.value == 0 && attacker == null) return false
-        val target = attacker ?: if (clearMode.value == 2) findRoomTarget(p) else findTarget(p)
+        if (clearValue == 0 && attacker == null) return false
+        val target = attacker ?: if (clearValue == 2) findRoomTarget(p) else findTarget(p)
         fightTarget = target
         if (target == null) return false
 
@@ -531,10 +631,29 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     /** Wither Impact: teleport into the pack (if far), then cast looking straight down so the blast covers us. */
     private fun hypeFight(p: Player, target: Entity, slot: Int): Boolean {
         PlayerUtils.swapToSlot(slot)
-        val dist = p.position().distanceTo(target.position())
+        // a mob that has not lost health after many casts is out of reach (behind glass, in a wall...): leave it for a while
+        if (target.id != targetId) {
+            targetId = target.id
+            castsOnTarget = 0
+            targetHealth = (target as? LivingEntity)?.health ?: - 1f
+        }
+        val hp = (target as? LivingEntity)?.health ?: - 1f
+        if (hp < targetHealth - 0.01f) {
+            castsOnTarget = 0
+            targetHealth = hp
+        }
+        if (castsOnTarget >= 6) {
+            ignored[target.id] = 200
+            castsOnTarget = 0
+            status = "can't hurt ${target.name.string}, skipping it"
+            return false
+        }
+        val centre = packCentre(p, target)
+        val dist = p.position().distanceTo(centre)
         val inBlast = dist <= blastRadius.value - 1.0
-        if (! inBlast && ! (hypeTeleport.value && dist <= 11.0)) {
-            walkTowards(p.position(), target.position())
+        val canTp = hypeTeleport.value && dist <= 11.0 && clearSight(p, centre)
+        if (! inBlast && ! canTp) {
+            walkTowards(p.position(), centre)
             status = "walking to ${target.name.string}"
             return true
         }
@@ -546,13 +665,14 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         }
         if (hitCooldown > 0) return true
         hitCooldown = castDelay.value
+        castsOnTarget++
         val aimed = if (inBlast) {
             status = "casting on ${target.name.string}"
             turn(p.yRot, 90f, 3f)
         }
         else {
             status = "teleporting to ${target.name.string}"
-            turnTo(target.position().add(0.0, 0.2, 0.0), 2f)
+            turnTo(centre.add(0.0, 0.2, 0.0), 2f)
         }
         if (! aimed) {
             hitCooldown = 0 // cast as soon as the aim arrives
@@ -562,20 +682,58 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         return true
     }
 
+    /** Middle of the mobs within blast range of [target] (moved ahead along their movement with Lead Moving Mobs). */
+    private fun packCentre(p: Player, target: Entity): Vec3 {
+        val r = blastRadius.value
+        val pack = p.level().getEntitiesOfClass(LivingEntity::class.java, target.boundingBox.inflate(r)) { e ->
+            e.isAlive && e !is ArmorStand && e !is Bat && e != p && e !is Player && e.id !in ignored
+        }.ifEmpty { listOf(target as? LivingEntity ?: return target.position()) }
+        var x = 0.0; var y = Double.MAX_VALUE; var z = 0.0
+        for (e in pack) {
+            val lead = if (hypeLead.value) e.deltaMovement.multiply(3.0, 0.0, 3.0) else Vec3.ZERO
+            x += e.x + lead.x; z += e.z + lead.z
+            y = minOf(y, e.y)
+        }
+        return Vec3(x / pack.size, y, z / pack.size)
+    }
+
+    /** Wither Impact stops at the first block: only teleport when nothing solid is in the way. */
+    private fun clearSight(p: Player, to: Vec3): Boolean {
+        val from = p.eyePosition
+        val hit = p.level().clip(net.minecraft.world.level.ClipContext(from, to.add(0.0, 0.5, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
+        return hit.type == net.minecraft.world.phys.HitResult.Type.MISS || hit.location.distanceTo(to) < 2.0
+    }
+
     /** The mob to go for when clearing the whole room: the one with the most other mobs around it, then the closest. */
     private fun findRoomTarget(p: Player): Entity? {
         val room = DungeonScanner.currentRoom ?: return findTarget(p)
         val centres = room.roomComponents.map { it.vec2() }.toSet()
         val area = p.boundingBox.inflate(48.0, 20.0, 48.0)
         val mobs = p.level().getEntitiesOfClass(LivingEntity::class.java, area) { e ->
-            e.isAlive && e.health > 0f && e !is ArmorStand && e !is Bat && e != p &&
+            e.isAlive && e.health > 0f && e !is ArmorStand && e !is Bat && e != p && e.id !in ignored &&
                 e.javaClass.simpleName != "WitherBoss" &&
                 (e !is Player || e.gameProfile.name in MINIBOSSES || e.name.string in MINIBOSSES) &&
                 DungeonScanner.getRoomCentre(e.blockX, e.blockZ) in centres
         }
         if (mobs.isEmpty()) return null
         val r2 = blastRadius.value * blastRadius.value
-        return mobs.maxWithOrNull(compareBy<LivingEntity> { m -> mobs.count { it.distanceToSqr(m) <= r2 } }.thenBy { - p.distanceToSqr(it) })
+        val special = if (hypePriority.value) starredAndMinis(p, area) else emptySet()
+        fun weight(e: LivingEntity) = if (e.id in special) 3 else 1
+        return mobs.maxWithOrNull(compareBy<LivingEntity> { m -> mobs.filter { it.distanceToSqr(m) <= r2 }.sumOf(::weight) }.thenBy { - p.distanceToSqr(it) })
+    }
+
+    /** Entity ids of starred mobs and minibosses in [area]. */
+    private fun starredAndMinis(p: Player, area: AABB): Set<Int> {
+        val level = p.level()
+        val out = HashSet<Int>()
+        for (stand in level.getEntitiesOfClass(ArmorStand::class.java, area)) {
+            val name = stand.customName?.string ?: continue
+            if (! name.contains("✯")) continue
+            val offset = if (name.uppercase().contains("WITHERMANCER")) 3 else 1
+            level.getEntity(stand.id - offset)?.takeIf { it !is ArmorStand }?.let { out += it.id }
+        }
+        for (other in level.getEntitiesOfClass(Player::class.java, area)) if (other != p && (other.gameProfile.name in MINIBOSSES || other.name.string in MINIBOSSES)) out += other.id
+        return out
     }
 
     /** The closest hostile-looking mob within 3 blocks (something that can be hitting us). */
@@ -606,7 +764,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             if (other.gameProfile.name in MINIBOSSES || other.name.string in MINIBOSSES) found += other
         }
 
-        return found.filter { it.isAlive && (it as? LivingEntity)?.health?.let { h -> h > 0f } != false && p.distanceTo(it) <= range + 1.0 }
+        return found.filter { it.id !in ignored && it.isAlive && (it as? LivingEntity)?.health?.let { h -> h > 0f } != false && p.distanceTo(it) <= range + 1.0 }
             .minByOrNull { p.distanceToSqr(it) }
     }
 
@@ -689,6 +847,12 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             }
         }
         if (! allowAotv) return false
+        return aotvLeap(pos, goal)
+    }
+
+    /** AOTV (no sneak) towards [goal]. True if it started (or is turning for) a teleport this tick. */
+    private fun aotvLeap(pos: Vec3, goal: Vec3): Boolean {
+        val p = mc.player ?: return false
         val aotvSlot = PlayerUtils.findHotbarSlot { it.skyblockId in AOTV_IDS } ?: return false
         PlayerUtils.swapToSlot(aotvSlot)
         releaseMovement()
@@ -731,6 +895,63 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         }
         lastEtherCheck = false
         return fallback
+    }
+
+    // ------------------------------------------------------------------ travel API (Auto Dungeon)
+
+    private var travelWait = 0
+    private var travelStuck = false
+
+    enum class Travel { MOVING, ARRIVED, STUCK }
+
+    /**
+     * One tick of getting to [goal] while no route is running: fights back, AOTVs on long straight stretches,
+     * otherwise walks (with Assist Path when installed). Reports STUCK once walking made no progress for 2 seconds.
+     */
+    fun travelTick(goal: Vec3, tolerance: Double = 1.5): Travel {
+        val p = mc.player ?: return Travel.STUCK
+        val pos = p.position()
+        if (horizontal(pos, goal) < tolerance && abs(pos.y - goal.y) < 3.0) {
+            releaseMovement()
+            AssistBridge.reset()
+            return Travel.ARRIVED
+        }
+        if (hitCooldown > 0) hitCooldown--
+        if (travelWait > 0) {
+            travelWait--
+            return Travel.MOVING
+        }
+        if (fight()) return Travel.MOVING
+        val flat = horizontal(pos, goal)
+        if (fastTravel.value && p.onGround() && flat > 10.0 && abs(goal.y - pos.y) < 6.0 && aotvLeap(pos, goal)) {
+            if (phase == Phase.AOTV_WAIT) {
+                phase = Phase.MOVE
+                travelWait = 6
+            }
+            return Travel.MOVING
+        }
+        travelStuck = false
+        walkTowards(pos, goal)
+        if (travelStuck) {
+            travelStuck = false
+            // one AOTV hop to get unstuck before giving up
+            return if (aotvLeap(pos, goal.add(0.0, 1.0, 0.0))) Travel.MOVING.also { phase = Phase.MOVE; travelWait = 6 } else Travel.STUCK
+        }
+        return Travel.MOVING
+    }
+
+    /** Turns to [target] and right-clicks it once the aim has arrived. True when it clicked. */
+    fun lookAndUse(target: Vec3): Boolean {
+        releaseMovement()
+        if (! turnTo(target)) return false
+        sendRotation()
+        PlayerUtils.rightClick()
+        return true
+    }
+
+    fun releaseAll() {
+        releaseKeys()
+        AssistBridge.reset()
     }
 
     private fun releaseMovement() {

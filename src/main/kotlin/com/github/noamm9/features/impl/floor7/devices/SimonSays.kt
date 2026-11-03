@@ -47,6 +47,8 @@ object SimonSays: Feature("Simon Says Solver") {
     private val autoStart by ToggleSetting("Auto Start", false).withDescription("Automatically starts the device when it can be started.")
     private val startClicks by SliderSetting("Start Clicks", 3, 1, 10, 1).withDescription("Amount of clicks to start the device.").showIf { autoStart.value }
     private val startClickDelay by SliderSetting("Start Click Delay", 3, 1, 25, 1).withDescription("Delay in ticks between each start click.").showIf { autoStart.value }
+    private val autoSolve by ToggleSetting("Auto Simon Says", false).withDescription("Looks at the next button of the sequence and presses it, while you stand at the device")
+    private val solveDelay by SliderSetting("Press Delay", 3, 1, 10, 1, " ticks").withDescription("Ticks between presses (too fast and the device can miss one)").showIf { autoSolve.value }
     //#endif
 
     private val alertsEnabled by ToggleSetting("Alerts Enabled", true).section("Alerts")
@@ -115,11 +117,19 @@ object SimonSays: Feature("Simon Says Solver") {
         }
 
         register<TickEvent.Start> {
-            if (! triggerBot.value) return@register
+            if (! triggerBot.value && ! autoSolve.value) return@register
             if (LocationUtils.F7Phase != 3) return@register
-            if (lastClick + 2 >= DungeonListener.currentTime) return@register
-
             val expected = solution.firstOrNull() ?: return@register
+
+            // Auto Simon Says: look at the next button (the click below happens once the aim has reached it)
+            if (autoSolve.value && mc.gui.screen() == null && player.eyePosition.distanceTo(deviceCenter) < 5.5) {
+                val aim = Vec3(expected.button.x + 0.88, expected.button.y + 0.5, expected.button.z + 0.5)
+                val rot = MathUtils.calcYawPitch(aim)
+                PlayerUtils.rotate(rot.yaw, rot.pitch)
+            }
+
+            val delay = if (autoSolve.value) solveDelay.value else 2
+            if (lastClick + delay >= DungeonListener.currentTime) return@register
             if (PlayerUtils.getSelectionBlock() != expected.button) return@register
 
             PlayerUtils.rightClick()
