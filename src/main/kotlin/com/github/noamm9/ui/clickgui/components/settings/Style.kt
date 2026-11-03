@@ -65,6 +65,13 @@ object Style {
     fun gradientPill(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, from: Color, to: Color) {
         val r = h / 2f
         if (w <= h) return roundRect(ctx, x, y, w, h, r, from)
+        if (ClickGui.shaderCorners.value && com.github.noamm9.utils.render.ShaderUI.available) {
+            // half caps that meet the strip edge to edge, so see-through pills have no darker bands
+            com.github.noamm9.utils.render.ShaderUI.halfCap(ctx, x, y, r, from, left = true)
+            com.github.noamm9.utils.render.ShaderUI.halfCap(ctx, x + w - r, y, r, to, left = false)
+            ctx.drawHorizontalGradient(x + r, y, w - h, h, from, to)
+            return
+        }
         roundRect(ctx, x, y, h, h, r, from)
         roundRect(ctx, x + w - h, y, h, h, r, to)
         ctx.drawHorizontalGradient(x + r, y, w - h, h, from, to)

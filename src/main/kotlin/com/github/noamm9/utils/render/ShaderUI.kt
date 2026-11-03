@@ -93,6 +93,26 @@ object ShaderUI: ISelfInit {
         }.isSuccess
     }
 
+    /**
+     * A half circle of radius [r] for the end of a pill: the left half when [left], else the right half.
+     * The flat side sits at [x] + r (left) or [x] (right), so it joins a gradient strip without overlapping it.
+     */
+    fun halfCap(ctx: GuiGraphicsExtractor, x: Float, y: Float, r: Float, color: Color, left: Boolean): Boolean {
+        if (! available) return false
+        if (color.alpha == 0 || r <= 0f) return true
+        val argb = color.rgb
+        return runCatching {
+            if (left) {
+                corner(ctx, x, y, r, x + r, y + r, argb)
+                corner(ctx, x, y + r, r, x + r, y + r, argb)
+            }
+            else {
+                corner(ctx, x, y, r, x, y + r, argb)
+                corner(ctx, x, y + r, r, x, y + r, argb)
+            }
+        }.onFailure { available = false }.isSuccess
+    }
+
     /** A fill at fractional coordinates (the pose carries the fraction, like Render2D.drawRect). */
     private fun fillF(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, argb: Int) {
         if (w <= 0f || h <= 0f) return
