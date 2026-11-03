@@ -34,8 +34,8 @@ object AutoFishing: Feature("Fishes by itself: casts, reels in on the bite, reca
     private val hookMotion by ToggleSetting("Detect By Hook Dive", true).withDescription("Also reels in when the hook suddenly dives (vanilla bite), not only on the \"!!!\" sign")
     private val rodSlot by SliderSetting("Rod Slot", 0, 0, 9, 1).section("Items").withDescription("Hotbar slot (1-9) of the rod. 0 = first fishing rod in the hotbar")
     private val killCreatures by ToggleSetting("Kill Sea Creatures", true).section("Sea Creatures")
-    private val killAt by SliderSetting("Kill When At Least", 1, 1, 30, 1, " mobs").withDescription("Keeps fishing until this many creatures are around, then kills them all (higher = barn fishing)")
-    private val killRange by SliderSetting("Kill Range", 6.0, 3.0, 12.0, 0.5, " blocks").withDescription("Creatures within this range count")
+    private val killRange by SliderSetting("Detect Range", 14.0, 4.0, 24.0, 0.5, " blocks").withDescription("A sea creature that comes up within this range is killed right away (they spawn at the hook, so keep it past your cast distance)")
+    private val blastRange by SliderSetting("Hyperion Reach", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("Casts once a creature is this close (the blast hits around you)")
     private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) of the weapon. 0 = Hyperion / Astraea / Scylla / Valkyrie if found")
     private val castDelay by SliderSetting("Hit Delay", 4, 1, 20, 1, " ticks")
     private val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
@@ -59,6 +59,9 @@ object AutoFishing: Feature("Fishes by itself: casts, reels in on the bite, reca
     private var kills = 0
     private var status = "idle"
     private var lastMobIds = emptySet<Int>()
+    /** Creature id -> ticks it has been out of reach; given up on after 15 s so fishing goes on. */
+    private val waiting = HashMap<Int, Int>()
+    private val ignored = HashSet<Int>()
 
     override fun init() {
         register<TickEvent.Start> {
@@ -96,6 +99,8 @@ object AutoFishing: Feature("Fishes by itself: casts, reels in on the bite, reca
         wait = 0
         caught = 0
         kills = 0
+        waiting.clear()
+        ignored.clear()
         info("&aAuto Fishing started. Press the key again to stop.")
     }
 
@@ -127,13 +132,17 @@ object AutoFishing: Feature("Fishes by itself: casts, reels in on the bite, reca
         val mobs = if (killCreatures.value) creatures(p) else emptyList()
         if (state == State.FIGHT) kills += lastMobIds.count { id -> p.level().getEntity(id)?.isAlive != true }
         lastMobIds = mobs.map { it.id }.toSet()
-        if (state == State.FIGHT || mobs.size >= killAt.value) {
+        if (state == State.FIGHT || mobs.isNotEmpty()) {
             if (mobs.isEmpty()) {
                 state = State.CAST
                 wait = recastDelay.value
                 PlayerUtils.rotate(spotYaw, spotPitch)
                 status = "back to fishing"
                 return
+            }
+            if (state != State.FIGHT) {
+                mc.options.keyUse.isDown = false
+                if (p.fishing != null) rod()?.let { hold(it); PlayerUtils.rightClick() } // pull the line in first
             }
             state = State.FIGHT
             fight(p, mobs)
@@ -216,15 +225,32 @@ object AutoFishing: Feature("Fishes by itself: casts, reels in on the bite, reca
     private fun creatures(p: Player): List<LivingEntity> {
         val r = killRange.value
         return p.level().getEntitiesOfClass(Mob::class.java, p.boundingBox.inflate(r, 4.0, r)) { e ->
-            e.isAlive && e.health > 0f && e.javaClass.simpleName !in NPC_CLASSES && e.distanceTo(p) <= r
+            e.isAlive && e.health > 0f && e.id !in ignored && e.javaClass.simpleName !in NPC_CLASSES && e.distanceTo(p) <= r
         }
     }
 
     private fun fight(p: Player, mobs: List<LivingEntity>) {
         val hype = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
+        // a creature that never comes within reach (stuck in the water) is left alone after 15 s
+        val reach = if (hype != null) blastRange.value else 3.2
+        for (m in mobs) {
+            if (p.distanceTo(m) <= reach) waiting.remove(m.id)
+            else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > 300) {
+                ignored += m.id
+                waiting.remove(m.id)
+            }
+        }
+        val close = mobs.filter { p.distanceTo(it) <= reach }
+        if (close.isEmpty()) {
+            val far = mobs.minByOrNull { it.distanceToSqr(p) } ?: return
+            status = "waiting for ${far.name.string} to come closer"
+            val rot = MathUtils.calcYawPitch(far.boundingBox.center)
+            PlayerUtils.rotate(rot.yaw, rot.pitch)
+            return
+        }
         if (hype != null) {
             hold(hype)
-            status = "Hyperion on ${mobs.size}"
+            status = "Hyperion on ${close.size}"
             PlayerUtils.rotate(p.yRot, 90f) // look straight down: the blast covers everything around us
             if (hitCooldown > 0) return
             hitCooldown = castDelay.value
@@ -233,7 +259,7 @@ object AutoFishing: Feature("Fishes by itself: casts, reels in on the bite, reca
             return
         }
         if (weaponSlot.value in 1 .. 9) hold(weaponSlot.value - 1)
-        val target = mobs.minByOrNull { it.distanceToSqr(p) } ?: return
+        val target = close.minByOrNull { it.distanceToSqr(p) } ?: return
         status = "fighting ${target.name.string}"
         val rot = MathUtils.calcYawPitch(target.boundingBox.center)
         PlayerUtils.rotate(rot.yaw, rot.pitch)
