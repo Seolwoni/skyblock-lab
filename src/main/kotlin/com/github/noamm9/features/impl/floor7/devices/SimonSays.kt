@@ -7,6 +7,7 @@ import com.github.noamm9.features.Feature
 import com.github.noamm9.init.RemoteFeatures
 import com.github.noamm9.ui.clickgui.components.*
 import com.github.noamm9.utils.*
+import com.github.noamm9.utils.Humanize
 import com.github.noamm9.utils.MathUtils.add
 import com.github.noamm9.utils.MathUtils.toVec
 import com.github.noamm9.utils.NumbersUtils.toFixed
@@ -79,6 +80,7 @@ object SimonSays: Feature("Simon Says Solver") {
     private var wasBroken = false
 
     private var startTick = 0L
+    private var pressGap = - 1
 
     override fun init() {
         hudElement(
@@ -123,16 +125,18 @@ object SimonSays: Feature("Simon Says Solver") {
 
             // Auto Simon Says: look at the next button (the click below happens once the aim has reached it)
             if (autoSolve.value && mc.gui.screen() == null && player.eyePosition.distanceTo(deviceCenter) < 5.5) {
-                val aim = Vec3(expected.button.x + 0.88, expected.button.y + 0.5, expected.button.z + 0.5)
+                val aim = Humanize.aimPoint(Vec3(expected.button.x + 0.88, expected.button.y + 0.5, expected.button.z + 0.5), 0.08)
                 val rot = MathUtils.calcYawPitch(aim)
-                PlayerUtils.rotate(rot.yaw, rot.pitch)
+                Humanize.turnTo(player, rot.yaw, rot.pitch, 0.8f)
             }
 
-            val delay = if (autoSolve.value) solveDelay.value else 2
+            if (autoSolve.value && pressGap < 0) pressGap = Humanize.around(solveDelay.value)
+            val delay = if (autoSolve.value) pressGap else 2
             if (lastClick + delay >= DungeonListener.currentTime) return@register
             if (PlayerUtils.getSelectionBlock() != expected.button) return@register
 
             PlayerUtils.rightClick()
+            pressGap = - 1
         }
         //#endif
 

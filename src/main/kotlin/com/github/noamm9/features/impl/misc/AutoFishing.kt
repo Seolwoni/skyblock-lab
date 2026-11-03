@@ -252,14 +252,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             PlayerUtils.rotate(yaw, pitch)
             return true
         }
-        if (AssistBridge.coreLoaded) return AssistBridge.turn(p, yaw, pitch, tol)
-        // ease out: a share of the way each tick, never crawling
-        fun step(d: Float): Float {
-            val s = d * 0.32f
-            return if (abs(s) < 0.6f) d.coerceIn(- 0.6f, 0.6f) else s.coerceIn(- 24f, 24f)
-        }
-        PlayerUtils.rotate(p.yRot + step(dy), p.xRot + step(dp))
-        return false
+        return com.github.noamm9.utils.Humanize.turnTo(p, yaw, pitch, tol)
     }
 
     /** The small eased head movements around the bobber while waiting. Also follows the player's own camera moves. */

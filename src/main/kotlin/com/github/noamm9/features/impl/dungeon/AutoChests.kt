@@ -36,6 +36,7 @@ object AutoChests: Feature("Buys the most profitable reward chest for you (Croes
 
     private var lastTitle: String? = null
     private var openTicks = 0
+    private var openWait = 6
     private var acted = false
     /** The chest we opened from Croesus, so its page buys right away. */
     private var picked: ChestProfit.DungeonChest? = null
@@ -53,12 +54,13 @@ object AutoChests: Feature("Buys the most profitable reward chest for you (Croes
             if (title != lastTitle) {
                 lastTitle = title
                 openTicks = 0
+                openWait = com.github.noamm9.utils.Humanize.around(clickDelay.value)
                 acted = false
             }
             if (screen == null || title == null || acted) return@register
             if (! LocationUtils.world.let { it == WorldType.DungeonHub || it == WorldType.Catacombs }) return@register
             if (! ChestProfit.enabled) return@register
-            if (++openTicks < clickDelay.value) return@register
+            if (++openTicks < openWait) return@register
 
             when {
                 croesus.value && title.matches(croesusRunRegex) -> pickInCroesus()

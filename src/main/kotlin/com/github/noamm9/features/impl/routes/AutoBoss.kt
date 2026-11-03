@@ -45,7 +45,7 @@ object AutoBoss: Feature("F7/M7 boss: does the terminals and levers of each P3 s
     private var running = false
     private var status = "idle"
     private var targetPos: Vec3? = null
-    private var cooldown = 0
+    private var cooldown = com.github.noamm9.utils.Humanize.around(0)
     private var stuck = 0
     private var leverCache: Pair<Int, List<BlockPos>>? = null
     private val tried = HashMap<BlockPos, Int>()
@@ -109,7 +109,7 @@ object AutoBoss: Feature("F7/M7 boss: does the terminals and levers of each P3 s
     private fun tick() {
         if (mc.gui.screen() != null) { // a terminal is open: Auto Terminal is on it
             AutoRoutes.releaseAll()
-            cooldown = 6
+            cooldown = com.github.noamm9.utils.Humanize.around(6)
             status = "in a terminal"
             return
         }
@@ -170,7 +170,7 @@ object AutoBoss: Feature("F7/M7 boss: does the terminals and levers of each P3 s
         stuck = 0
         if (AutoRoutes.lookAndUse(task.pos)) {
             tried[task.key] = (tried[task.key] ?: 0) + 1
-            cooldown = if (task.lever) 6 else 10
+            cooldown = com.github.noamm9.utils.Humanize.around(if (task.lever) 6 else 10)
         }
     }
 
@@ -203,7 +203,7 @@ object AutoBoss: Feature("F7/M7 boss: does the terminals and levers of each P3 s
                 return
             }
             PlayerUtils.swapToSlot(8)
-            if (AutoRoutes.lookAndUse(cauldron)) cooldown = 8
+            if (AutoRoutes.lookAndUse(cauldron)) cooldown = com.github.noamm9.utils.Humanize.around(8)
             return
         }
         val relic = p.level().getEntitiesOfClass(ArmorStand::class.java, p.boundingBox.inflate(40.0, 15.0, 40.0)) {
@@ -222,7 +222,7 @@ object AutoBoss: Feature("F7/M7 boss: does the terminals and levers of each P3 s
             AutoRoutes.travelTick(relic.position(), reach.value - 0.8)
             return
         }
-        if (AutoRoutes.lookAndUse(head)) cooldown = 6
+        if (AutoRoutes.lookAndUse(head)) cooldown = com.github.noamm9.utils.Humanize.around(6)
     }
 }
 //#endif

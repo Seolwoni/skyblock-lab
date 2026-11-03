@@ -94,16 +94,16 @@ object ArrowAlign: Feature("Arrow Align Solver") {
             // the closest frame that still needs clicks, within reach
             val index = clicksRemaining.keys.minByOrNull { i -> player.eyePosition.distanceToSqr(frameCentre(i)) } ?: return@register
             if (player.eyePosition.distanceTo(frameCentre(index)) > 4.5) return@register
-            val rot = com.github.noamm9.utils.MathUtils.calcYawPitch(frameCentre(index))
-            com.github.noamm9.utils.PlayerUtils.rotate(rot.yaw, rot.pitch)
+            val rot = com.github.noamm9.utils.MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(frameCentre(index), 0.12))
+            if (! com.github.noamm9.utils.Humanize.turnTo(player, rot.yaw, rot.pitch, 1f)) { alignPending = null; return@register }
             // click on the tick after the aim arrived, so the crosshair is really on the frame
-            if (alignPending != index) { alignPending = index; return@register }
+            if (alignPending != index) { alignPending = index; alignCooldown = com.github.noamm9.utils.Humanize.reaction() / 2; return@register }
             val hit = mc.hitResult as? net.minecraft.world.phys.EntityHitResult ?: return@register
             val frame = hit.entity as? ItemFrame ?: return@register
             val pos = frame.blockPosition()
             if ((pos.y - gridCorner.y) + (pos.z - gridCorner.z) * 5 != index) return@register
             com.github.noamm9.utils.PlayerUtils.rightClick()
-            alignCooldown = alignDelay.value
+            alignCooldown = com.github.noamm9.utils.Humanize.around(alignDelay.value)
             if (sol.getOrNull(index) == null) alignPending = null
         }
         //#endif

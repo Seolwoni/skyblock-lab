@@ -283,7 +283,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     }
 
     private val zeroTick get() = speed.value == 0
-    private val actionDelay get() = when (speed.value) { 0, 1 -> 0; 2 -> 1; else -> 3 }
+    private val actionDelay get() = when (speed.value) { 0, 1 -> 0; 2 -> 1; else -> 3 } + if (speed.value != 0 && com.github.noamm9.features.impl.general.HumanBehaviour.enabled) com.github.noamm9.utils.Humanize.delay(1, 4) else 0
 
     // ------------------------------------------------------------------ main loop
 
@@ -612,6 +612,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         retaliating = attacker != null
         if (clearValue == 0 && attacker == null) return false
         val target = attacker ?: if (clearValue == 2) findRoomTarget(p) else findTarget(p)
+        if (target != null && target != fightTarget) hitCooldown = maxOf(hitCooldown, com.github.noamm9.utils.Humanize.reaction())
         fightTarget = target
         if (target == null) return false
 
@@ -647,7 +648,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         status = "fighting ${target.name.string}"
         if (! turnTo(target.boundingBox.center, 4f)) return true
         if (hitCooldown > 0) return true
-        hitCooldown = hitDelay.value
+        hitCooldown = com.github.noamm9.utils.Humanize.around(hitDelay.value)
         if (zeroTick) {
             sendRotation()
             mc.gameMode?.attack(p, target)
@@ -693,7 +694,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             return true
         }
         if (hitCooldown > 0) return true
-        hitCooldown = castDelay.value
+        hitCooldown = com.github.noamm9.utils.Humanize.around(castDelay.value)
         castsOnTarget++
         val aimed = if (inBlast) {
             status = "casting on ${target.name.string}"
@@ -778,7 +779,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         releaseMovement()
         if (weaponSlot.value in 1 .. 9) PlayerUtils.swapToSlot(weaponSlot.value - 1)
         if (! turnTo(target.boundingBox.center, 4f) || hitCooldown > 0) return true
-        hitCooldown = hitDelay.value
+        hitCooldown = com.github.noamm9.utils.Humanize.around(hitDelay.value)
         sendRotation()
         mc.gameMode?.attack(p, target)
         p.swing(InteractionHand.MAIN_HAND)
@@ -866,7 +867,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     /** Snaps, or with Smooth Turning turns like Assist Core does. True once looking within [tolerance] degrees. */
     private fun turn(yaw: Float, pitch: Float, tolerance: Float = 2f, settle: Boolean = true): Boolean {
         val p = mc.player ?: return false
-        val arrived = if (smoothTurning.value && AssistBridge.coreLoaded) AssistBridge.turn(p, yaw, pitch, tolerance)
+        val arrived = if (smoothTurning.value) com.github.noamm9.utils.Humanize.turnTo(p, yaw, pitch, tolerance)
         else {
             PlayerUtils.rotate(yaw, pitch)
             true
@@ -879,7 +880,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val same = prev != null && abs(wrapDeg(yaw - prev.first)) < 12f && abs(pitch - prev.second) < 12f
         if (! same) {
             settleKey = yaw to pitch
-            settleLeft = (aimPause.value + kotlin.random.Random.nextInt(- 1, 2)).coerceAtLeast(0)
+            settleLeft = com.github.noamm9.utils.Humanize.around(aimPause.value)
         }
         if (settleLeft > 0) {
             settleLeft--
@@ -896,7 +897,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     }
 
     private fun turnTo(target: Vec3, tolerance: Float = 2f, settle: Boolean = true): Boolean {
-        val rot = MathUtils.calcYawPitch(target)
+        val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(target))
         return turn(rot.yaw, rot.pitch, tolerance, settle)
     }
 

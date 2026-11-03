@@ -103,7 +103,7 @@ object AutoPuzzles: Feature("Solves puzzles by itself using the Puzzle Solvers' 
         }
         if (AutoRoutes.lookAndUse(centre)) {
             done += a.key
-            cooldown = clickDelay.value
+            cooldown = com.github.noamm9.utils.Humanize.around(clickDelay.value) + com.github.noamm9.utils.Humanize.maybeBreak()
         }
     }
 
@@ -128,7 +128,7 @@ object AutoPuzzles: Feature("Solves puzzles by itself using the Puzzle Solvers' 
         // careful steps: no sprint, straight at the block centre
         mc.options.keySprint.isDown = false
         val yaw = Math.toDegrees(kotlin.math.atan2(goal.z - p.z, goal.x - p.x)).toFloat() - 90f
-        p.yRot = yaw
+        com.github.noamm9.utils.Humanize.turnTo(p, yaw, p.xRot, 4f)
         mc.options.keyUp.isDown = true
         walkingNow = true
         mc.options.keyShift.isDown = a.key.startsWith("icefill") // sneak on ice so we don't slide past
