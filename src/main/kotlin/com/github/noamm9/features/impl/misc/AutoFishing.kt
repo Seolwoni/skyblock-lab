@@ -20,6 +20,7 @@ import com.github.noamm9.utils.ChatUtils.modMessage
 import com.github.noamm9.utils.MathUtils
 import com.github.noamm9.utils.PlayerUtils
 import com.github.noamm9.utils.GuiUtils
+import com.github.noamm9.utils.ColorUtils.withAlpha
 import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.github.noamm9.utils.render.Render2D.drawString
 import net.minecraft.client.player.LocalPlayer
@@ -109,11 +110,18 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe").withDescription(
         "Stops (doesn't try to hide anything): when the server teleports or turns you, changes your held item, or opens a menu by itself"
     )
+    private val longBreaks by ToggleSetting("Long Breaks", true).section("Breaks").withDescription("Every so often reels in and takes a proper break, looking around now and then, like a person getting a drink")
+    private val breakEveryMin by SliderSetting("Break Every Min", 25, 5, 120, 1, " min").showIf { longBreaks.value }
+    private val breakEveryMax by SliderSetting("Break Every Max", 45, 5, 180, 1, " min").showIf { longBreaks.value }
+    private val breakLenMin by SliderSetting("Break Length Min", 60, 10, 900, 10, " s").showIf { longBreaks.value }
+    private val breakLenMax by SliderSetting("Break Length Max", 240, 10, 1800, 10, " s").showIf { longBreaks.value }
+    private val showMarkers by ToggleSetting("Show Markers", true).section("Display").withDescription("A box where the hook lands and a highlight on your sea creatures")
+
     private val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
     private val chatInfo by ToggleSetting("Chat Messages", true)
     private val statusHud by ToggleSetting("Status HUD", true)
 
-    private enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT, SELL }
+    private enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT, SELL, BREAK }
 
     private val RANDOM = Random()
     private var timing = com.github.noamm9.utils.HumanTiming()
@@ -194,6 +202,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var wobYaw = 0f
     private var wobPitch = 0f
 
+    // session numbers for the status card
+    private var sessionStart = 0L
+    private var kills = 0
+    private var creaturesCaught = 0
+    private val mineAlive = HashSet<Int>()
+    private var lastLanding: Vec3? = null
+    private var nextBreakAt = 0L
+    private var breakUntil = 0L
+    private var glanceIn = 0
+
     // which creatures are ours: they come up at our hook right after we reel in
     private class Reel(val tick: Int, val at: Vec3)
     private val reels = ArrayDeque<Reel>()
@@ -234,6 +252,21 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             event.isCanceled = true
         }
         register<com.github.noamm9.event.impl.RenderWorldEvent> {
+            if (! running || ! showMarkers.value) return@register
+            val level = mc.level ?: return@register
+            with(com.github.noamm9.utils.render.world.Render3D) {
+                lastLanding?.takeIf { state != State.TRAVEL }?.let { l ->
+                    val c = com.github.noamm9.ui.clickgui.components.settings.Style.accentColor
+                    event.ctx.renderBoxBounds(l.x - 0.3, l.y - 0.1, l.z - 0.3, l.x + 0.3, l.y + 0.5, l.z + 0.3, c, c.withAlpha(70), phase = true, lineWidth = 2)
+                }
+                for (id in mineAlive) {
+                    val e = level.getEntity(id) ?: continue
+                    val c = com.github.noamm9.ui.clickgui.components.settings.Style.accent2
+                    event.ctx.renderBoxBounds(e.boundingBox.inflate(0.1), c, c.withAlpha(45), phase = true, lineWidth = 2)
+                }
+            }
+        }
+        register<com.github.noamm9.event.impl.RenderWorldEvent> {
             if (! running || ! showRoute.value || state != State.TRAVEL) return@register
             val p = mc.player ?: return@register
             var from = p.position().add(0.0, 0.1, 0.0)
@@ -258,10 +291,77 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
 
         hudElement("Auto Fishing Status", { statusHud.value }, { running }) { ctx, example ->
-            val lines = if (example) listOf("§dAuto Fishing §aWAIT_BITE", "§7lava  §8waiting 6s") else listOf("§dAuto Fishing §a$state", "§7$status")
-            lines.forEachIndexed { i, l -> ctx.drawString(l, 0, i * 10) }
-            lines.maxOf { with(com.github.noamm9.utils.render.RenderHelper) { it.width() } } to lines.size * 10
+            drawCard(ctx, example)
+        }.also { it.themedPanel = false }
+    }
+
+    private val fishIcon = net.minecraft.resources.Identifier.fromNamespaceAndPath(com.github.noamm9.NoammAddons.MOD_ID, "textures/gui/icons/fishing.png")
+
+    private fun stateLabel() = when (state) {
+        State.FIND -> "Looking for a hotspot"
+        State.TRAVEL -> "Travelling"
+        State.CAST -> if (returning) "Re-aiming" else "Casting"
+        State.WAIT_BITE -> "Waiting"
+        State.REEL -> "Reeling"
+        State.FIGHT -> "Attacking"
+        State.SELL -> "Selling"
+        State.BREAK -> "On a break"
+    }
+
+    private fun clock(ms: Long): String {
+        val s = (ms / 1000).coerceAtLeast(0)
+        return if (s >= 3600) "${s / 3600}h ${(s / 60) % 60}m" else if (s >= 60) "${s / 60}m ${s % 60}s" else "${s}s"
+    }
+
+    /** The status card: icon, state, kills per hour big, then sea creatures / session / per hour / next break. */
+    private fun drawCard(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, example: Boolean): Pair<Number, Number> {
+        val st = com.github.noamm9.ui.clickgui.components.settings.Style
+        val w = 150f
+        val h = 92f
+        val now = System.currentTimeMillis()
+        val session = if (example) 754_000L else now - sessionStart
+        val hours = session / 3_600_000.0
+        val killsHr = if (example) 1_412 else if (hours > 0.003) (kills / hours).toInt() else 0
+        val label = if (example) "Waiting" else stateLabel()
+        val breakText = when {
+            example -> "21m 4s"
+            ! longBreaks.value -> "off"
+            state == State.BREAK -> "now " + clock(breakUntil - now)
+            nextBreakAt > 0 -> clock(nextBreakAt - now)
+            else -> "-"
         }
+        st.drawShadow(ctx, 0f, 0f, w, h, 6f, 0.6f)
+        st.roundRect(ctx, 0f, 0f, w, h, 6f, java.awt.Color(15, 11, 23, 225))
+        st.roundRect(ctx, 10f, 1f, w - 20f, 0.75f, 0.4f, java.awt.Color(255, 255, 255, 22))
+        // icon in an accent ring
+        st.roundRect(ctx, 7f, 7f, 18f, 18f, 9f, st.accentColor)
+        st.roundRect(ctx, 8.5f, 8.5f, 15f, 15f, 7.5f, java.awt.Color(15, 11, 23))
+        ctx.pose().pushMatrix()
+        ctx.pose().translate(10.5f, 10.5f)
+        ctx.pose().scale(11f / 64f, 11f / 64f)
+        with(com.github.noamm9.utils.render.Render2D) { ctx.drawTexture(fishIcon, 0, 0, 64, 64, st.accentColor) }
+        ctx.pose().popMatrix()
+        ctx.drawString("§lAuto Fishing", 30f, 8f, st.mix(st.accentColor, java.awt.Color.WHITE, 0.35f), shadow = false)
+        ctx.drawString(label, 30f, 17.5f, java.awt.Color(150, 140, 175), shadow = false, scale = 0.9f)
+
+        ctx.drawString("KILLS / HR", 8f, 32f, java.awt.Color(110, 100, 135), shadow = false, scale = 0.75f)
+        // the headline number, a size up
+        ctx.pose().pushMatrix()
+        ctx.pose().translate(8f, 39.5f)
+        ctx.pose().scale(1.55f, 1.55f)
+        st.drawTabular(ctx, "%,d".format(killsHr), 0f, 0f, java.awt.Color(230, 224, 245))
+        ctx.pose().popMatrix()
+        fun cell(title: String, value: String, x: Float, y: Float, right: Boolean) {
+            val tw = with(com.github.noamm9.utils.render.RenderHelper) { title.width() } * 0.7f
+            val vw = with(com.github.noamm9.utils.render.RenderHelper) { value.width() } * 0.9f
+            ctx.drawString(title, if (right) x - tw else x, y, java.awt.Color(110, 100, 135), shadow = false, scale = 0.7f)
+            ctx.drawString(value, if (right) x - vw else x, y + 7.5f, java.awt.Color(214, 206, 232), shadow = false, scale = 0.9f)
+        }
+        cell("SEA CREATURES", if (example) "38" else "$creaturesCaught", 8f, 55f, false)
+        cell("SESSION TIME", clock(session), w - 8f, 55f, true)
+        cell("KILLS", if (example) "36" else "$kills", 8f, 73f, false)
+        cell("NEXT BREAK", breakText, w - 8f, 73f, true)
+        return w to h
     }
 
     override fun onDisable() {
@@ -287,6 +387,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         sold = 0
         reels.clear()
         mine.clear()
+        mineAlive.clear()
+        kills = 0
+        creaturesCaught = 0
+        sessionStart = System.currentTimeMillis()
+        lastLanding = null
+        if (longBreaks.value) scheduleBreak() else nextBreakAt = 0L
         firstSeen.clear()
         mc.level?.let { l -> l.entitiesForRendering().forEach { firstSeen += it.id } } // everything already here isn't ours
         offYaw = 0f; offPitch = 0f; moveLen = 0
@@ -458,6 +564,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
         // sea creatures first, the moment one comes up
         val seen = if (killCreatures.value && mc.gui.screen() == null) creatures(p) else emptyList()
+        if (mineAlive.isNotEmpty()) mineAlive.removeIf { id -> val e = p.level().getEntity(id); (e == null || ! e.isAlive).also { if (it && e != null) kills++ } }
         // a person needs a moment to notice something new: each creature gets its own notice time
         for (m in seen) noticeAt.getOrPut(m.id) { tickCount + delay(noticeMin.value, noticeMax.value) }
         if (noticeAt.size > 200) noticeAt.keys.retainAll(seen.map { it.id }.toSet())
@@ -483,6 +590,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             fight(p, mobs)
             return
         }
+
+        if (state == State.BREAK) return onBreak(p)
 
         // back to the fishing spot (eased) after a fight
         if (returning) {
@@ -514,6 +623,15 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     return
                 }
                 if (free == 0) return stop("the inventory is full")
+                if (longBreaks.value && nextBreakAt > 0 && System.currentTimeMillis() >= nextBreakAt) {
+                    if (hook != null) { hold(rod); use(p) }
+                    val len = timing.uniform(minOf(breakLenMin.value, breakLenMax.value), maxOf(breakLenMin.value, breakLenMax.value))
+                    breakUntil = System.currentTimeMillis() + len * 1000L
+                    glanceIn = timing.uniform(60, 200)
+                    state = State.BREAK
+                    info("&7Taking a break for ${len / 60}m ${len % 60}s.")
+                    return
+                }
                 val mf = com.github.noamm9.utils.ManaGuard.fraction
                 if (killCreatures.value && pauseMana.value > 0 && mf != null && mf * 100 < pauseMana.value && hasHype()) {
                     status = "waiting for mana (${(mf * 100).toInt()}%)"
@@ -551,6 +669,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 }
                 timer++
                 if (inFluid(hook)) inFluidTicks++
+                if (inFluidTicks == 8) lastLanding = hook.position()
                 status = "waiting ${timer / 20}s in ${fluidName()}" + if (hotspot != null) " (hotspot)" else ""
                 if (hotspots.value) {
                     val hs = hotspot
@@ -610,7 +729,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 status = "reeled in"
             }
 
-            State.FIGHT, State.FIND, State.TRAVEL, State.SELL -> {}
+            State.FIGHT, State.FIND, State.TRAVEL, State.SELL, State.BREAK -> {}
         }
     }
 
@@ -1075,6 +1194,46 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
     }
 
+    private fun scheduleBreak() {
+        val lo = minOf(breakEveryMin.value, breakEveryMax.value)
+        val hi = maxOf(breakEveryMin.value, breakEveryMax.value)
+        nextBreakAt = System.currentTimeMillis() + timing.uniform(lo * 60, hi * 60) * 1000L
+    }
+
+    /** On a break: stand still, now and then look around a little, then back to fishing. */
+    private fun onBreak(p: LocalPlayer) {
+        val left = breakUntil - System.currentTimeMillis()
+        status = "on a break (${left / 60000}:${"%02d".format((left / 1000) % 60)})"
+        if (left <= 0) {
+            scheduleBreak()
+            offYaw = 0f; offPitch = 0f; moveLen = 0
+            state = State.CAST
+            returning = true
+            wait = castWait()
+            info("&7Break over, back to fishing.")
+            return
+        }
+        if (--glanceIn <= 0) {
+            // look somewhere else for a while, then back
+            toYaw = (RANDOM.nextFloat() * 2 - 1) * 40f
+            toPitch = - 10f + RANDOM.nextFloat() * 25f
+            fromYaw = offYaw; fromPitch = offPitch
+            moveTick = 0
+            moveLen = timing.uniform(14, 30)
+            glanceIn = timing.uniform(80, 260)
+        }
+        if (moveLen > 0) {
+            moveTick++
+            val t = (moveTick / moveLen.toFloat()).coerceAtMost(1f)
+            val ease = t * t * (3 - 2 * t)
+            offYaw = fromYaw + (toYaw - fromYaw) * ease
+            offPitch = fromPitch + (toPitch - fromPitch) * ease
+            p.yRot = anchorYaw + offYaw + wobYaw
+            p.xRot = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
+            if (t >= 1f) moveLen = 0
+        }
+    }
+
     // ------------------------------------------------------------------ auto sell
 
     private fun sellNames() = sellList.value.split('|').filter { it.isNotBlank() }.toSet()
@@ -1286,7 +1445,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
         // the first time we see a mob, decide if it's ours: it showed up by our hook within 2 s of us reeling in
         for (e in all) if (firstSeen.add(e.id)) {
-            if (reels.any { tickCount - it.tick in 0 .. 40 && e.position().distanceTo(it.at) <= 7.0 }) mine += e.id
+            if (reels.any { tickCount - it.tick in 0 .. 40 && e.position().distanceTo(it.at) <= 7.0 }) {
+                mine += e.id
+                mineAlive += e.id
+                creaturesCaught++
+            }
         }
         if (firstSeen.size > 2000) { firstSeen.retainAll(all.map { it.id }.toSet()); mine.retainAll(firstSeen) }
         // anything actually hitting us counts too (self-defence)
