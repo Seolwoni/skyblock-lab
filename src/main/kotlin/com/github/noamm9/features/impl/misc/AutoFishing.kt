@@ -94,7 +94,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val autoSell by ToggleSetting("Auto Sell", false).section("Auto Sell").withDescription(
         "When the inventory is nearly full: opens the SkyBlock Menu (hotbar slot below), clicks the Booster Cookie, sells only the items on your sell list to the NPC, closes it and goes back to fishing"
     )
-    private val sellWhenFree by SliderSetting("Sell When Free Slots", 3, 0, 15, 1).withDescription("Sells once this few empty slots are left")
+    private val sellEvery by SliderSetting("Sell Every", 60, 0, 300, 5, " catches").withDescription("Sells after this many catches (0 = only when the inventory is nearly full)")
+    private val sellWhenFree by SliderSetting("Sell When Free Slots", 3, 0, 15, 1).withDescription("Also sells early if only this few empty slots are left")
     private val menuSlot by SliderSetting("Menu Slot", 9, 1, 9, 1).withDescription("Hotbar slot of the SkyBlock Menu (the Nether Star)")
     private val sellListKey by KeybindSetting("Add To Sell List Key").withDescription("In any inventory, point at an item and press this to add it to (or remove it from) the sell list. Only items on the list are ever sold")
     val sellList by com.github.noamm9.config.types.TextInputSetting("Sell List", "").withDescription("The items Auto Sell may sell, by name, separated by | (fill it with the key above, or type names here)")
@@ -174,6 +175,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val sellQueue = ArrayDeque<Int>()
     private var sellFails = 0
     private var sold = 0
+    private var catchesSinceSell = 0
 
     // planned hops (etherwarp / AOTV) while travelling
     private class Hop(val ether: Boolean, val slot: Int, val target: BlockPos?, val yaw: Float, val pitch: Float, val landing: Vec3)
@@ -276,6 +278,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         path = emptyList()
         sellFails = 0
         sold = 0
+        catchesSinceSell = 0
         offYaw = 0f; offPitch = 0f; moveLen = 0
         nextMoveIn = nextMoveDelay()
         running = true
@@ -492,7 +495,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             State.CAST -> {
                 if (moveLen > 0) return // don't cast in the middle of a head movement
                 val free = freeSlots(p)
-                if (autoSell.value && free <= sellWhenFree.value && sellFails < 3 && sellables(p).isNotEmpty()) {
+                val due = (sellEvery.value > 0 && catchesSinceSell >= sellEvery.value) || free <= sellWhenFree.value
+                if (autoSell.value && due && sellFails < 3 && sellables(p).isNotEmpty()) {
                     state = State.SELL
                     sellStep = 0
                     sellTimer = 0
@@ -588,6 +592,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             State.REEL -> {
                 hold(rod)
                 if (hook != null) use(p)
+                catchesSinceSell++
                 state = State.CAST
                 wait = castWait()
                 status = "reeled in"
@@ -1137,7 +1142,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     private fun sellDone(p: LocalPlayer, ok: Boolean, why: String?) {
         if (mc.gui.screen() != null) p.closeContainer()
-        if (ok) sellFails = 0 else {
+        if (ok) { sellFails = 0; catchesSinceSell = 0 } else {
             sellFails++
             info("&eAuto Sell: $why${if (sellFails >= 3) " - turned off until the next start" else ""}.")
         }
