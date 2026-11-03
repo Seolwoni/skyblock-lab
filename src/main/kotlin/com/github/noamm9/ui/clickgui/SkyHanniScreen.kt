@@ -673,8 +673,14 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val y = Resolution.height / 2f - 20f
         // a soft glow behind the word
         val glowA = (fadeOut * minOf(1f, t / 0.3f))
-        Style.roundRect(ctx, x - 26f, y - 12f, widths.sum() + 52f, 9f * scale + 24f, 22f, Style.accentColor.withAlpha((26 * glowA).toInt()))
-        Style.roundRect(ctx, x - 12f, y - 5f, widths.sum() + 24f, 9f * scale + 10f, 14f, Style.accent2.withAlpha((20 * glowA).toInt()))
+        // many faint layers, each a little bigger, so the glow fades out instead of ending in an edge
+        val gw = widths.sum()
+        val gh = 9f * scale
+        for (i in 10 downTo 1) {
+            val d = i * 4f
+            val c = Style.mix(Style.accent2, Style.accentColor, i / 10f)
+            Style.roundRect(ctx, x - d, y - d * 0.55f, gw + d * 2, gh + d * 1.1f, gh / 2f + d * 0.55f, c.withAlpha((7 * glowA).toInt()))
+        }
         val sweep = (t - 0.28f) / 0.42f // 0..1 across the word
         word.forEachIndexed { i, ch ->
             val p = i / (word.length - 1f)
