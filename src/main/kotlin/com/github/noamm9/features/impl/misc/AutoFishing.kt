@@ -19,6 +19,7 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen
 import com.github.noamm9.utils.ChatUtils.modMessage
 import com.github.noamm9.utils.MathUtils
 import com.github.noamm9.utils.PlayerUtils
+import com.github.noamm9.utils.GuiUtils
 import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.github.noamm9.utils.render.Render2D.drawString
 import net.minecraft.client.player.LocalPlayer
@@ -90,6 +91,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val hotspotRadius by SliderSetting("Hotspot Size", 2.5, 1.0, 6.0, 0.5, " blocks").withDescription("How close to the Hotspot's centre the hook has to land; it adjusts the aim until it does")
     private val stayHome by ToggleSetting("Return To Spot", true).withDescription("Walks back to the fishing spot if you get pushed away from it")
 
+    private val autoSell by ToggleSetting("Auto Sell", false).section("Auto Sell").withDescription(
+        "When the inventory is nearly full: opens the SkyBlock Menu (hotbar slot below), clicks the Booster Cookie, sells the junk to the NPC, closes it and goes back to fishing"
+    )
+    private val sellWhenFree by SliderSetting("Sell When Free Slots", 3, 0, 15, 1).withDescription("Sells once this few empty slots are left")
+    private val menuSlot by SliderSetting("Menu Slot", 9, 1, 9, 1).withDescription("Hotbar slot of the SkyBlock Menu (the Nether Star)")
+    private val sellCheap by ToggleSetting("Sell Cheap Junk", true).withDescription("Also sells Common / Uncommon items worth less than the price below on the bazaar or auction house (items with no known price are kept)")
+    private val sellBelow by SliderSetting("Junk Price", 2.0, 0.1, 50.0, 0.1, "k coins")
+    private val sellListKey by KeybindSetting("Add To Sell List Key").withDescription("In any inventory, point at an item and press this to add it to (or remove it from) the sell list. Items on the list are always sold")
+    val sellList by com.github.noamm9.config.types.TextInputSetting("Sell List", "").hidden()
+
     private val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe").withDescription(
         "Stops (doesn't try to hide anything): when the server teleports or turns you, changes your held item, or opens a menu by itself"
     )
@@ -97,7 +108,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val chatInfo by ToggleSetting("Chat Messages", true)
     private val statusHud by ToggleSetting("Status HUD", true)
 
-    private enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT }
+    private enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT, SELL }
 
     private val RANDOM = Random()
     private var timing = com.github.noamm9.utils.HumanTiming()
@@ -153,6 +164,15 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var hopWait = 0
     private var repath = 0
 
+    // selling
+    private var sellStep = 0
+    private var sellTimer = 0
+    private var sellGap = 0
+    private var sellTitle: String? = null
+    private val sellQueue = ArrayDeque<Int>()
+    private var sellFails = 0
+    private var sold = 0
+
     // planned hops (etherwarp / AOTV) while travelling
     private class Hop(val ether: Boolean, val slot: Int, val target: BlockPos?, val yaw: Float, val pitch: Float, val landing: Vec3)
     private var hop: Hop? = null
@@ -187,6 +207,20 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         register<WorldChangeEvent> {
             remembered.clear()
             if (running) stop("world changed")
+        }
+        register<com.github.noamm9.event.impl.KeyboardEvent.KeyPressed> {
+            if (event.action != com.mojang.blaze3d.platform.InputConstants.PRESS) return@register
+            val screen = mc.gui.screen() as? net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*> ?: return@register
+            if (! sellListKey.matches(event.keyEvent.key, mouse = false)) return@register
+            val slot = (screen as com.github.noamm9.mixin.IAbstractContainerScreen).hoveredSlot ?: return@register
+            val name = itemKey(slot.item) ?: return@register
+            val list = sellNames().toMutableSet()
+            val added = list.add(name)
+            if (! added) list.remove(name)
+            sellList.value = list.joinToString("|")
+            com.github.noamm9.config.ConfigManager.save()
+            NotificationManager.push("Sell List", if (added) "&fAdded &d$name" else "&fRemoved &d$name")
+            event.isCanceled = true
         }
         register<com.github.noamm9.event.impl.RenderWorldEvent> {
             if (! running || ! showRoute.value || state != State.TRAVEL) return@register
@@ -238,6 +272,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         aimTarget = null
         noticeAt.clear()
         path = emptyList()
+        sellFails = 0
+        sold = 0
         offYaw = 0f; offPitch = 0f; moveLen = 0
         nextMoveIn = nextMoveDelay()
         running = true
@@ -382,7 +418,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (failsafe.value) {
             if (expectedSlot >= 0 && p.inventory.selectedSlot != expectedSlot) return failStop("your held item was changed")
             val sc = mc.gui.screen()
-            if (sc is AbstractContainerScreen<*> && sc !is InventoryScreen) return failStop("a menu opened by itself (${sc.title.string})")
+            if (sc is AbstractContainerScreen<*> && sc !is InventoryScreen && state != State.SELL && ownMoveTicks <= 0) return failStop("a menu opened by itself (${sc.title.string})")
         }
 
         tickCount++
@@ -392,6 +428,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         when (state) {
             State.FIND -> return findHotspot(p)
             State.TRAVEL -> return travel(p)
+            State.SELL -> return sell(p)
             else -> {}
         }
         // pushed away from the spot: walk back (not while fighting, sea creatures come to us)
@@ -452,6 +489,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         when (state) {
             State.CAST -> {
                 if (moveLen > 0) return // don't cast in the middle of a head movement
+                val free = freeSlots(p)
+                if (autoSell.value && free <= sellWhenFree.value && sellFails < 3 && sellables(p).isNotEmpty()) {
+                    state = State.SELL
+                    sellStep = 0
+                    sellTimer = 0
+                    sellGap = delay(4, 12)
+                    status = "inventory nearly full, selling"
+                    return
+                }
+                if (free == 0) return stop("the inventory is full")
                 val mf = com.github.noamm9.utils.ManaGuard.fraction
                 if (killCreatures.value && pauseMana.value > 0 && mf != null && mf * 100 < pauseMana.value && hasHype()) {
                     status = "waiting for mana (${(mf * 100).toInt()}%)"
@@ -544,7 +591,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 status = "reeled in"
             }
 
-            State.FIGHT, State.FIND, State.TRAVEL -> {}
+            State.FIGHT, State.FIND, State.TRAVEL, State.SELL -> {}
         }
     }
 
@@ -1007,6 +1054,103 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------------ auto sell
+
+    private fun sellNames() = sellList.value.split('|').filter { it.isNotBlank() }.toSet()
+
+    private fun itemKey(stack: net.minecraft.world.item.ItemStack): String? =
+        if (stack.isEmpty) null else stack.hoverName.string.replace(Regex("§."), "").trim().ifBlank { null }
+
+    private fun freeSlots(p: LocalPlayer) = (0 until 36).count { p.inventory.getItem(it).isEmpty }
+
+    /** Is this stack junk to sell: on the sell list, or (Sell Cheap Junk) a cheap Common / Uncommon item. */
+    private fun shouldSell(stack: net.minecraft.world.item.ItemStack): Boolean {
+        if (stack.isEmpty || stack.item == Items.FISHING_ROD) return false
+        val name = itemKey(stack) ?: return false
+        if (name in sellNames()) return true
+        if (! sellCheap.value) return false
+        val rarity = com.github.noamm9.utils.items.ItemUtils.getRarity(stack)
+        if (rarity != com.github.noamm9.utils.items.ItemRarity.COMMON && rarity != com.github.noamm9.utils.items.ItemRarity.UNCOMMON) return false
+        val id = stack.skyblockId.ifBlank { return false }
+        val price = (com.github.noamm9.init.NetworkLoop.getPrice(id) as? Number)?.toDouble() ?: return false
+        return price < sellBelow.value * 1000
+    }
+
+    /** Inventory indexes (not the hotbar) holding junk. */
+    private fun sellables(p: LocalPlayer) = (9 until 36).filter { shouldSell(p.inventory.getItem(it)) }
+
+    private fun sell(p: LocalPlayer) {
+        ownMoveTicks = 20
+        sellTimer++
+        if (sellTimer > 600) return sellDone(p, false, "selling took too long")
+        if (sellGap > 0) { sellGap--; return }
+        val screen = mc.gui.screen() as? AbstractContainerScreen<*>
+        when (sellStep) {
+            0 -> { // put the rod away and open the SkyBlock Menu
+                if (p.fishing != null) { rod()?.let { hold(it); use(p) }; sellGap = delay(4, 10); return }
+                hold(menuSlot.value - 1)
+                sellGap = delay(3, 8)
+                sellStep = 1
+            }
+            1 -> {
+                use(p)
+                sellTimer = 0
+                sellStep = 2
+            }
+            2 -> { // wait for the menu, then click the cookie
+                if (screen == null || screen is InventoryScreen) { if (sellTimer > 40) sellDone(p, false, "the SkyBlock Menu didn't open"); return }
+                val menu = p.containerMenu
+                val top = menu.slots.filter { it.container !is net.minecraft.world.entity.player.Inventory }
+                val cookie = top.firstOrNull { it.item.item == Items.COOKIE || it.item.hoverName.string.contains("Cookie", true) }
+                    ?: return sellDone(p, false, "no Booster Cookie in the menu")
+                sellTitle = screen.title.string
+                GuiUtils.clickSlot(cookie.index, GuiUtils.ButtonType.LEFT)
+                sellTimer = 0
+                sellStep = 3
+                sellGap = delay(2, 5)
+            }
+            3 -> { // the sell menu: queue up the junk
+                if (screen == null || screen.title.string == sellTitle) { if (sellTimer > 40) sellDone(p, false, "the sell menu didn't open"); return }
+                sellQueue.clear()
+                for (slot in p.containerMenu.slots) {
+                    if (slot.container !is net.minecraft.world.entity.player.Inventory) continue
+                    if (slot.containerSlot < 9) continue // never the hotbar
+                    if (shouldSell(slot.item)) sellQueue += slot.index
+                }
+                sellStep = 4
+                sellGap = delay(5, 14) // look at the menu for a moment first
+            }
+            4 -> { // click them one by one at a human pace
+                if (screen == null) return sellDone(p, true, null)
+                val next = sellQueue.removeFirstOrNull()
+                if (next == null) {
+                    sellStep = 5
+                    sellGap = delay(4, 12)
+                    return
+                }
+                if (! p.containerMenu.slots.getOrNull(next)?.item.let { it != null && ! it.isEmpty }) return
+                GuiUtils.clickSlot(next, GuiUtils.ButtonType.LEFT)
+                sold++
+                sellGap = delay(4, 11) + if (RANDOM.nextInt(100) < 8) timing.uniform(6, 16) else 0
+            }
+            else -> sellDone(p, true, null)
+        }
+    }
+
+    private fun sellDone(p: LocalPlayer, ok: Boolean, why: String?) {
+        if (mc.gui.screen() != null) p.closeContainer()
+        if (ok) sellFails = 0 else {
+            sellFails++
+            info("&eAuto Sell: $why${if (sellFails >= 3) " - turned off until the next start" else ""}.")
+        }
+        expectedSlot = - 1
+        rod()?.let { hold(it) }
+        state = State.CAST
+        returning = true
+        wait = castWait()
+        status = if (ok) "sold junk ($sold so far)" else "couldn't sell"
     }
 
     /** In lava: jump and walk back to the last safe ground; stop if it doesn't work out. */
