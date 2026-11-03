@@ -813,8 +813,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     /** The bobber floats on top, so its own in-water flag flickers: look at its block and the two below too. */
     private fun nearFluid(hook: FishingHook, tag: net.minecraft.tags.TagKey<net.minecraft.world.level.material.Fluid>): Boolean {
+        // the hook can sit a little above, beside or under the surface (lava especially): look around it
+        val lvl = hook.level()
         val pos = hook.blockPosition()
-        for (dy in 0 downTo - 2) if (hook.level().getFluidState(pos.offset(0, dy, 0)).`is`(tag)) return true
+        for (dy in 1 downTo - 3) for (dx in - 1 .. 1) for (dz in - 1 .. 1) {
+            if (dy == 1 && (dx != 0 || dz != 0)) continue
+            if ((dx != 0 || dz != 0) && dy < - 1) continue
+            if (lvl.getFluidState(pos.offset(dx, dy, dz)).`is`(tag)) return true
+        }
         return false
     }
 
@@ -826,14 +832,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     /** True once the hook has clearly settled somewhere that isn't water / lava. */
     private fun grounded(hook: FishingHook): Boolean {
-        if (hook.hookedIn == null && inFluid(hook)) {
+        // once it has been in the water / lava this cast, it didn't land on the ground; and a hook stuck in
+        // a mob (or SkyBlock's invisible stands over lava) isn't on the ground either
+        if (inFluidTicks >= 3 || hook.hookedIn != null || inFluid(hook)) {
             groundTicks = 0
             return false
         }
         val moved = lastHookPos?.distanceToSqr(hook.position()) ?: 1.0
         lastHookPos = hook.position()
         if (timer < 25) return false
-        val stuck = hook.hookedIn != null || hook.onGround() || moved < 1.0E-4
+        val stuck = hook.onGround() || moved < 1.0E-4
         groundTicks = if (stuck) groundTicks + 1 else 0
         return groundTicks >= 10
     }
