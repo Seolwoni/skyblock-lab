@@ -70,6 +70,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val killCreatures by ToggleSetting("Kill Sea Creatures", true).section("Sea Creatures")
     private val killRange by SliderSetting("Detect Range", 14.0, 4.0, 24.0, 0.5, " blocks").withDescription("A sea creature that comes up within this range is killed right away")
     private val blastRange by SliderSetting("Hyperion Reach", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("Casts once a creature is this close (the blast hits around you)")
+    private val onlyMine by ToggleSetting("Only My Sea Creatures", true).withDescription(
+        "Only fights creatures that came up at your hook right after you reeled in (and anything that hits you). Other people's creatures are left alone"
+    )
     private val noticeMin by SliderSetting("Notice Delay Min", 8, 0, 40, 1, " ticks").withDescription("How long it takes to notice a sea creature that came up, before reacting")
     private val noticeMax by SliderSetting("Notice Delay Max", 26, 0, 60, 1, " ticks")
     private val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")
@@ -191,6 +194,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var wobYaw = 0f
     private var wobPitch = 0f
 
+    // which creatures are ours: they come up at our hook right after we reel in
+    private class Reel(val tick: Int, val at: Vec3)
+    private val reels = ArrayDeque<Reel>()
+    private val firstSeen = HashSet<Int>()
+    private val mine = HashSet<Int>()
+
     // noticing sea creatures
     private val noticeAt = HashMap<Int, Int>()
     private var tickCount = 0
@@ -276,6 +285,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         path = emptyList()
         sellFails = 0
         sold = 0
+        reels.clear()
+        mine.clear()
+        firstSeen.clear()
+        mc.level?.let { l -> l.entitiesForRendering().forEach { firstSeen += it.id } } // everything already here isn't ours
         offYaw = 0f; offPitch = 0f; moveLen = 0
         nextMoveIn = nextMoveDelay()
         running = true
@@ -587,7 +600,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
             State.REEL -> {
                 hold(rod)
-                if (hook != null) use(p)
+                if (hook != null) {
+                    reels += Reel(tickCount, hook.position())
+                    if (reels.size > 6) reels.removeFirst()
+                    use(p)
+                }
                 state = State.CAST
                 wait = castWait()
                 status = "reeled in"
@@ -1263,8 +1280,19 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     private fun creatures(p: LocalPlayer): List<LivingEntity> {
         val r = killRange.value
-        return p.level().getEntitiesOfClass(Mob::class.java, p.boundingBox.inflate(r, 6.0, r)) { e ->
-            e.isAlive && e.health > 0f && e.id !in ignored && e.javaClass.simpleName !in NPC_CLASSES && e.distanceTo(p) <= r
+        val scan = maxOf(r, 24.0)
+        val all = p.level().getEntitiesOfClass(Mob::class.java, p.boundingBox.inflate(scan, 8.0, scan)) { e ->
+            e.isAlive && e.health > 0f && e.javaClass.simpleName !in NPC_CLASSES
+        }
+        // the first time we see a mob, decide if it's ours: it showed up by our hook within 2 s of us reeling in
+        for (e in all) if (firstSeen.add(e.id)) {
+            if (reels.any { tickCount - it.tick in 0 .. 40 && e.position().distanceTo(it.at) <= 7.0 }) mine += e.id
+        }
+        if (firstSeen.size > 2000) { firstSeen.retainAll(all.map { it.id }.toSet()); mine.retainAll(firstSeen) }
+        // anything actually hitting us counts too (self-defence)
+        if (p.hurtTime > 0) all.filter { it.distanceTo(p) <= 3.5f && p.hasLineOfSight(it) }.forEach { mine += it.id }
+        return all.filter { e ->
+            e.id !in ignored && e.distanceTo(p) <= r && (! onlyMine.value || e.id in mine)
         }
     }
 
