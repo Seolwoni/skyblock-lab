@@ -80,10 +80,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val hotspots by ToggleSetting("Go To Hotspots", false).section("Hotspots").withDescription(
         "Finds the nearest fishing Hotspot, walks to a spot on the shore next to it and casts into it. When it goes away, moves on to the next one. With none around it fishes where you started"
     )
-    private val hopMin by SliderSetting("AOTV Gap Min", 5, 2, 40, 1, " ticks").withDescription("Shortest wait between AOTV hops on the way (same timing model as casting)")
+    private val hopMin by SliderSetting("AOTV Gap Min", 5, 2, 40, 1, " ticks").withDescription("Shortest wait between etherwarps / AOTV hops on the way (same timing model as casting)")
     private val hopMax by SliderSetting("AOTV Gap Max", 18, 2, 60, 1, " ticks")
-    private val walkSome by SliderSetting("Walk Instead", 15, 0, 80, 5, "%").withDescription("Chance to walk a stretch instead of hopping with the AOTV")
-    private val hotspotRange by SliderSetting("Search Range", 64, 16, 160, 8, " blocks").withDescription("How far it looks for a Hotspot")
+    private val walkSome by SliderSetting("Walk Instead", 15, 0, 80, 5, "%").withDescription("Chance to walk a stretch instead of hopping, when walking is possible")
+    private val aotvRange by SliderSetting("AOTV Distance", 12, 8, 16, 1, " blocks").withDescription("How far your AOTV teleports (8 + Transmission Tuners)")
+    private val hotspotRange by SliderSetting("Search Range", 200, 16, 400, 8, " blocks").withDescription("How far it looks for a Hotspot. Hotspots seen earlier are remembered for 3 minutes, even after they're out of sight")
+    private val useEther by ToggleSetting("Etherwarp On The Way", true).withDescription("Plans etherwarps (and AOTV hops) to get to far or high spots, checking where each one lands, like Secret Routes does")
+    private val showRoute by ToggleSetting("Show Route", true).withDescription("Draws the planned walk and the next etherwarp / AOTV landing in the world")
     private val hotspotRadius by SliderSetting("Hotspot Size", 2.5, 1.0, 6.0, 0.5, " blocks").withDescription("How close to the Hotspot's centre the hook has to land; it adjusts the aim until it does")
     private val stayHome by ToggleSetting("Return To Spot", true).withDescription("Walks back to the fishing spot if you get pushed away from it")
 
@@ -150,6 +153,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var hopWait = 0
     private var repath = 0
 
+    // planned hops (etherwarp / AOTV) while travelling
+    private class Hop(val ether: Boolean, val slot: Int, val target: BlockPos?, val yaw: Float, val pitch: Float, val landing: Vec3)
+    private var hop: Hop? = null
+    private var hopPhase = 0
+    private var hopTimer = 0
+    private var hopFrom: Vec3 = Vec3.ZERO
+    private var planIn = 0
+    private val remembered = HashMap<Long, Pair<Vec3, Long>>() // block key -> position, last seen
+    private var scouting = false
+
     // aiming the cast
     private var aimTarget: Vec3? = null
     /** This cast's small hand wobble on top of the aim. */
@@ -169,7 +182,28 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             }
             if (running) runCatching(::tick).onFailure { stop("error: ${it.message}") }
         }
-        register<WorldChangeEvent> { if (running) stop("world changed") }
+        register<WorldChangeEvent> {
+            remembered.clear()
+            if (running) stop("world changed")
+        }
+        register<com.github.noamm9.event.impl.RenderWorldEvent> {
+            if (! running || ! showRoute.value || state != State.TRAVEL) return@register
+            val p = mc.player ?: return@register
+            var from = p.position().add(0.0, 0.1, 0.0)
+            for (i in pathIndex until path.size) {
+                val c = Vec3.atBottomCenterOf(path[i]).add(0.0, 0.1, 0.0)
+                with(com.github.noamm9.utils.render.world.Render3D) { event.ctx.renderLine(from, c, java.awt.Color(167, 107, 250), 2, phase = true) }
+                from = c
+            }
+            hop?.let { h ->
+                val col = if (h.ether) java.awt.Color(236, 72, 153) else java.awt.Color(120, 200, 255)
+                with(com.github.noamm9.utils.render.world.Render3D) {
+                    event.ctx.renderLine(p.eyePosition, h.landing.add(0.0, 0.2, 0.0), col, 2, phase = true)
+                    event.ctx.renderBlock(BlockPos.containing(h.landing.x, h.landing.y - 0.5, h.landing.z), col, fill = false, phase = true, lineWidth = 3)
+                }
+            }
+            stand?.let { with(com.github.noamm9.utils.render.world.Render3D) { event.ctx.renderBlock(BlockPos.containing(it.x, it.y - 0.5, it.z), java.awt.Color(80, 255, 140), fill = false, phase = true, lineWidth = 2) } }
+        }
         register<MainThreadPacketReceivedEvent.Pre> {
             if (! running || ! failsafe.value || ownMoveTicks > 0) return@register
             val name = event.packet.javaClass.simpleName
@@ -227,6 +261,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     private fun stop(reason: String?) {
         running = false
+        hop = null
         AutoRoutes.releaseAll()
         mc.options.keyUse.isDown = false
         if (reason != null) info("&eAuto Fishing $reason.")
@@ -556,21 +591,46 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     private fun nearestHotspot(p: LocalPlayer): ArmorStand? {
         val r = hotspotRange.value.toDouble()
-        return p.level().getEntitiesOfClass(ArmorStand::class.java, p.boundingBox.inflate(r, 24.0, r)) {
-            it.isAlive && it.id !in badHotspots && it.customName?.string?.contains("HOTSPOT", ignoreCase = true) == true
-        }.minByOrNull { it.distanceToSqr(p) }
+        val live = p.level().getEntitiesOfClass(ArmorStand::class.java, p.boundingBox.inflate(r, 64.0, r)) {
+            it.isAlive && it.customName?.string?.contains("HOTSPOT", ignoreCase = true) == true
+        }
+        val now = System.currentTimeMillis()
+        for (h in live) remembered[h.blockPosition().asLong()] = h.position() to now
+        return live.filter { it.id !in badHotspots }.minByOrNull { it.distanceToSqr(p) }
+    }
+
+    /** A hotspot seen earlier that is out of entity range now (remembered for 3 minutes). */
+    private fun rememberedHotspot(p: LocalPlayer): Vec3? {
+        val now = System.currentTimeMillis()
+        remembered.entries.removeIf { now - it.value.second > 180_000 }
+        return remembered.values.map { it.first }.filter { it.distanceTo(p.position()) > 40 }.minByOrNull { it.distanceTo(p.position()) }
     }
 
     private fun findHotspot(p: LocalPlayer) {
         val hs = nearestHotspot(p)
         if (hs == null) {
+            // none in sight: head for one seen earlier, it'll show up once we're close
+            val far = rememberedHotspot(p)
+            val spot = far?.let { shoreSpot(p, it) }
+            if (far != null && spot != null) {
+                hotspot = null
+                stand = spot
+                scouting = true
+                path = emptyList()
+                travelStuck = 0
+                state = State.TRAVEL
+                info("&7Heading for a hotspot seen earlier &8(${p.position().distanceTo(far).toInt()} blocks)")
+                return
+            }
+            if (far != null) remembered.remove(BlockPos.containing(far).asLong())
             hotspot = null
             if (stand == null) stand = p.position()
             status = "no hotspot nearby, fishing here"
             state = State.CAST
             return
         }
-        val spot = shoreSpot(p, hs)
+        scouting = false
+        val spot = shoreSpot(p, hs.position())
         if (spot == null) {
             badHotspots += hs.id
             status = "no place to stand by that hotspot"
@@ -586,9 +646,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     /** A block on the shore 4-10 blocks from the hotspot, with a clear view of it, as close to us as possible. */
-    private fun shoreSpot(p: LocalPlayer, hs: ArmorStand): Vec3? {
+    private fun shoreSpot(p: LocalPlayer, centre: Vec3): Vec3? {
         val level = p.level()
-        val c = hs.blockPosition()
+        val c = BlockPos.containing(centre)
         var best: Vec3? = null
         var bestScore = Double.MAX_VALUE
         for (dx in - 10 .. 10) for (dz in - 10 .. 10) {
@@ -603,8 +663,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 if (! level.getBlockState(feet.above()).getCollisionShape(level, feet.above()).isEmpty) continue
                 if (nearLava(feet, 1)) continue // never stand right at a lava edge
                 val eye = Vec3(feet.x + 0.5, feet.y + 1.62, feet.z + 0.5)
-                val clip = level.clip(net.minecraft.world.level.ClipContext(eye, hs.position().add(0.0, 0.3, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
-                if (clip.type != net.minecraft.world.phys.HitResult.Type.MISS && clip.location.distanceTo(hs.position()) > 1.5) continue
+                val clip = level.clip(net.minecraft.world.level.ClipContext(eye, centre.add(0.0, 0.3, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
+                if (clip.type != net.minecraft.world.phys.HitResult.Type.MISS && clip.location.distanceTo(centre) > 1.5) continue
                 val pos = Vec3(feet.x + 0.5, feet.y.toDouble(), feet.z + 0.5)
                 val score = pos.distanceTo(p.position()) + abs(flat - 7.0) * 2
                 if (score < bestScore) { bestScore = score; best = pos }
@@ -624,26 +684,55 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             arrive(p)
             return
         }
-        if (pathGoal != goal || path.isEmpty() || --repath <= 0) {
+        // a hop in progress
+        if (hop != null) return doHop(p)
+        if (hopWait > 0) hopWait--
+
+        val flat = horizontalDist(p.position(), goal)
+        val rise = goal.y - p.y
+        if (pathGoal != goal || --repath <= 0) {
             pathGoal = goal
-            path = findPath(p, BlockPos.containing(goal.x, goal.y + 0.1, goal.z)) ?: run {
-                stopWalking()
-                if (++travelStuck > 3) {
-                    hotspot?.let { badHotspots += it.id }
-                    hotspot = null
-                    state = State.FIND
-                    status = "no safe way there"
-                }
-                return
-            }
+            path = if (flat < 70) findPath(p, BlockPos.containing(goal.x, goal.y + 0.1, goal.z)) ?: emptyList() else emptyList()
             pathIndex = 0
             repath = 100
+        }
+        // far, high, or no walkable way: plan an etherwarp / AOTV hop, checking where it lands
+        val needHop = path.isEmpty() || flat > 14 || rise > 3
+        if (useEther.value && needHop && hopWait <= 0 && p.onGround() && --planIn <= 0) {
+            planIn = 6
+            val walkable = path.isNotEmpty()
+            if (! walkable || RANDOM.nextInt(100) >= walkSome.value) planHop(p, goal)?.let {
+                hop = it
+                hopPhase = 0
+                hopTimer = 0
+                stopWalking()
+                status = (if (it.ether) "etherwarp" else "AOTV") + " (${p.position().distanceTo(goal).toInt()}m left)"
+                return doHop(p)
+            }
+        }
+        if (path.isEmpty()) {
+            stopWalking()
+            if (planIn == 6 && ++travelStuck > 25) {
+                hotspot?.let { badHotspots += it.id }
+                hotspot = null
+                scouting = false
+                state = State.FIND
+                status = "no safe way there"
+            }
+            else status = "planning a way there"
+            return
         }
         status = "going to ${if (hotspot != null) "the hotspot" else "the spot"} (${p.position().distanceTo(goal).toInt()}m)"
         walkPath(p)
     }
 
     private fun arrive(p: LocalPlayer) {
+        if (scouting) { // got near a remembered hotspot: look for it properly now
+            scouting = false
+            remembered.clear()
+            state = State.FIND
+            return
+        }
         val hs = hotspot
         if (hs != null) aimAt(p, hs) else aimTarget = null
         offYaw = 0f; offPitch = 0f; moveLen = 0
@@ -786,6 +875,133 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         hopWait = delay(hopMin.value, hopMax.value)
         pathIndex = pick
         return true
+    }
+
+    // ------------------------------------------------------------------ hop planning (etherwarp / AOTV)
+
+    /** How good standing at [feet] is on the way to [goal] (lower is better). */
+    private fun hopScore(feet: Vec3, goal: Vec3) = horizontalDist(feet, goal) + abs(goal.y - feet.y) * 1.2
+
+    /**
+     * Picks the next hop towards [goal]:
+     * etherwarp - top faces of solid ground near the line to the goal (and the goal itself), each checked with
+     * Noamm's etherwarp prediction from a sneaking eye, never next to lava;
+     * AOTV - a few aims towards the goal, each traced to where the teleport stops and where we'd fall to.
+     * Only hops that get clearly closer count.
+     */
+    private fun planHop(p: LocalPlayer, goal: Vec3): Hop? {
+        val here = hopScore(p.position(), goal)
+        val etherSlot = PlayerUtils.findHotbarSlot { com.github.noamm9.utils.items.EtherwarpHelper.getEtherwarpDistance(it) != null }
+        if (etherSlot != null) {
+            val range = com.github.noamm9.utils.items.EtherwarpHelper.getEtherwarpDistance(p.inventory.getItem(etherSlot)) ?: 57.0
+            val sneakFeet = if (p.isCrouching) p.position() else p.position().subtract(0.0, 0.35, 0.0)
+            val cands = LinkedHashSet<BlockPos>()
+            cands += BlockPos.containing(goal.x, goal.y - 0.5, goal.z)
+            val dir = goal.subtract(p.position())
+            for (step in 1 .. 14) {
+                val t = step / 14.0
+                val pt = p.position().add(dir.scale(t))
+                for (ox in - 4 .. 4 step 2) for (oz in - 4 .. 4 step 2) {
+                    topBlock(BlockPos.containing(pt.x + ox, maxOf(pt.y, goal.y) + 6, pt.z + oz), 16)?.let { cands += it }
+                }
+            }
+            var best: Hop? = null
+            var bestScore = here - 6.0
+            var checked = 0
+            for (b in cands) {
+                if (checked > 220) break
+                val feet = b.above()
+                if (! standable(feet) || nearLava(feet, 1)) continue
+                val top = Vec3(b.x + 0.5, b.y + 0.98, b.z + 0.5)
+                if (top.distanceTo(p.eyePosition) > range) continue
+                val score = hopScore(Vec3.atBottomCenterOf(feet), goal)
+                if (score >= bestScore) continue
+                checked++
+                val rot = MathUtils.calcYawPitch(top)
+                val look = Vec3.directionFromRotation(rot.pitch, rot.yaw)
+                val land = com.github.noamm9.utils.items.EtherwarpHelper.getEtherPos(sneakFeet, look, range)
+                if (! land.succeeded || land.pos != b) continue
+                bestScore = score
+                best = Hop(true, etherSlot, b, rot.yaw, rot.pitch, Vec3.atBottomCenterOf(feet))
+            }
+            if (best != null) return best
+        }
+        val aotvSlot = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" } ?: return null
+        val baseYaw = Math.toDegrees(kotlin.math.atan2(goal.z - p.z, goal.x - p.x)).toFloat() - 90f
+        var best: Hop? = null
+        var bestScore = here - 4.0
+        for (dyaw in floatArrayOf(0f, - 12f, 12f, - 25f, 25f)) for (pitch in floatArrayOf(- 5f, - 20f, - 35f, - 50f, 5f)) {
+            val yaw = baseYaw + dyaw
+            val land = aotvLanding(p, yaw, pitch) ?: continue
+            val score = hopScore(land, goal)
+            if (score < bestScore) {
+                bestScore = score
+                best = Hop(false, aotvSlot, null, yaw, pitch, land)
+            }
+        }
+        return best
+    }
+
+    /** The highest solid block with two free blocks over it, scanning down [depth] blocks from [from]. */
+    private fun topBlock(from: BlockPos, depth: Int): BlockPos? {
+        val level = mc.level ?: return null
+        var b = from
+        repeat(depth) {
+            val below = b.below()
+            if (! level.getBlockState(below).getCollisionShape(level, below).isEmpty) return if (isFluid(below)) null else below
+            if (isFluid(below)) return null
+            b = below
+        }
+        return null
+    }
+
+    /** Where an AOTV with this aim leaves us standing: the teleport stops before the first block, then we fall. Null if unsafe. */
+    private fun aotvLanding(p: LocalPlayer, yaw: Float, pitch: Float): Vec3? {
+        val look = Vec3.directionFromRotation(pitch, yaw)
+        val eye = p.eyePosition
+        val end = eye.add(look.scale(aotvRange.value.toDouble()))
+        val hit = p.level().clip(net.minecraft.world.level.ClipContext(eye, end, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
+        val stop = if (hit.type == net.minecraft.world.phys.HitResult.Type.MISS) end else hit.location.subtract(look.scale(0.6))
+        if (stop.distanceTo(eye) < 5.0) return null
+        var feet = BlockPos.containing(stop.x, stop.y - 1.6, stop.z)
+        repeat(8) { // fall to the ground
+            if (isFluid(feet) || isFluid(feet.below())) return null
+            if (standable(feet)) return if (nearLava(feet, 1)) null else Vec3.atBottomCenterOf(feet)
+            feet = feet.below()
+        }
+        return null
+    }
+
+    private fun doHop(p: LocalPlayer) {
+        val h = hop ?: return
+        ownMoveTicks = 30
+        hold(h.slot)
+        when (hopPhase) {
+            0 -> { // sneak (etherwarp) or stand (AOTV), turn onto the aim
+                PlayerUtils.toggleSneak(h.ether)
+                if (! turn(p, h.yaw, h.pitch, 0.6f)) return
+                p.yRot = h.yaw; p.xRot = h.pitch
+                if (h.ether != p.isCrouching) return // the sneak hasn't reached the server yet
+                if (h.ether) { // check once more from where we really are
+                    val range = com.github.noamm9.utils.items.EtherwarpHelper.getEtherwarpDistance(p.inventory.getItem(h.slot)) ?: 57.0
+                    val land = com.github.noamm9.utils.items.EtherwarpHelper.getEtherPos(p.position(), Vec3.directionFromRotation(h.pitch, h.yaw), range)
+                    if (! land.succeeded || land.pos != h.target) { hop = null; PlayerUtils.toggleSneak(false); planIn = 0; return }
+                }
+                hopTimer = 0
+                hopFrom = p.position()
+                use(p)
+                hopPhase = 1
+            }
+            else -> { // wait for the teleport
+                if (p.position().distanceTo(hopFrom) > 2.0 || ++hopTimer > 15) {
+                    PlayerUtils.toggleSneak(false)
+                    hop = null
+                    hopWait = delay(hopMin.value, hopMax.value)
+                    repath = 0
+                    planIn = 0
+                }
+            }
+        }
     }
 
     /** In lava: jump and walk back to the last safe ground; stop if it doesn't work out. */
