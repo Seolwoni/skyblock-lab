@@ -145,8 +145,11 @@ object Style {
             roundRect(ctx, x - 1f, y - 1f, w + 2f, h + 2f, h / 2f + 1f, accentColor.withAlpha((40 * progress).toInt()))
         }
         val knob = h - 2f
-        val kx = x + 1f + (w - knob - 2f) * progress
-        roundRect(ctx, kx, y + 1f, knob, knob, knob / 2f, Color(138, 127, 163).lerpTo(Color.WHITE, progress))
+        // mid-switch the knob stretches like a finger dragging it, and settles round at either end
+        val stretch = if (progress > 0.02f && progress < 0.98f) kotlin.math.sin(progress * Math.PI).toFloat() * knob * 0.5f else 0f
+        val kw = knob + stretch
+        val kx = x + 1f + (w - kw - 2f) * progress
+        roundRect(ctx, kx, y + 1f, kw, knob, knob / 2f, Color(138, 127, 163).lerpTo(Color.WHITE, progress))
     }
 
     private fun Color.lerpTo(other: Color, t: Float): Color {

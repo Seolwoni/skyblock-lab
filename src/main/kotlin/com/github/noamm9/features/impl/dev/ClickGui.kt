@@ -19,6 +19,8 @@ object ClickGui: Feature("A feature used to change the ClickGui configuration.",
     val accentColor by ColorSetting("Accent Color", Color(139, 92, 246), false).withDescription("The accent color used by the whole ClickGui.")
     val guiStyle by DropdownSetting("GUI Style", 0, listOf("SkyHanni", "Classic")).withDescription("SkyHanni: one window with search, a category list and option cards with descriptions. Classic: the original NoammAddons panels.")
     val intro by DropdownSetting("Logo Intro", 1, listOf("Off", "First open", "Every open")).withDescription("Plays the Riftwalk logo animation when the menu opens (a click or a key skips it)")
+    val glass by com.github.noamm9.config.types.SliderSetting("Glass", 40, 0, 100, 5, "%").withDescription("How see-through the menu is: the blurred world shows through like frosted glass. 0 = solid")
+    val clickFeel by ToggleSetting("Click Feel", true).withDescription("A soft ripple where you click, cards and buttons dip for a moment, switch knobs stretch as they slide")
     val shaderCorners by ToggleSetting("Smooth Corners", true).withDescription("Draws rounded corners with a shader (anti-aliased, no steps). Turn off if menus look broken with your graphics setup")
     val customFont by ToggleSetting("Smooth Font", true).withDescription("Riftwalk menu uses the Pretendard font instead of Minecraft's pixel font")
     val riftClickSound by ToggleSetting("Riftwalk Click Sound", true)

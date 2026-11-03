@@ -55,12 +55,15 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         private const val DESC_SCALE = 0.9f
 
         // Void Rift palette
-        private val bg = Color(15, 11, 23, 250)
-        private val panel = Color(21, 15, 32, 255)
-        private val panelTop = Color(32, 22, 50, 255)
-        private val card = Color(26, 20, 38, 255)
-        private val cardOff = Color(20, 15, 30, 255)
-        private val cardHover = Color(37, 27, 55, 255)
+        /** 0 = solid, 1 = most see-through (Dev > ClickGui > Glass). */
+        private val glass get() = com.github.noamm9.features.impl.dev.ClickGui.glass.value / 100f
+        private fun glassA(solid: Int, drop: Int) = (solid - drop * glass).toInt().coerceIn(0, 255)
+        private val bg get() = Color(15, 11, 23, glassA(250, 120))
+        private val panel get() = Color(21, 15, 32, glassA(255, 150))
+        private val panelTop get() = Color(32, 22, 50, glassA(255, 130))
+        private val card get() = Color(26, 20, 38, glassA(255, 110))
+        private val cardOff get() = Color(20, 15, 30, glassA(255, 120))
+        private val cardHover get() = Color(37, 27, 55, glassA(255, 90))
         private val field = Color(11, 8, 18, 255)
         private val line = Color(42, 31, 61, 255)
         private val textMain = Color(237, 231, 255)
@@ -139,6 +142,60 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     private var entries = emptyList<Entry>()
     private val drawnFeatureCards = ArrayList<Pair<Feature, FloatArray>>() // feature -> x, y, w, h
     private val drawnSideRows = ArrayList<Pair<Any, FloatArray>>()
+    private val drawnOptionCards = ArrayList<FloatArray>()
+
+    // ------------------------------------------------------------------ click feel
+    private class Ripple(val rect: FloatArray, val x: Float, val y: Float, val start: Long)
+    private val ripples = ArrayList<Ripple>()
+    private val presses = HashMap<Any, Long>()
+
+    private fun ripple(rect: FloatArray, x: Float, y: Float, key: Any? = null) {
+        if (! com.github.noamm9.features.impl.dev.ClickGui.clickFeel.value) return
+        ripples += Ripple(rect.copyOf(), x, y, System.currentTimeMillis())
+        if (key != null) presses[key] = System.currentTimeMillis()
+    }
+
+    /** Pushes a matrix that dips [depth] (0.012 = 1.2%) around [rect]'s centre for a moment after a click. Always pop after. */
+    private fun pressPush(ctx: GuiGraphicsExtractor, key: Any, rect: FloatArray, depth: Float) {
+        ctx.pose().pushMatrix()
+        val t0 = presses[key] ?: return
+        val t = (System.currentTimeMillis() - t0) / 220f
+        if (t >= 1f) { presses.remove(key); return }
+        val s = 1f - depth * kotlin.math.sin(t * Math.PI).toFloat()
+        val cx = rect[0] + rect[2] / 2f
+        val cy = rect[1] + rect[3] / 2f
+        ctx.pose().translate(cx, cy)
+        ctx.pose().scale(s, s)
+        ctx.pose().translate(- cx, - cy)
+    }
+
+    /** A soft light circle spreading from the click point, kept inside what was clicked. */
+    private fun drawRipples(ctx: GuiGraphicsExtractor) {
+        if (ripples.isEmpty()) return
+        val now = System.currentTimeMillis()
+        ripples.removeIf { now - it.start > 520 }
+        for (r in ripples) {
+            val t = (now - r.start) / 520f
+            val ease = 1f - (1f - t) * (1f - t) * (1f - t)
+            val far = maxOf(r.rect[2], r.rect[3])
+            val rad = 4f + far * 1.05f * ease
+            val alpha = ((1f - t) * 34).toInt()
+            ctx.enableScissor(r.rect[0].toInt(), r.rect[1].toInt(), (r.rect[0] + r.rect[2]).toInt(), (r.rect[1] + r.rect[3]).toInt())
+            Style.roundRect(ctx, r.x - rad, r.y - rad, rad * 2, rad * 2, rad, Style.mix(Color.WHITE, Style.accentColor, 0.35f).withAlpha(alpha))
+            ctx.disableScissor()
+        }
+    }
+
+    /** Light on glass: a faint highlight along the top edge and a sheen fading down from it. */
+    private fun drawSheen(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float) {
+        val g = glass
+        ctx.drawVerticalGradient(x + 5f, y + 1f, w - 10f, 46f, Color(255, 255, 255, (10 + 10 * g).toInt()), Color(255, 255, 255, 0))
+        ctx.drawHorizontalGradient(x + 8f, y + 0.5f, (w - 16f) / 2f, 0.75f, Color(255, 255, 255, 0), Color(255, 255, 255, (40 + 25 * g).toInt()))
+        ctx.drawHorizontalGradient(x + w / 2f, y + 0.5f, (w - 16f) / 2f, 0.75f, Color(255, 255, 255, (40 + 25 * g).toInt()), Color(255, 255, 255, 0))
+        // faint accent rim on the sides, brighter towards the top
+        ctx.drawVerticalGradient(x, y + 6f, 0.75f, h * 0.6f, Style.accentColor.withAlpha((50 * (0.4f + g)).toInt().coerceAtMost(90)), Style.accentColor.withAlpha(0))
+        ctx.drawVerticalGradient(x + w - 0.75f, y + 6f, 0.75f, h * 0.6f, Style.accent2.withAlpha((50 * (0.4f + g)).toInt().coerceAtMost(90)), Style.accent2.withAlpha(0))
+    }
     private var visibleWidgets = emptyList<Widget<*>>()
 
     private fun winX() = MARGIN_X
@@ -204,11 +261,13 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
         Style.drawShadow(context, winX(), winY(), winW(), winH(), 5f, a)
         Style.roundRect(context, winX(), winY(), winW(), winH(), 5f, bg)
+        drawSheen(context, winX(), winY(), winW(), winH())
 
         drawTitleBar(context, mx.toFloat(), my.toFloat())
         drawSidebar(context, mx.toFloat(), my.toFloat())
         drawContent(context, mx, my)
 
+        drawRipples(context)
         if (a < 0.999f) Style.roundRect(context, winX(), winY(), winW(), winH(), 5f, Color(15, 11, 23, (255 * (1f - a)).toInt()))
         context.pose().popMatrix()
 
@@ -250,8 +309,10 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         titleButtons().forEach { (label, rect) ->
             val hovered = inside(mx, my, rect)
             val warn = label == "All On" // everything is off right now
-            Style.roundRect(ctx, rect[0], rect[1], rect[2], rect[3], 3f, if (warn) Color(120, 40, 50) else if (hovered) cardHover else Color(42, 38, 52))
+            pressPush(ctx, "btn:$label", rect, 0.06f)
+            Style.roundRect(ctx, rect[0], rect[1], rect[2], rect[3], 3f, if (warn) Color(120, 40, 50) else if (hovered) cardHover else Color(42, 38, 52, glassA(255, 80)))
             ctx.drawCenteredString(label, rect[0] + rect[2] / 2f, rect[1] + 5f, if (warn) Color.WHITE else if (hovered) Style.accentColor else textSoft)
+            ctx.pose().popMatrix()
         }
     }
 
@@ -395,6 +456,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         scroll.update(heights.sum() + entries.size * CARD_GAP, h)
 
         drawnFeatureCards.clear()
+        drawnOptionCards.clear()
         val shown = ArrayList<Widget<*>>()
         val insideContent = mx in x .. x + w && my in top .. top + h
 
@@ -429,6 +491,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                         val hovered = insideContent && inside(mx, my, rect)
                         val on = anim(f to "on", 220).also { it.update(if (f.enabled) 1f else 0f) }.value
                         val hov = anim(f to "card", 150).also { it.update(if (hovered && selected != f) 1f else 0f) }.value
+                        pressPush(ctx, f, rect, 0.012f)
                         Style.roundRect(ctx, x, y, w, eh, 4f, Style.mix(Style.mix(cardOff, card, on), cardHover, hov))
                         Style.drawGlow(ctx, x + 2f, y + 1f, 26f, eh - 2f, Style.accentColor, on)
                         ctx.drawRect(x, y + 1f, 2f, eh - 2f, Style.mix(line, Style.accentColor, on))
@@ -446,6 +509,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                             val label = if (f is IFeatureScreen) "open ›" else "$n setting${if (n == 1) "" else "s"} ›"
                             ctx.drawString(label, x + w - 8f - uiWidth(label), y + eh - 12f, if (f.enabled) accentLight() else textFaint, shadow = false)
                         }
+                        ctx.pose().popMatrix()
                     }
                 }
 
@@ -454,6 +518,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     if (visible) {
                         val ohov = anim(widget, 150).also { it.update(if (insideContent && my in y .. y + eh && mx in x .. x + w) 1f else 0f) }.value
                         Style.roundRect(ctx, x, y, w, eh, 4f, Style.mix(card, cardHover, ohov * 0.6f))
+                        drawnOptionCards += floatArrayOf(x, y, w, eh)
                         var wy = y + CARD_PAD
                         if (entry.prefix != null) {
                             ctx.drawString("§8${entry.prefix} ›", x + CARD_PAD, wy + 1f, textFaint, shadow = false)
@@ -527,6 +592,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
         if (left) titleButtons().forEach { (label, rect) ->
             if (!inside(mx, my, rect)) return@forEach
+            ripple(rect, mx, my, "btn:$label")
             Style.playClickSound(1f)
             when (label) {
                 "✕" -> onClose()
@@ -542,8 +608,9 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
         val sideTop = winY() + TITLE_H + 6f
         val sideBottom = winY() + winH() - 6f
-        if (my in sideTop .. sideBottom) drawnSideRows.firstOrNull { inside(mx, my, it.second) }?.let { (key, _) ->
+        if (my in sideTop .. sideBottom) drawnSideRows.firstOrNull { inside(mx, my, it.second) }?.let { (key, rect) ->
             if (!left) return true
+            ripple(rect, mx, my)
             Style.playClickSound(1f)
             when (key) {
                 is CategoryType -> { category = key; selected = null; query = "" }
@@ -558,9 +625,11 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val top = contentY()
         if (mx !in x .. x + contentW() || my !in top .. top + contentH()) return super.mouseClicked(mouseButtonEvent, bl)
 
+        drawnOptionCards.firstOrNull { inside(mx, my, it) }?.let { ripple(it, mx, my) }
         visibleWidgets.forEach { if (it.mouseClicked(mx.toDouble(), my.toDouble(), button)) return true }
 
         drawnFeatureCards.firstOrNull { inside(mx, my, it.second) }?.let { (f, rect) ->
+            if (left) ripple(rect, mx, my, f)
             val onSwitch = mx >= rect[0] + rect[2] - 40f && my <= rect[1] + 20f
             if (left && (onSwitch || selected == f)) {
                 f.toggle()
