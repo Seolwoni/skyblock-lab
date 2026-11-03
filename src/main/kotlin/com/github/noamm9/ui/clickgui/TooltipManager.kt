@@ -3,6 +3,7 @@ package com.github.noamm9.ui.clickgui
 import com.github.noamm9.NoammAddons.mc
 import com.github.noamm9.ui.clickgui.components.settings.Style
 import com.github.noamm9.ui.utils.Resolution
+import com.github.noamm9.utils.render.Render2D.drawHorizontalGradient
 import com.github.noamm9.utils.render.Render2D.drawRect
 import com.github.noamm9.utils.render.RenderHelper.width
 import com.github.noamm9.utils.render.RenderHelper.wrap
@@ -12,7 +13,7 @@ import kotlin.math.abs
 
 object TooltipManager {
     private const val displayDelay = 500L
-    private val backgroundColor = Color(10, 10, 10, 240)
+    private val backgroundColor = Color(21, 15, 32, 245)
 
     private var hoveredText: String? = null
     private var displayStartTime = 0L
@@ -45,8 +46,8 @@ object TooltipManager {
         if (tx + textWidth + (padding * 2) > logicalWidth) tx = lastMouseX - textWidth - (padding * 2) - 4f
         if (ty + textHeight + (padding * 2) > logicalHeight) ty = logicalHeight - textHeight - (padding * 2) - 4f
 
-        context.drawRect(tx, ty, textWidth + (padding * 2f), textHeight + (padding * 1.5f), backgroundColor)
-        context.drawRect(tx, ty, textWidth + (padding * 2f), 1.5f, Style.accentColor)
+        Style.roundRect(context, tx, ty, textWidth + (padding * 2f), textHeight + (padding * 1.5f), 3f, backgroundColor)
+        context.drawHorizontalGradient(tx + 2f, ty, textWidth + (padding * 2f) - 4f, 1.5f, Style.accentColor, Style.accent2)
 
         var currentY = ty + padding
         lines.forEach { line ->

@@ -176,8 +176,13 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
                 "§7Path §f${minOf(pathIndex, s?.path?.size ?: 0)}/${s?.path?.size ?: 0}  §7phase §f$phase",
                 "§7" + status + (lastEtherCheck?.let { if (it) "  §aether ok" else "  §cether miss" } ?: ""),
             )
-            lines.forEachIndexed { i, l -> ctx.drawString(l, 0, i * 10) }
-            return@hudElement lines.maxOf { mc.font.width(it.replace(Regex("§."), "")) } to lines.size * 10
+            val w = lines.maxOf { mc.font.width(it.replace(Regex("§."), "")) }
+            val h = lines.size * 10
+            // Void Rift panel behind the text
+            com.github.noamm9.ui.clickgui.components.settings.Style.roundRect(ctx, 0f, 0f, w + 12f, h + 6f, 4f, Color(15, 11, 23, 215))
+            ctx.fill(0, 2, 2, h + 4, com.github.noamm9.ui.clickgui.components.settings.Style.accentColor.rgb)
+            lines.forEachIndexed { i, l -> ctx.drawString(l, 7, 4 + i * 10) }
+            return@hudElement (w + 12) to (h + 6)
         }
     }
 

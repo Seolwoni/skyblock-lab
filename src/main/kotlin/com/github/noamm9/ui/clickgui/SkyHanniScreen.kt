@@ -12,6 +12,7 @@ import com.github.noamm9.ui.clickgui.components.settings.WidgetFactory
 import com.github.noamm9.ui.clickgui.enums.CategoryType
 import com.github.noamm9.ui.hud.HudEditorScreen
 import com.github.noamm9.ui.notification.NotificationManager
+import com.github.noamm9.ui.utils.Animation
 import com.github.noamm9.ui.utils.MouseHelper
 import com.github.noamm9.ui.utils.Resolution
 import com.github.noamm9.ui.utils.ScrollState
@@ -21,7 +22,9 @@ import com.github.noamm9.utils.ColorUtils.withAlpha
 import com.github.noamm9.utils.GuiUtils
 import com.github.noamm9.utils.render.Render2D.drawBorder
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
+import com.github.noamm9.utils.render.Render2D.drawHorizontalGradient
 import com.github.noamm9.utils.render.Render2D.drawRect
+import com.github.noamm9.utils.render.Render2D.drawVerticalGradient
 import com.github.noamm9.utils.render.Render2D.drawString
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -48,24 +51,33 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         private const val CARD_GAP = 5f
         private const val LINE_H = 10f
 
-        private val bg = Color(22, 20, 28, 248)
-        private val panel = Color(31, 28, 39, 255)
-        private val card = Color(36, 32, 46, 255)
-        private val cardOff = Color(29, 26, 37, 255)
-        private val cardHover = Color(44, 40, 56, 255)
-        private val field = Color(18, 16, 23, 255)
-        private val line = Color(46, 42, 58, 255)
-        private val textMain = Color(232, 230, 239)
-        private val textSoft = Color(185, 181, 200)
-        private val textDim = Color(143, 139, 163)
-        private val textFaint = Color(108, 104, 128)
-        private val onDot = Color(95, 211, 138)
-        private val offDot = Color(74, 70, 88)
+        // Void Rift palette
+        private val bg = Color(15, 11, 23, 250)
+        private val panel = Color(21, 15, 32, 255)
+        private val panelTop = Color(32, 22, 50, 255)
+        private val card = Color(26, 20, 38, 255)
+        private val cardOff = Color(20, 15, 30, 255)
+        private val cardHover = Color(37, 27, 55, 255)
+        private val field = Color(11, 8, 18, 255)
+        private val line = Color(42, 31, 61, 255)
+        private val textMain = Color(237, 231, 255)
+        private val textSoft = Color(196, 184, 224)
+        private val textDim = Color(138, 127, 163)
+        private val textFaint = Color(93, 84, 112)
+        private val onDot = Color(236, 72, 153)
+        private val offDot = Color(52, 41, 72)
+        private val logoFrom = Color(139, 92, 246)
+        private val logoTo = Color(236, 72, 153)
 
         /** Remembered between openings, like SkyHanni does. */
         @JvmField var lastCategory: CategoryType = CategoryType.DUNGEON
         @JvmField var lastFeature: Feature? = null
     }
+
+    private val openAnim = Animation(170, 0f)
+    private val contentAnim = Animation(200, 1f)
+    private var closing = false
+    private val anims = HashMap<Any, Animation>()
 
     private var query = ""
     private val search = TextInputHandler({ query }, { query = it; scroll.reset() })
@@ -123,25 +135,50 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         scroll.mouseDragged(my.toFloat())
         sideScroll.mouseDragged(my.toFloat())
 
-        context.drawRect(0, 0, Resolution.width, Resolution.height, Color(0, 0, 0, 110))
-        Style.roundRect(context, winX(), winY(), winW(), winH(), 4f, bg)
+        openAnim.update(if (closing) 0f else 1f)
+        contentAnim.update(1f)
+        val a = openAnim.value
+        if (closing && a <= 0.02f) {
+            Resolution.pop(context)
+            closing = false
+            super.onClose()
+            return
+        }
+
+        context.drawRect(0, 0, Resolution.width, Resolution.height, Color(6, 2, 14, (130 * a).toInt()))
+
+        // opens by growing from 96% while fading in, closes the other way
+        val cx = winX() + winW() / 2f
+        val cy = winY() + winH() / 2f
+        val sc = 0.96f + 0.04f * a
+        context.pose().pushMatrix()
+        context.pose().translate(cx, cy)
+        context.pose().scale(sc, sc)
+        context.pose().translate(- cx, - cy)
+
+        Style.drawShadow(context, winX(), winY(), winW(), winH(), 5f, a)
+        Style.roundRect(context, winX(), winY(), winW(), winH(), 5f, bg)
 
         drawTitleBar(context, mx.toFloat(), my.toFloat())
         drawSidebar(context, mx.toFloat(), my.toFloat())
         drawContent(context, mx, my)
 
-        TooltipManager.draw(context, Resolution.width, Resolution.height)
+        if (a < 0.999f) Style.roundRect(context, winX(), winY(), winW(), winH(), 5f, Color(15, 11, 23, (255 * (1f - a)).toInt()))
+        context.pose().popMatrix()
+
+        if (! closing) TooltipManager.draw(context, Resolution.width, Resolution.height)
         Resolution.pop(context)
     }
 
     private fun drawTitleBar(ctx: GuiGraphicsExtractor, mx: Float, my: Float) {
         val x = winX()
         val y = winY()
-        Style.roundRect(ctx, x, y, winW(), TITLE_H, 4f, panel)
-        ctx.drawRect(x, y + TITLE_H - 4f, winW(), 3f, panel)
-        ctx.drawRect(x, y + TITLE_H - 1f, winW(), 1f, Style.accentColor.withAlpha(170))
-        ctx.drawString("Riftwalk", x + 10f, y + 9f, Color.WHITE)
-        ctx.drawString(com.github.noamm9.NoammAddons.MOD_VERSION, x + 10f + uiWidth("Riftwalk") + 6f, y + 9f, textFaint, shadow = false)
+        Style.roundRect(ctx, x, y, winW(), TITLE_H, 5f, panelTop)
+        ctx.drawVerticalGradient(x, y + 5f, winW(), TITLE_H - 5f, panelTop, panel)
+        ctx.drawHorizontalGradient(x, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accentColor.withAlpha(0), Style.accentColor)
+        ctx.drawHorizontalGradient(x + winW() / 2f, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accent2, Style.accent2.withAlpha(0))
+        val logoEnd = drawLogo(ctx, x + 10f, y + 9f)
+        ctx.drawString(com.github.noamm9.NoammAddons.MOD_VERSION, logoEnd + 6f, y + 9f, textFaint, shadow = false)
 
         val sw = 240f
         val sx = x + (winW() - sw) / 2f
@@ -198,11 +235,13 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                 is CategoryType -> {
                     val open = key == category && query.isBlank()
                     val active = open && selected == null
-                    if (open) {
-                        ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Style.accentColor.withAlpha(if (active) 58 else 30))
-                        ctx.drawRect(x, y, 2f, ROW_H, Style.accentColor)
+                    val sel = anim(key to "sel", 220).also { it.update(if (open) (if (active) 1f else 0.6f) else 0f) }.value
+                    val hov = anim(key, 140).also { it.update(if (hovered && ! open) 1f else 0f) }.value
+                    if (sel > 0.01f) {
+                        ctx.drawHorizontalGradient(x, y, SIDEBAR_W, ROW_H, Style.accentColor.withAlpha((70 * sel).toInt()), Style.accent2.withAlpha((18 * sel).toInt()))
+                        ctx.drawRect(x, y + (ROW_H * (1 - sel)) / 2f, 2f, ROW_H * sel, Style.accentColor)
                     }
-                    else if (hovered) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Color(255, 255, 255, 10))
+                    if (hov > 0.01f) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Color(255, 255, 255, (12 * hov).toInt()))
                     if (key != CategoryType.entries.first()) ctx.drawRect(x + 6f, y, SIDEBAR_W - 12f, 1f, line)
                     ctx.drawString(label, x + 8f, y + 4f, if (open) accentLight() else textMain)
                     val all = featuresIn(key)
@@ -212,9 +251,13 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
                 is Feature -> {
                     val active = key == selected
-                    if (active) ctx.drawRect(x + 6f, y, SIDEBAR_W - 6f, ROW_H, Style.accentColor.withAlpha(45))
-                    else if (hovered) ctx.drawRect(x + 6f, y, SIDEBAR_W - 6f, ROW_H, Color(255, 255, 255, 10))
-                    Style.roundRect(ctx, x + 14f, y + 5f, 5f, 5f, 2.5f, if (key.enabled) onDot else offDot)
+                    val sel = anim(key to "sel", 200).also { it.update(if (active) 1f else 0f) }.value
+                    val hov = anim(key to "side", 140).also { it.update(if (hovered && ! active) 1f else 0f) }.value
+                    if (sel > 0.01f) ctx.drawHorizontalGradient(x + 6f, y, SIDEBAR_W - 6f, ROW_H, Style.accentColor.withAlpha((60 * sel).toInt()), Style.accentColor.withAlpha(0))
+                    if (hov > 0.01f) ctx.drawRect(x + 6f, y, SIDEBAR_W - 6f, ROW_H, Color(255, 255, 255, (10 * hov).toInt()))
+                    val dot = anim(key to "dot", 200).also { it.update(if (key.enabled) 1f else 0f) }.value
+                    if (dot > 0.01f) Style.roundRect(ctx, x + 13f, y + 4f, 7f, 7f, 3.5f, onDot.withAlpha((60 * dot).toInt()))
+                    Style.roundRect(ctx, x + 14f, y + 5f, 5f, 5f, 2.5f, Style.mix(offDot, onDot, dot))
                     ctx.drawString(fit(label, SIDEBAR_W - 32f), x + 23f, y + 4f, if (active) accentLight() else if (key.enabled) textSoft else textFaint, shadow = active)
                 }
             }
@@ -300,7 +343,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val insideContent = mx in x .. x + w && my in top .. top + h
 
         ctx.enableScissor(x.toInt(), top.toInt(), (x + w).toInt(), (top + h).toInt())
-        var y = top - scroll.value
+        val slide = (1f - contentAnim.value) * 12f
+        var y = top - scroll.value + slide
         entries.forEachIndexed { i, entry ->
             val eh = heights[i]
             val visible = y + eh >= top && y <= top + h
@@ -318,16 +362,18 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     drawnFeatureCards += f to rect
                     if (visible) {
                         val hovered = insideContent && inside(mx, my, rect)
-                        val base = if (f.enabled) card else cardOff
-                        Style.roundRect(ctx, x, y, w, eh, 3f, if (hovered && selected != f) cardHover else base)
-                        ctx.drawRect(x, y + 1f, 2f, eh - 2f, if (f.enabled) Style.accentColor else line)
+                        val on = anim(f to "on", 220).also { it.update(if (f.enabled) 1f else 0f) }.value
+                        val hov = anim(f to "card", 150).also { it.update(if (hovered && selected != f) 1f else 0f) }.value
+                        Style.roundRect(ctx, x, y, w, eh, 4f, Style.mix(Style.mix(cardOff, card, on), cardHover, hov))
+                        Style.drawGlow(ctx, x + 2f, y + 1f, 26f, eh - 2f, Style.accentColor, on)
+                        ctx.drawRect(x, y + 1f, 2f, eh - 2f, Style.mix(line, Style.accentColor, on))
                         ctx.drawString("§l${f.name}", x + CARD_PAD + 3f, y + 6f, if (f.enabled) textMain else textSoft)
                         var ly = y + 18f
                         for (l in wrap(f.description.orEmpty().replace("\\n", " "), w - CARD_PAD * 2 - 60f)) {
                             ctx.drawString(l, x + CARD_PAD + 3f, ly, if (f.enabled) textDim else textFaint, shadow = false)
                             ly += LINE_H
                         }
-                        Style.drawSwitch(ctx, x + w - 32f, y + 6f, 24f, 12f, if (f.enabled) 1f else 0f)
+                        Style.drawSwitch(ctx, x + w - 32f, y + 6f, 24f, 12f, on)
                         if (selected != f && hasSettings(f)) {
                             val n = f.configSettings.size
                             val label = if (f is IFeatureScreen) "open ›" else "$n setting${if (n == 1) "" else "s"} ›"
@@ -339,7 +385,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                 is Entry.Option -> {
                     val widget = entry.widget
                     if (visible) {
-                        Style.roundRect(ctx, x, y, w, eh, 3f, card)
+                        val ohov = anim(widget, 150).also { it.update(if (insideContent && my in y .. y + eh && mx in x .. x + w) 1f else 0f) }.value
+                        Style.roundRect(ctx, x, y, w, eh, 4f, Style.mix(card, cardHover, ohov * 0.6f))
                         var wy = y + CARD_PAD
                         if (entry.prefix != null) {
                             ctx.drawString("§8${entry.prefix} ›", x + CARD_PAD, wy + 1f, textFaint, shadow = false)
@@ -363,6 +410,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
             }
             y += eh + CARD_GAP
         }
+        if (contentAnim.value < 0.999f) ctx.drawRect(x, top, w, h, Color(15, 11, 23, (230 * (1f - contentAnim.value)).toInt()))
         ctx.disableScissor()
         visibleWidgets = shown
         scroll.drawScrollbar(ctx, x + w + 2f, top, 2f, h, mx, my)
@@ -497,6 +545,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     }
 
     private fun remember() {
+        contentAnim.set(0f)
         lastCategory = category
         lastFeature = selected
     }
@@ -509,8 +558,28 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     }
 
     override fun onClose() {
+        if (closing) return
         saveAndClear()
-        super.onClose()
+        closing = true // the frame loop finishes closing once the fade-out is done
+    }
+
+    /** One animation per thing on screen (card, row, switch...), created on first use. */
+    private fun anim(key: Any, ms: Long): Animation = anims.getOrPut(key) { Animation(ms, 0f) }
+
+    /** "Riftwalk" in the smooth bold font, purple -> pink letter by letter. Returns where it ends. */
+    private fun drawLogo(ctx: GuiGraphicsExtractor, x: Float, y: Float): Float {
+        val word = "Riftwalk"
+        if (! UiFont.active) {
+            ctx.drawString(word, x, y, Color.WHITE)
+            return x + mc.font.width(word)
+        }
+        var cx = x
+        word.forEachIndexed { i, ch ->
+            val t = i / (word.length - 1f)
+            ctx.drawString("§l$ch", cx, y, Style.mix(logoFrom, logoTo, t))
+            cx += UiFont.width("§l$ch")
+        }
+        return cx
     }
 
     // ------------------------------------------------------------------ text helpers

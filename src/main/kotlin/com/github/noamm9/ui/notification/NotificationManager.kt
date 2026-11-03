@@ -8,6 +8,7 @@ import com.github.noamm9.ui.clickgui.components.settings.Style
 import com.github.noamm9.ui.utils.Animation
 import com.github.noamm9.utils.ChatUtils.addColor
 import com.github.noamm9.utils.ColorUtils.withAlpha
+import com.github.noamm9.utils.render.Render2D.drawHorizontalGradient
 import com.github.noamm9.utils.render.Render2D.drawRect
 import com.github.noamm9.utils.render.Render2D.drawString
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -82,8 +83,9 @@ object NotificationManager: ISelfInit {
 
             if (! isHovered && isAlive) notify.elapsedTime += delta
 
-            ctx.drawRect(x, y, width, height, Color(20, 20, 20, 240))
-            ctx.drawRect(x, y, width, 2f, Style.accentColor)
+            Style.drawShadow(ctx, x, y, width, height, 4f, 0.8f)
+            Style.roundRect(ctx, x, y, width, height, 4f, Color(21, 15, 32, 245))
+            ctx.drawHorizontalGradient(x + 3f, y, width - 6f, 2f, Style.accentColor, Style.accent2)
 
             ctx.drawString("§a${notify.title}", x + 10f, y + 8f, Color.GREEN)
 
