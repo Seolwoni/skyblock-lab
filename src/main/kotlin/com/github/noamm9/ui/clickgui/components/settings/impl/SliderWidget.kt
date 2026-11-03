@@ -49,10 +49,11 @@ class SliderWidget<T: Number>(config: SliderSetting<T>): Widget<T>(config) {
         Style.drawNudgedText(ctx, name, x + 8f, y + 2f, hoverAnim.value)
 
         val valStr = if (isTyping) inputBuffer else cfg.stringfy(value) + cfg.suffix
-        val bw = valStr.width() + 6f
+        val bw = (if (isTyping) valStr.width().toFloat() else Style.tabWidth(valStr)) + 6f
         val bx = x + width - bw - 6f
         Style.valuePill(ctx, bx, y + 1f, bw, 10f, isTyping, hoverAnim.value)
-        ctx.drawString(valStr, bx + 3f, y + 2f, if (isTyping) Style.accentColor else Color.WHITE, shadow = false)
+        if (isTyping) ctx.drawString(valStr, bx + 3f, y + 2f, Style.accentColor, shadow = false)
+        else Style.drawTabular(ctx, valStr, bx + 3f, y + 2f, Color.WHITE)
 
         Style.drawSlider(ctx, x + 8f, y + 14f, width - 16f, sliderAnim.value, Style.accentColor)
     }

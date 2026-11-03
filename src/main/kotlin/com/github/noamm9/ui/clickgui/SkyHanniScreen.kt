@@ -51,6 +51,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         private const val CARD_PAD = 5f
         private const val CARD_GAP = 5f
         private const val LINE_H = 10f
+        /** Descriptions a step smaller than names, so names lead. */
+        private const val DESC_SCALE = 0.9f
 
         // Void Rift palette
         private val bg = Color(15, 11, 23, 250)
@@ -86,12 +88,30 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
         private fun titleOf(cat: CategoryType) = if (cat == CategoryType.FLOOR7) "Floor 7" else cat.name.lowercase().replaceFirstChar { it.uppercase() }
 
+        /** The logo intro has played this launch. */
+        private var introPlayed = false
+
         /** Remembered between openings, like SkyHanni does. */
         @JvmField var lastCategory: CategoryType = CategoryType.DUNGEON
         @JvmField var lastFeature: Feature? = null
     }
 
     private val openAnim = Animation(170, 0f)
+    private val introOn = when (com.github.noamm9.features.impl.dev.ClickGui.intro.value) {
+        0 -> false
+        1 -> ! introPlayed
+        else -> true
+    }.also { if (it) introPlayed = true }
+    private var introStart = 0L
+    private var introSkipped = false
+    private val INTRO_MS = 1300L
+
+    /** 0..1 through the intro, 1 when it's over (or off / skipped). */
+    private fun introT(): Float {
+        if (! introOn || introSkipped) return 1f
+        if (introStart == 0L) introStart = System.currentTimeMillis()
+        return ((System.currentTimeMillis() - introStart) / INTRO_MS.toFloat()).coerceIn(0f, 1f)
+    }
     private val contentAnim = Animation(200, 1f)
     private var closing = false
     private val anims = HashMap<Any, Animation>()
@@ -152,6 +172,12 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         scroll.mouseDragged(my.toFloat())
         sideScroll.mouseDragged(my.toFloat())
 
+        val intro = introT()
+        if (intro < 1f) drawIntro(context, intro)
+        if (intro < 0.7f) {
+            Resolution.pop(context)
+            return
+        }
         openAnim.update(if (closing) 0f else 1f)
         contentAnim.update(1f)
         val a = openAnim.value
@@ -162,7 +188,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
             return
         }
 
-        context.drawRect(0, 0, Resolution.width, Resolution.height, Color(6, 2, 14, (130 * a).toInt()))
+        if (intro >= 1f) context.drawRect(0, 0, Resolution.width, Resolution.height, Color(6, 2, 14, (130 * a).toInt()))
 
         // opens by growing from 96% while fading in, closes the other way
         val cx = winX() + winW() / 2f
@@ -195,7 +221,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         ctx.drawHorizontalGradient(x, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accentColor.withAlpha(0), Style.accentColor)
         ctx.drawHorizontalGradient(x + winW() / 2f, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accent2, Style.accent2.withAlpha(0))
         val logoEnd = drawLogo(ctx, x + 10f, y + 9f)
-        ctx.drawString(com.github.noamm9.NoammAddons.MOD_VERSION, logoEnd + 6f, y + 9f, textFaint, shadow = false)
+        Style.drawTabular(ctx, com.github.noamm9.NoammAddons.MOD_VERSION, logoEnd + 6f, y + 9f, textFaint)
 
         val sw = 240f
         val sx = x + (winW() - sw) / 2f
@@ -273,7 +299,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     ctx.drawString(label, x + 21f, y + 4f, if (open) accentLight() else textMain)
                     val all = featuresIn(key)
                     val count = if (open) "${all.count { it.enabled }}/${all.size}" else "${all.size}"
-                    ctx.drawString(count, x + SIDEBAR_W - 8f - uiWidth(count), y + 4f, if (open) accentLight() else textFaint, shadow = false)
+                    Style.drawTabular(ctx, count, x + SIDEBAR_W - 8f - Style.tabWidth(count), y + 4f, if (open) accentLight() else textFaint)
                 }
 
                 is Feature -> {
@@ -337,13 +363,13 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     }
 
     private fun featureCardHeight(feature: Feature, w: Float): Float {
-        val lines = wrap(feature.description.orEmpty().replace("\\n", " "), w - CARD_PAD * 2 - 60f).size.coerceAtLeast(0)
+        val lines = wrap(feature.description.orEmpty().replace("\\n", " "), (w - CARD_PAD * 2 - 60f) / DESC_SCALE).size.coerceAtLeast(0)
         // Room for the switch on top and the "N settings" link at the bottom.
         return maxOf(18f + lines * LINE_H + CARD_PAD, if (hasSettings(feature) && selected != feature) 32f else 22f)
     }
 
     private fun optionHeight(entry: Entry.Option, w: Float): Float {
-        val lines = wrap(entry.widget.config.description.orEmpty(), w - CARD_PAD * 2).size
+        val lines = wrap(entry.widget.config.description.orEmpty(), (w - CARD_PAD * 2) / DESC_SCALE).size
         return CARD_PAD + (if (entry.prefix != null) LINE_H else 0f) + entry.widget.height + (if (lines > 0) 3f + lines * LINE_H else 0f) + CARD_PAD
     }
 
@@ -383,9 +409,11 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                         drawIcon(ctx, cat, tx, y + 3.5f, 1f)
                         tx += 13f
                     }
-                    ctx.drawString(entry.text, tx, y + 4f, accentLight())
+                    val big = cat != null
+                    val hs = if (big) 1.15f else 1f
+                    ctx.drawString("§l${entry.text}", tx, y + (if (big) 3f else 4f), accentLight(), scale = hs, shadow = false)
                     val on = headerOnCount(entry.text)
-                    if (on != null) ctx.drawString(on, tx + 6f + uiWidth(entry.text), y + 4f, textFaint, shadow = false)
+                    if (on != null) ctx.drawString(on, tx + 6f + uiWidth("§l${entry.text}") * hs, y + 5f, textFaint, shadow = false)
                     ctx.drawHorizontalGradient(x + 2f, y + 15f, (w - 4f) * 0.35f, 1f, Style.accentColor.withAlpha(140), line)
                     ctx.drawRect(x + 2f + (w - 4f) * 0.35f, y + 15f, (w - 4f) * 0.65f, 1f, line)
                 }
@@ -404,9 +432,9 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                         highlight(ctx, f.name, x + CARD_PAD + 3f, y + 6f, "§l")
                         ctx.drawString("§l${f.name}", x + CARD_PAD + 3f, y + 6f, if (f.enabled) textMain else textSoft)
                         var ly = y + 18f
-                        for (l in wrap(f.description.orEmpty().replace("\\n", " "), w - CARD_PAD * 2 - 60f)) {
-                            highlight(ctx, l, x + CARD_PAD + 3f, ly, "")
-                            ctx.drawString(l, x + CARD_PAD + 3f, ly, if (f.enabled) textDim else textFaint, shadow = false)
+                        for (l in wrap(f.description.orEmpty().replace("\\n", " "), (w - CARD_PAD * 2 - 60f) / DESC_SCALE)) {
+                            highlight(ctx, l, x + CARD_PAD + 3f, ly + 0.5f, "", DESC_SCALE)
+                            ctx.drawString(l, x + CARD_PAD + 3f, ly + 0.5f, if (f.enabled) textDim else textFaint, scale = DESC_SCALE, shadow = false)
                             ly += LINE_H
                         }
                         Style.drawSwitch(ctx, x + w - 32f, y + 6f, 24f, 12f, on)
@@ -434,8 +462,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                         widget.draw(ctx, mouseX, mouseY)
                         shown += widget
                         var ly = wy + widget.height + 3f
-                        for (line in wrap(widget.config.description.orEmpty(), w - CARD_PAD * 2)) {
-                            ctx.drawString(line, x + CARD_PAD + 2f, ly, textDim, shadow = false)
+                        for (line in wrap(widget.config.description.orEmpty(), (w - CARD_PAD * 2) / DESC_SCALE)) {
+                            ctx.drawString(line, x + CARD_PAD + 2f, ly + 0.5f, textDim, scale = DESC_SCALE, shadow = false)
                             ly += LINE_H
                         }
                     }
@@ -453,16 +481,16 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     }
 
     /** Soft purple -> pink marker behind the part of [text] that matches the search. */
-    private fun highlight(ctx: GuiGraphicsExtractor, text: String, x: Float, y: Float, fmt: String) {
+    private fun highlight(ctx: GuiGraphicsExtractor, text: String, x: Float, y: Float, fmt: String, scale: Float = 1f) {
         val q = query.trim()
         if (q.isEmpty()) return
         var from = 0
         while (true) {
             val i = text.indexOf(q, from, ignoreCase = true)
             if (i < 0) return
-            val hx = x + uiWidth(fmt + text.substring(0, i))
-            val hw = uiWidth(fmt + text.substring(i, i + q.length))
-            Style.gradientPill(ctx, hx - 1.5f, y - 1.5f, hw + 3f, 11f, Style.accentColor.withAlpha(110), Style.accent2.withAlpha(110))
+            val hx = x + uiWidth(fmt + text.substring(0, i)) * scale
+            val hw = uiWidth(fmt + text.substring(i, i + q.length)) * scale
+            Style.gradientPill(ctx, hx - 1.5f, y - 1.5f, hw + 3f, 11f * scale, Style.accentColor.withAlpha(110), Style.accent2.withAlpha(110))
             from = i + q.length
         }
     }
@@ -485,6 +513,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     // ------------------------------------------------------------------ input
 
     override fun mouseClicked(mouseButtonEvent: MouseButtonEvent, bl: Boolean): Boolean {
+        if (introT() < 0.7f) { introSkipped = true; return true }
         val mx = Resolution.getMouseX(mouseButtonEvent.x).toFloat()
         val my = Resolution.getMouseY(mouseButtonEvent.y).toFloat()
         val button = mouseButtonEvent.button()
@@ -580,6 +609,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     }
 
     override fun keyPressed(keyEvent: KeyEvent): Boolean {
+        if (introT() < 0.7f && keyEvent.key != InputConstants.KEY_ESCAPE) { introSkipped = true; return true }
         visibleWidgets.forEach { if (it.keyPressed(keyEvent.key, keyEvent.scanCodeCompat, keyEvent.modifiers)) return true }
         if (search.keyPressed(keyEvent)) return true
         if (keyEvent.hasControlDown() && keyEvent.input() == InputConstants.KEY_F) {
@@ -622,6 +652,41 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val t = cat.ordinal / (CategoryType.entries.size - 1f)
         val c = Style.mix(textFaint, Style.mix(Style.accentColor, Style.accent2, t), strength)
         drawCategoryIcon(ctx, cat, x, y - 0.5f, 9f, c)
+    }
+
+    /**
+     * The logo intro: the letters rise in one after another, a light sweeps across them,
+     * then it fades while the window opens. A click or a key skips it.
+     */
+    private fun drawIntro(ctx: GuiGraphicsExtractor, t: Float) {
+        val fadeOut = if (t > 0.7f) 1f - (t - 0.7f) / 0.3f else 1f
+        val dim = (minOf(1f, t / 0.15f) * 130).toInt()
+        ctx.drawRect(0, 0, Resolution.width, Resolution.height, Color(6, 2, 14, dim))
+        if (fadeOut <= 0.01f) return
+        val word = "Riftwalk"
+        val scale = 3.2f
+        val widths = word.map { uiWidth("§l$it") * scale }
+        var x = Resolution.width / 2f - widths.sum() / 2f
+        val y = Resolution.height / 2f - 20f
+        // a soft glow behind the word
+        val glowA = (fadeOut * minOf(1f, t / 0.3f))
+        Style.roundRect(ctx, x - 26f, y - 12f, widths.sum() + 52f, 9f * scale + 24f, 22f, Style.accentColor.withAlpha((26 * glowA).toInt()))
+        Style.roundRect(ctx, x - 12f, y - 5f, widths.sum() + 24f, 9f * scale + 10f, 14f, Style.accent2.withAlpha((20 * glowA).toInt()))
+        val sweep = (t - 0.28f) / 0.42f // 0..1 across the word
+        word.forEachIndexed { i, ch ->
+            val p = i / (word.length - 1f)
+            val appear = ((t * 1.8f - i * 0.07f) / 0.25f).coerceIn(0f, 1f)
+            val ease = 1f - (1f - appear) * (1f - appear)
+            val shine = (1f - kotlin.math.abs(p - sweep) * 4f).coerceIn(0f, 1f) * 0.85f
+            val base = Style.mix(logoFrom, logoTo, p)
+            val c = Style.mix(base, Color.WHITE, shine)
+            val alpha = (255 * ease * fadeOut).toInt().coerceIn(0, 255)
+            if (alpha > 3) ctx.drawString("§l$ch", x, y + (1f - ease) * 8f, c.withAlpha(alpha), scale = scale, shadow = false)
+            x += widths[i]
+        }
+        val sub = "v" + com.github.noamm9.NoammAddons.MOD_VERSION
+        val subA = (((t - 0.35f) / 0.2f).coerceIn(0f, 1f) * fadeOut * 200).toInt()
+        if (subA > 3) ctx.drawCenteredString(sub, Resolution.width / 2f, y + 9f * scale + 8f, textDim.withAlpha(subA), shadow = false)
     }
 
     /** "Riftwalk" in the smooth bold font, purple -> pink letter by letter. Returns where it ends. */

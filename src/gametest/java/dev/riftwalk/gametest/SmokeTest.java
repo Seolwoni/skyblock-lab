@@ -57,6 +57,19 @@ public class SmokeTest implements FabricClientGameTest {
 			if (!srLoaded) failures.add("Secret Routes did not initialise");
 
 			// 3. Settings screens open and draw
+			try {
+				context.runOnClient(mc -> mc.gui.setScreen(ClickGui.createScreen()));
+				context.waitTicks(11);
+				context.takeScreenshot("rw-00-intro");
+				context.runOnClient(mc -> mc.gui.setScreen(null));
+				context.waitTicks(5);
+			} catch (Throwable t) {
+				failures.add("intro: " + t);
+			}
+			context.runOnClient(mc -> {
+				com.github.noamm9.ui.notification.NotificationManager.INSTANCE.push("Auto Fishing stopped", "&fThe server moved or turned you.", 60000L);
+				com.github.noamm9.ui.notification.NotificationManager.INSTANCE.push("Riftwalk", "&fReset &d38 &fcolours to the Void Rift defaults", 60000L);
+			});
 			checkScreen(context, "rw-01-skyhanni", true);
 			checkScreen(context, "rw-02-classic", false);
 			context.runOnClient(mc -> {

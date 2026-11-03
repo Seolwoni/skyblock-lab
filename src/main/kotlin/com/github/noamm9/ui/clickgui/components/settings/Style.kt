@@ -58,6 +58,31 @@ object Style {
         gradientPill(ctx, x, y, w, h, accentColor.withAlpha(a), accent2.withAlpha(a))
     }
 
+    /** Width of [s] with every digit as wide as "0", so numbers don't wobble when they change. */
+    fun tabWidth(s: String): Float {
+        val zero = with(com.github.noamm9.utils.render.RenderHelper) { "0".width() }.toFloat()
+        var w = 0f
+        for (ch in s) w += if (ch.isDigit()) zero else with(com.github.noamm9.utils.render.RenderHelper) { ch.toString().width() }.toFloat()
+        return w
+    }
+
+    /** Draws [s] with fixed-width digits (each centred in a "0"-wide cell). */
+    fun drawTabular(ctx: GuiGraphicsExtractor, s: String, x: Float, y: Float, color: Color, shadow: Boolean = false) {
+        val zero = with(com.github.noamm9.utils.render.RenderHelper) { "0".width() }.toFloat()
+        var cx = x
+        for (ch in s) {
+            val cw = with(com.github.noamm9.utils.render.RenderHelper) { ch.toString().width() }.toFloat()
+            if (ch.isDigit()) {
+                ctx.drawString(ch.toString(), cx + (zero - cw) / 2f, y, color, shadow = shadow)
+                cx += zero
+            }
+            else {
+                ctx.drawString(ch.toString(), cx, y, color, shadow = shadow)
+                cx += cw
+            }
+        }
+    }
+
     /** Linear mix of two colours, alpha included. */
     fun mix(a: Color, b: Color, t: Float): Color = a.lerpTo(b, t)
 
