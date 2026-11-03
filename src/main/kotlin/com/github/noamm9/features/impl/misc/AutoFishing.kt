@@ -75,6 +75,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val onlyMine by ToggleSetting("Only My Sea Creatures", true).withDescription(
         "Only fights creatures that came up at your hook right after you reeled in (and anything that hits you). Other people's creatures are left alone"
     )
+    private val ownWindow by SliderSetting("My Creature Window", 1.0, 0.3, 3.0, 0.1, " s").withDescription("A creature counts as yours only if it appears within this long after YOU reel in. Lower it if other people's creatures get picked up")
+    private val ownDistance by SliderSetting("My Creature Distance", 4.0, 1.5, 8.0, 0.5, " blocks").withDescription("...and only this close to where your hook was")
     private val noticeMin by SliderSetting("Notice Delay Min", 8, 0, 40, 1, " ticks").withDescription("How long it takes to notice a sea creature that came up, before reacting")
     private val noticeMax by SliderSetting("Notice Delay Max", 26, 0, 60, 1, " ticks")
     private val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")
@@ -222,6 +224,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val firstSeen = HashSet<Int>()
     private val mine = HashSet<Int>()
     private val seenAt = HashMap<Int, Int>()
+    private val seenPos = HashMap<Int, Vec3>()
 
     // noticing sea creatures
     private val noticeAt = HashMap<Int, Int>()
@@ -411,6 +414,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (rod() == null) return info("&cNo fishing rod in the hotbar.")
         anchorYaw = p.yRot
         anchorPitch = p.xRot
+        seenAt.clear(); seenPos.clear(); reels.clear()
+        tickCount += 100 // anything seen from now on is "after" any stale reel
         timing = com.github.noamm9.utils.HumanTiming()
         lastLookYaw = null
         wobYaw = 0f; wobPitch = 0f
@@ -1486,23 +1491,27 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
      * little off and move it into place.
      */
     private fun claimOwn(p: LocalPlayer) {
-        while (reels.isNotEmpty() && tickCount - reels.first().tick > 60) reels.removeFirst()
-        if (reels.isEmpty()) return
-        for (r in reels) {
-            val box = net.minecraft.world.phys.AABB(r.at, r.at).inflate(10.0, 10.0, 10.0)
-            for (e in p.level().getEntitiesOfClass(Mob::class.java, box) { it.isAlive && it.javaClass.simpleName !in NPC_CLASSES }) {
-                if (e.id in mine) continue
-                val first = seenAt.getOrPut(e.id) { tickCount }
-                if (first < r.tick || tickCount - first > 30) continue // was already there before we reeled in
-                if (e.position().distanceTo(r.at) <= 8.0) {
-                    mine += e.id
-                    mineAlive += e.id
-                    firstSeen += e.id
-                    creaturesCaught++
-                }
+        val lvl = p.level()
+        // remember when every mob around us first showed up, all the time - so a creature someone else
+        // fished up earlier is never mistaken for a new one just because we reeled in next to it
+        val around = lvl.getEntitiesOfClass(Mob::class.java, p.boundingBox.inflate(40.0, 24.0, 40.0)) { it.isAlive && it.javaClass.simpleName !in NPC_CLASSES }
+        for (e in around) if (e.id !in seenAt) { seenAt[e.id] = tickCount; seenPos[e.id] = e.position() }
+        if (seenAt.size > 3000) { val live = around.map { it.id }.toSet(); seenAt.keys.retainAll(live); seenPos.keys.retainAll(live) }
+
+        val window = (ownWindow.value * 20).toInt()
+        while (reels.isNotEmpty() && tickCount - reels.first().tick > window + 5) reels.removeFirst()
+        for (e in around) {
+            if (e.id in mine) continue
+            val first = seenAt[e.id] ?: continue
+            val at = seenPos[e.id] ?: continue
+            // ours only if it appeared AFTER one of our reels, within the window, right where our hook was
+            if (reels.any { first >= it.tick && first - it.tick <= window && at.distanceTo(it.at) <= ownDistance.value }) {
+                mine += e.id
+                mineAlive += e.id
+                firstSeen += e.id
+                creaturesCaught++
             }
         }
-        if (seenAt.size > 3000) seenAt.keys.retainAll(mine)
     }
 
     /** The SkyBlock name tag that floats over a mob ("[Lv45] Sea Walker 1,200/1,200❤"), if there is one. */
