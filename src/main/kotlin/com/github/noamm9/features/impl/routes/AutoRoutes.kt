@@ -137,7 +137,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private var pendingCast = false
     private var retaliating = false
     private var assistFailedGoal: BlockPos? = null
-    private var settleKey: Pair<Int, Int>? = null
+    private var settleKey: Pair<Float, Float>? = null
     private var settleLeft = 0
     private var fightTarget: Entity? = null
     private val AOTV_IDS = setOf("ASPECT_OF_THE_VOID", "ASPECT_OF_THE_END")
@@ -152,6 +152,11 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private val etherFails = HashMap<BlockPos, Int>()
     private val ignored = HashMap<Int, Int>() // entity id -> ticks left
     private var castsOnTarget = 0
+    private var retaliateTicks = 0
+    private var stallId = - 1
+    private var stallHp = 0f
+    private var stallPos: Vec3? = null
+    private var stallTicks = 0
     private var targetHealth = - 1f
     private var targetId = - 1
 
@@ -599,12 +604,33 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     /** Kills the nearest star mob / miniboss in detour range. Returns true while busy fighting. */
     private fun fight(): Boolean {
         val p = mc.player ?: return false
-        val attacker = if (fightBack.value && p.hurtTime > 0 || (fightBack.value && fightTarget?.let { it.isAlive && it.distanceTo(p) < 4f && retaliating } == true)) findAttacker(p) else null
+        if (retaliating) retaliateTicks++ else retaliateTicks = 0
+        val keepRetaliating = retaliating && retaliateTicks < 100 && fightTarget?.let { it.isAlive && it.distanceTo(p) < 4f } == true
+        var attacker = if (fightBack.value && (p.hurtTime > 0 || keepRetaliating)) findAttacker(p) else null
+        // hit from range (arrows, spells): go for the shooter only when Hyperion can reach it, never stand there
+        if (attacker == null && fightBack.value && p.hurtTime > 0) attacker = findShooter(p)
         retaliating = attacker != null
         if (clearValue == 0 && attacker == null) return false
         val target = attacker ?: if (clearValue == 2) findRoomTarget(p) else findTarget(p)
         fightTarget = target
         if (target == null) return false
+
+        // watchdog: a fight that gets nowhere (no damage dealt, we don't move) for 3 seconds is dropped for 10 s
+        val hp = (target as? LivingEntity)?.health ?: 0f
+        val here = p.position()
+        if (target.id != stallId || hp < stallHp - 0.01f || (stallPos?.distanceTo(here) ?: 0.0) > 1.5) {
+            stallId = target.id
+            stallHp = hp
+            stallPos = here
+            stallTicks = 0
+        }
+        if (++stallTicks > 60) {
+            ignored[target.id] = 200
+            stallTicks = 0
+            retaliating = false
+            if (assistLog.value) AssistBridge.logEvent("gave up on ${target.name.string}: no progress for 3 s")
+            return false
+        }
 
         val hypeSlot = if (useHype.value) PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } else null
         if (hypeSlot != null) return hypeFight(p, target, hypeSlot)
@@ -675,7 +701,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         }
         else {
             status = "teleporting to ${target.name.string}"
-            turnTo(centre.add(0.0, 0.2, 0.0), 2f)
+            turnTo(centre.add(0.0, 0.2, 0.0), 4f)
         }
         if (! aimed) {
             hitCooldown = 0 // cast as soon as the aim arrives
@@ -773,10 +799,26 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         return out
     }
 
+    /**
+     * Who is shooting us: the owner of an arrow / projectile close by, or failing that a visible skeleton-type mob.
+     * Only returned when Hyperion can get to it (in teleport range with a clear line), otherwise null so the route goes on.
+     */
+    private fun findShooter(p: Player): Entity? {
+        val level = p.level()
+        val hasHype = useHype.value && PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } != null
+        if (! hasHype) return null
+        val fromArrow = level.getEntitiesOfClass(net.minecraft.world.entity.projectile.Projectile::class.java, p.boundingBox.inflate(4.0)) { true }
+            .mapNotNull { it.owner as? LivingEntity }.firstOrNull { it != p && it.isAlive && it !is Player }
+        val shooter = fromArrow ?: level.getEntitiesOfClass(LivingEntity::class.java, p.boundingBox.inflate(16.0)) { e ->
+            e.isAlive && e !is Player && e !is ArmorStand && e.id !in ignored && e.javaClass.simpleName.contains("Skeleton") && p.hasLineOfSight(e)
+        }.minByOrNull { it.distanceToSqr(p) }
+        return shooter?.takeIf { it.id !in ignored && p.distanceTo(it) <= 11f && clearSight(p, it.position()) }
+    }
+
     /** The closest hostile-looking mob within 3 blocks (something that can be hitting us). */
     private fun findAttacker(p: Player): Entity? = p.level().getEntitiesOfClass(LivingEntity::class.java, p.boundingBox.inflate(3.5)) { e ->
         e.isAlive && e.health > 0f && e !is ArmorStand && e !is Bat && e != p && (e !is Player || e.gameProfile.name in MINIBOSSES) &&
-            e.distanceTo(p) <= 3.5f
+            e.distanceTo(p) <= 3.5f && e.id !in ignored && p.hasLineOfSight(e)
     }.minByOrNull { it.distanceToSqr(p) }
 
     private fun AABB.clipNearest(from: Vec3) = Vec3(from.x.coerceIn(minX, maxX), from.y.coerceIn(minY, maxY), from.z.coerceIn(minZ, maxZ))
@@ -829,16 +871,14 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             PlayerUtils.rotate(yaw, pitch)
             true
         }
-        if (! arrived) {
-            settleKey = null
-            return false
-        }
+        if (! arrived) return false // keep the settle state: chasing a moving aim must not restart the pause
         if (! settle || aimPause.value <= 0) return true
 
-        // Same aim (within ~3 degrees) waits once; a new aim waits again.
-        val key = Math.round(yaw / 3f) to Math.round(pitch / 3f)
-        if (key != settleKey) {
-            settleKey = key
+        // The same aim (within 12 degrees, so a moving mob or a knock-back doesn't count as new) waits once.
+        val prev = settleKey
+        val same = prev != null && abs(wrapDeg(yaw - prev.first)) < 12f && abs(pitch - prev.second) < 12f
+        if (! same) {
+            settleKey = yaw to pitch
             settleLeft = (aimPause.value + kotlin.random.Random.nextInt(- 1, 2)).coerceAtLeast(0)
         }
         if (settleLeft > 0) {
@@ -846,6 +886,13 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             return false
         }
         return true
+    }
+
+    private fun wrapDeg(d: Float): Float {
+        var x = d % 360f
+        if (x > 180f) x -= 360f
+        if (x < - 180f) x += 360f
+        return x
     }
 
     private fun turnTo(target: Vec3, tolerance: Float = 2f, settle: Boolean = true): Boolean {
