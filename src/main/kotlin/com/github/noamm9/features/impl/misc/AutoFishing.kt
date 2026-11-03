@@ -825,9 +825,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val f5 = kotlin.math.sin(- pitch * r)
         var pos = Vec3(p.x - f3 * 0.3, p.eyeY, p.z - f2 * 0.3)
         var v = Vec3(- f3, (- (f5 / f4)).coerceIn(- 5.0, 5.0), - f2)
-        v = v.scale(0.6 / v.length())
+        v = v.scale(0.6 / v.length() + 0.5) // vanilla: 0.6 / length + 0.5 (the 0.5 has a tiny random spread)
         val level = p.level()
-        repeat(120) {
+        repeat(160) {
             val next = pos.add(v)
             val hit = level.clip(net.minecraft.world.level.ClipContext(pos, next, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
             if (hit.type != net.minecraft.world.phys.HitResult.Type.MISS) return null
@@ -842,18 +842,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private fun solveAim(p: LocalPlayer, target: Vec3): Pair<Float, Float>? {
         val surface = surfaceY(BlockPos.containing(target))
         val yaw = Math.toDegrees(kotlin.math.atan2(target.z - p.z, target.x - p.x)).toFloat() - 90f
-        var best: Float? = null
-        var bestErr = Double.MAX_VALUE
+        val tries = ArrayList<Pair<Float, Double>>()
         var pitch = - 55f
         while (pitch <= 50f) {
-            val land = landing(p, yaw, pitch, surface)
-            if (land != null) {
-                val err = horizontalDist(land, target)
-                if (err < bestErr) { bestErr = err; best = pitch }
-            }
+            landing(p, yaw, pitch, surface)?.let { tries += pitch to horizontalDist(it, target) }
             pitch += 0.25f
         }
-        return best?.let { yaw to it }
+        val bestErr = tries.minOfOrNull { it.second } ?: return null
+        // a short and a high throw can land on the same spot: take the flatter one, like people do
+        val best = tries.filter { it.second <= bestErr + 0.25 }.maxByOrNull { it.first } ?: return null
+        return yaw to best.first
     }
 
     private fun aimAt(p: LocalPlayer, hs: ArmorStand) {
