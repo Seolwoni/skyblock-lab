@@ -73,7 +73,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         private fun iconOf(cat: CategoryType) = when (cat) {
             CategoryType.GENERAL -> "⚙"
             CategoryType.DUNGEON -> "☠"
-            CategoryType.FLOOR7 -> "♛"
+            CategoryType.FLOOR7 -> "⚔"
             CategoryType.VISUAL -> "✦"
             CategoryType.MISC -> "✿"
             CategoryType.ROUTES -> "➶"
