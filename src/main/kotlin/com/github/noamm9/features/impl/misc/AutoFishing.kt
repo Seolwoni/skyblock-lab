@@ -174,6 +174,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var tickCount = 0
     private var fightWait = 0
     private var castDownPitch = 0f
+    private var hypeStage = 0
+    private var hypeBeat = 0
 
     override fun init() {
         register<TickEvent.Start> {
@@ -410,6 +412,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val mobs = seen.filter { (noticeAt[it.id] ?: 0) <= tickCount }
         if (state == State.FIGHT || mobs.isNotEmpty()) {
             if (mobs.isEmpty()) {
+                hypeStage = 0
+                hypeBeat = 0
+                castDownPitch = 0f
                 state = State.CAST
                 returning = true
                 wait = castWait()
@@ -1148,15 +1153,33 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             return
         }
         if (hype != null) {
-            hold(hype)
             status = "Hyperion on ${close.size}"
-            // look straight down so the blast covers everything around us
-            if (castDownPitch == 0f) castDownPitch = 80f + RANDOM.nextFloat() * 9f
-            if (! turn(p, p.yRot, castDownPitch, 3f) || hitCooldown > 0) return
-            castDownPitch = 0f
-            hitCooldown = hitDelay.value
-            ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
-            use(p)
+            if (hypeBeat > 0) { hypeBeat--; return }
+            when (hypeStage) {
+                0 -> { // take the Hyperion out, glance at the creature first
+                    hold(hype)
+                    val m = close.minByOrNull { it.distanceToSqr(p) } ?: return
+                    val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(m.boundingBox.center, 0.5))
+                    if (abs(wrap(rot.yaw - p.yRot)) > 15f && ! turn(p, rot.yaw, rot.pitch, 10f)) return
+                    hypeStage = 1
+                    hypeBeat = delay(3, 9)
+                }
+                1 -> { // then look down so the blast covers everything around us
+                    if (castDownPitch == 0f) castDownPitch = 78f + RANDOM.nextFloat() * 11f
+                    if (! turn(p, p.yRot, castDownPitch, 3f)) return
+                    hypeStage = 2
+                    hypeBeat = delay(2, 7) // a beat with the aim settled before clicking
+                }
+                else -> { // cast; between casts keep looking down, each cast a little different
+                    if (hitCooldown > 0) return
+                    hold(hype)
+                    ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
+                    use(p)
+                    hitCooldown = delay(hitDelay.value, hitDelay.value * 2 + 4)
+                    castDownPitch = (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
+                    if (abs(castDownPitch - p.xRot) > 1.5f) { hypeStage = 1; hypeBeat = delay(1, 4) }
+                }
+            }
             return
         }
         if (weaponSlot.value in 1 .. 9) hold(weaponSlot.value - 1)
