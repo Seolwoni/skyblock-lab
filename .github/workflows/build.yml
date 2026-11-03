@@ -104,6 +104,19 @@ jobs:
             unzip -l "$j" | grep -E "features/impl/routes|secretroutes.mixins|assets/secretroutesmod/(rooms|secretlocations)" >> /tmp/libs.txt || true
             unzip -p "$j" fabric.mod.json >> /tmp/libs.txt || true
           done
+          # [probe] commits: dump render API signatures and vanilla GUI shaders for reference
+          if echo "${{ github.event.head_commit.message }}" | grep -q "\[probe\]"; then
+            mkdir -p /tmp/probe
+            MCJ=$(find ~/.gradle .gradle -name "*.jar" 2>/dev/null | grep -iE "minecraft-(merged|clientonly|common)" | grep -v sources | grep "26.2" | head -3)
+            echo "$MCJ" > /tmp/probe/jars.txt
+            for j in $MCJ; do
+              unzip -l "$j" | grep -E "shaders/(core|include)/" >> /tmp/probe/shader-list.txt || true
+              mkdir -p /tmp/probe/sh && (cd /tmp/probe/sh && unzip -o -q "$j" "assets/minecraft/shaders/core/gui*" "assets/minecraft/shaders/core/position_color*" "assets/minecraft/shaders/core/position_tex_color*" "assets/minecraft/shaders/include/*" 2>/dev/null) || true
+              for c in com.mojang.blaze3d.pipeline.RenderPipeline 'com.mojang.blaze3d.pipeline.RenderPipeline$Builder' 'com.mojang.blaze3d.pipeline.RenderPipeline$Snippet' net.minecraft.client.renderer.RenderPipelines com.mojang.blaze3d.vertex.DefaultVertexFormat net.minecraft.client.gui.render.TextureSetup net.minecraft.client.renderer.state.gui.GuiElementRenderState net.minecraft.client.gui.GuiGraphicsExtractor; do
+                javap -cp "$j" "$c" >> /tmp/probe/javap.txt 2>&1 || true
+              done
+            done
+          fi
           git checkout --orphan ci-log
           git rm -rf --cached . > /dev/null
           cp /tmp/compile.txt /tmp/tail.txt /tmp/libs.txt .
@@ -112,7 +125,8 @@ jobs:
           cp /tmp/assist/*.jar jar/ 2>/dev/null || true
           mkdir -p gt && cp /tmp/assist/*-build.log gt/ 2>/dev/null || true
           echo "${{ github.sha }} ${{ job.status }} ${{ env.RW_VERSION }}" > status.txt
-          git add compile.txt tail.txt libs.txt status.txt gt jar
+          [ -d /tmp/probe ] && cp -r /tmp/probe probe || true
+          git add compile.txt tail.txt libs.txt status.txt gt jar; [ -d probe ] && git add probe || true
           git commit -m "build log ${{ github.run_number }}"
           git push -f origin ci-log
       - name: upload jars
