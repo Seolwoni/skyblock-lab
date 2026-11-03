@@ -78,14 +78,17 @@ object Style {
 
     /** Layered soft shadow around a rounded panel. */
     fun drawShadow(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, radius: Float, strength: Float = 1f) {
-        for (i in 6 downTo 1) {
-            val a = (16 * strength * (7 - i) / 6f).toInt().coerceIn(0, 255)
-            roundRect(ctx, x - i, y - i + 2f, w + i * 2, h + i * 2, radius + i, Color(4, 0, 12, a))
+        // 12 thin layers: with the smooth corners this reads as one soft, slightly lowered shadow
+        for (i in 12 downTo 1) {
+            val d = i * 0.75f
+            val a = (9 * strength * (13 - i) / 12f).toInt().coerceIn(0, 255)
+            roundRect(ctx, x - d, y - d + 2.5f, w + d * 2, h + d * 2, radius + d, Color(4, 0, 12, a))
         }
     }
 
     /** A filled rectangle with rounded corners (radius in GUI pixels, drawn as stacked strips). */
     fun roundRect(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, radius: Float, color: Color) {
+        if (ClickGui.shaderCorners.value && com.github.noamm9.utils.render.ShaderUI.roundRect(ctx, x, y, w, h, radius, color)) return
         val r = radius.coerceAtMost(minOf(w, h) / 2f).coerceAtLeast(0f)
         if (r < 0.75f) return ctx.drawRect(x, y, w, h, color)
         ctx.drawRect(x, y + r, w, h - 2 * r, color)
