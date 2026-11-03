@@ -5,10 +5,17 @@ import com.github.noamm9.config.types.DropdownSetting
 import com.github.noamm9.config.types.KeybindSetting
 import com.github.noamm9.config.types.SliderSetting
 import com.github.noamm9.config.types.ToggleSetting
+import com.github.noamm9.event.impl.MainThreadPacketReceivedEvent
 import com.github.noamm9.event.impl.TickEvent
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.features.impl.routes.AssistBridge
+import com.github.noamm9.features.impl.routes.AutoRoutes
+import com.github.noamm9.ui.notification.NotificationManager
+import net.minecraft.core.BlockPos
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
+import net.minecraft.client.gui.screens.inventory.InventoryScreen
 import com.github.noamm9.utils.ChatUtils.modMessage
 import com.github.noamm9.utils.MathUtils
 import com.github.noamm9.utils.PlayerUtils
@@ -57,11 +64,21 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) of the weapon. 0 = Hyperion / Astraea / Scylla / Valkyrie if found")
     private val hitDelay by SliderSetting("Hit Delay", 4, 1, 20, 1, " ticks")
 
+    private val hotspots by ToggleSetting("Go To Hotspots", false).section("Hotspots").withDescription(
+        "Finds the nearest fishing Hotspot, walks to a spot on the shore next to it and casts into it. When it goes away, moves on to the next one. With none around it fishes where you started"
+    )
+    private val hotspotRange by SliderSetting("Search Range", 64, 16, 160, 8, " blocks").withDescription("How far it looks for a Hotspot")
+    private val hotspotRadius by SliderSetting("Hotspot Size", 3.0, 1.0, 6.0, 0.5, " blocks").withDescription("How close to the Hotspot's centre the hook has to land; it adjusts the aim until it does")
+    private val stayHome by ToggleSetting("Return To Spot", true).withDescription("Walks back to the fishing spot if you get pushed away from it")
+
+    private val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe").withDescription(
+        "Stops (doesn't try to hide anything): when the server teleports or turns you, changes your held item, or opens a menu by itself"
+    )
     private val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
     private val chatInfo by ToggleSetting("Chat Messages", true)
     private val statusHud by ToggleSetting("Status HUD", true)
 
-    private enum class State { CAST, WAIT_BITE, REEL, FIGHT }
+    private enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT }
 
     private val RANDOM = Random()
     private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
@@ -95,6 +112,15 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var nextMoveIn = 0
     private var returning = false
 
+    // hotspots / location
+    private var hotspot: ArmorStand? = null
+    private var stand: Vec3? = null
+    private val badHotspots = HashSet<Int>()
+    private var aimTries = 0
+    private var travelStuck = 0
+    private var ownMoveTicks = 0
+    private var expectedSlot = - 1
+
     override fun init() {
         register<TickEvent.Start> {
             if (toggleKey.isPressed() && mc.gui.screen() == null) {
@@ -103,6 +129,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             if (running) runCatching(::tick).onFailure { stop("error: ${it.message}") }
         }
         register<WorldChangeEvent> { if (running) stop("world changed") }
+        register<MainThreadPacketReceivedEvent.Pre> {
+            if (! running || ! failsafe.value || ownMoveTicks > 0) return@register
+            val name = event.packet.javaClass.simpleName
+            if (event.packet is ClientboundPlayerPositionPacket || name.contains("PlayerRotation")) mc.execute { if (running) failStop("the server moved or turned you") }
+        }
 
         hudElement("Auto Fishing Status", { statusHud.value }, { running }) { ctx, example ->
             val lines = if (example) listOf("§dAuto Fishing §aWAIT_BITE", "§7lava  §8waiting 6s") else listOf("§dAuto Fishing §a$state", "§7$status")
@@ -129,7 +160,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         nextMoveIn = nextMoveDelay()
         running = true
         returning = false
-        state = State.CAST
+        state = if (hotspots.value) State.FIND else State.CAST
+        stand = if (hotspots.value) null else p.position()
+        hotspot = null
+        badHotspots.clear()
+        aimTries = 0
+        expectedSlot = - 1
         wait = 0
         groundFails = 0
         waiting.clear()
@@ -137,8 +173,15 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         info("&aAuto Fishing started. Press the key again to stop.")
     }
 
+    private fun failStop(why: String) {
+        stop("stopped: $why")
+        NotificationManager.push("Auto Fishing stopped", why)
+        com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_PLING.value(), 1f, 0.6f)
+    }
+
     private fun stop(reason: String?) {
         running = false
+        AutoRoutes.releaseAll()
         mc.options.keyUse.isDown = false
         if (reason != null) info("&eAuto Fishing $reason.")
     }
@@ -230,6 +273,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private fun hold(slot: Int) {
         val p = mc.player ?: return
         if (p.inventory.selectedSlot != slot) p.inventory.selectedSlot = slot
+        expectedSlot = slot
     }
 
     private fun use(p: LocalPlayer) {
@@ -241,6 +285,26 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val p = mc.player ?: return stop("no player")
         if (stopHealth.value > 0 && p.health / p.maxHealth * 100f < stopHealth.value) return stop("health is low")
         if (hitCooldown > 0) hitCooldown--
+        if (ownMoveTicks > 0) ownMoveTicks--
+        if (failsafe.value) {
+            if (expectedSlot >= 0 && p.inventory.selectedSlot != expectedSlot) return failStop("your held item was changed")
+            val sc = mc.gui.screen()
+            if (sc is AbstractContainerScreen<*> && sc !is InventoryScreen) return failStop("a menu opened by itself (${sc.title.string})")
+        }
+
+        when (state) {
+            State.FIND -> return findHotspot(p)
+            State.TRAVEL -> return travel(p)
+            else -> {}
+        }
+        // pushed away from the spot: walk back (not while fighting, sea creatures come to us)
+        val home = stand
+        if (stayHome.value && home != null && state != State.FIGHT && p.position().distanceTo(home) > 3.0) {
+            if (p.fishing != null) rod()?.let { hold(it); use(p) }
+            state = State.TRAVEL
+            status = "pushed away, going back"
+            return
+        }
 
         // sea creatures first, the moment one comes up
         val mobs = if (killCreatures.value && mc.gui.screen() == null) creatures(p) else emptyList()
@@ -301,7 +365,28 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 }
                 timer++
                 if (inFluid(hook)) inFluidTicks++
-                status = "waiting ${timer / 20}s in ${fluidName()}"
+                status = "waiting ${timer / 20}s in ${fluidName()}" + if (hotspot != null) " (hotspot)" else ""
+                if (hotspots.value) {
+                    val hs = hotspot
+                    if (hs != null && ! hs.isAlive) { // the hotspot ended: next one
+                        hold(rod); use(p)
+                        hotspot = null
+                        state = State.FIND
+                        status = "hotspot gone"
+                        return
+                    }
+                    if (hs != null && inFluidTicks == 8 && ! landedIn(p, hook, hs)) {
+                        hold(rod); use(p)
+                        state = State.CAST
+                        wait = delay(castMin.value, castMax.value)
+                        return
+                    }
+                    if (hs == null && timer % 200 == 0 && nearestHotspot(p) != null) { // one appeared
+                        hold(rod); use(p)
+                        state = State.FIND
+                        return
+                    }
+                }
                 if (bitten(hook)) {
                     state = State.REEL
                     wait = delay(reelMin.value, reelMax.value)
@@ -335,7 +420,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 status = "reeled in"
             }
 
-            State.FIGHT -> {}
+            State.FIGHT, State.FIND, State.TRAVEL -> {}
         }
     }
 
@@ -383,6 +468,112 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         return hookDive.value && inFluidTicks > 10 && hook.deltaMovement.y < - 0.05
     }
 
+    // ------------------------------------------------------------------ hotspots
+
+    private fun nearestHotspot(p: LocalPlayer): ArmorStand? {
+        val r = hotspotRange.value.toDouble()
+        return p.level().getEntitiesOfClass(ArmorStand::class.java, p.boundingBox.inflate(r, 24.0, r)) {
+            it.isAlive && it.id !in badHotspots && it.customName?.string?.contains("HOTSPOT", ignoreCase = true) == true
+        }.minByOrNull { it.distanceToSqr(p) }
+    }
+
+    private fun findHotspot(p: LocalPlayer) {
+        val hs = nearestHotspot(p)
+        if (hs == null) {
+            hotspot = null
+            if (stand == null) stand = p.position()
+            status = "no hotspot nearby, fishing here"
+            state = State.CAST
+            return
+        }
+        val spot = shoreSpot(p, hs)
+        if (spot == null) {
+            badHotspots += hs.id
+            status = "no place to stand by that hotspot"
+            return
+        }
+        hotspot = hs
+        stand = spot
+        aimTries = 0
+        travelStuck = 0
+        state = State.TRAVEL
+        info("&7Hotspot found &8(${p.position().distanceTo(hs.position()).toInt()} blocks)&7, going there.")
+    }
+
+    /** A block on the shore 4-10 blocks from the hotspot, with a clear view of it, as close to us as possible. */
+    private fun shoreSpot(p: LocalPlayer, hs: ArmorStand): Vec3? {
+        val level = p.level()
+        val c = hs.blockPosition()
+        var best: Vec3? = null
+        var bestScore = Double.MAX_VALUE
+        for (dx in - 10 .. 10) for (dz in - 10 .. 10) {
+            val flat = kotlin.math.sqrt((dx * dx + dz * dz).toDouble())
+            if (flat < 4.0 || flat > 10.0) continue
+            for (dy in - 2 .. 5) {
+                val feet = BlockPos(c.x + dx, c.y + dy, c.z + dz)
+                val below = feet.below()
+                if (level.getBlockState(below).getCollisionShape(level, below).isEmpty) continue
+                if (! level.getFluidState(below).isEmpty) continue
+                if (! level.getBlockState(feet).getCollisionShape(level, feet).isEmpty || ! level.getFluidState(feet).isEmpty) continue
+                if (! level.getBlockState(feet.above()).getCollisionShape(level, feet.above()).isEmpty) continue
+                val eye = Vec3(feet.x + 0.5, feet.y + 1.62, feet.z + 0.5)
+                val clip = level.clip(net.minecraft.world.level.ClipContext(eye, hs.position().add(0.0, 0.3, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
+                if (clip.type != net.minecraft.world.phys.HitResult.Type.MISS && clip.location.distanceTo(hs.position()) > 1.5) continue
+                val pos = Vec3(feet.x + 0.5, feet.y.toDouble(), feet.z + 0.5)
+                val score = pos.distanceTo(p.position()) + abs(flat - 7.0) * 2
+                if (score < bestScore) { bestScore = score; best = pos }
+                break
+            }
+        }
+        return best
+    }
+
+    private fun travel(p: LocalPlayer) {
+        val goal = stand ?: return run { state = State.FIND }
+        ownMoveTicks = 20 // our own AOTV / walking: not the server's doing
+        expectedSlot = - 1
+        when (AutoRoutes.travelTick(goal, 0.6)) {
+            AutoRoutes.Travel.ARRIVED -> {
+                AutoRoutes.releaseAll()
+                val hs = hotspot
+                if (hs != null) {
+                    val rot = MathUtils.calcYawPitch(hs.position().add(0.0, 0.2, 0.0))
+                    anchorYaw = rot.yaw
+                    anchorPitch = (rot.pitch - 8f).coerceIn(- 30f, 60f) // a little above it: the hook flies in an arc
+                }
+                offYaw = 0f; offPitch = 0f; moveLen = 0
+                returning = true
+                state = State.CAST
+                wait = delay(castMin.value, castMax.value)
+                status = "at the spot"
+            }
+            AutoRoutes.Travel.STUCK -> if (++travelStuck > 5) {
+                hotspot?.let { badHotspots += it.id }
+                hotspot = null
+                state = State.FIND
+                status = "couldn't get there"
+            }
+            AutoRoutes.Travel.MOVING -> status = "going to ${if (hotspot != null) "the hotspot" else "the spot"} (${p.position().distanceTo(goal).toInt()}m)"
+        }
+    }
+
+    /** Is the hook inside the hotspot? If not, nudge the aim towards it for the next cast (up to 8 tries, then accept). */
+    private fun landedIn(p: LocalPlayer, hook: FishingHook, hs: ArmorStand): Boolean {
+        val off = hook.position().subtract(hs.position())
+        if (kotlin.math.sqrt(off.x * off.x + off.z * off.z) <= hotspotRadius.value || aimTries >= 8) return true
+        aimTries++
+        val eye = p.eyePosition
+        fun flat(v: Vec3) = kotlin.math.sqrt((v.x - eye.x) * (v.x - eye.x) + (v.z - eye.z) * (v.z - eye.z))
+        val tooFar = flat(hook.position()) - flat(hs.position())
+        anchorPitch = (anchorPitch + (tooFar * 1.6).toFloat().coerceIn(- 6f, 6f)).coerceIn(- 45f, 70f)
+        val yawHook = Math.toDegrees(kotlin.math.atan2(hook.z - eye.z, hook.x - eye.x)).toFloat()
+        val yawHs = Math.toDegrees(kotlin.math.atan2(hs.z - eye.z, hs.x - eye.x)).toFloat()
+        anchorYaw += wrap(yawHs - yawHook).coerceIn(- 10f, 10f)
+        returning = true
+        status = "hook landed outside the hotspot, adjusting aim ($aimTries)"
+        return false
+    }
+
     // ------------------------------------------------------------------ sea creatures
 
     private fun creatures(p: LocalPlayer): List<LivingEntity> {
@@ -416,6 +607,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             // look straight down so the blast covers everything around us
             if (! turn(p, p.yRot, 90f, 3f) || hitCooldown > 0) return
             hitCooldown = hitDelay.value
+            ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
             use(p)
             return
         }
