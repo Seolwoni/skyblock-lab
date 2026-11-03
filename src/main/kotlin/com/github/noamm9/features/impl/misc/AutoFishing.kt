@@ -147,6 +147,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val inReach = HashMap<Int, Pair<Int, Float>>() // id -> ticks in reach without losing health, last health
     private var manaWait = 0
     private var fightTicks = 0
+    private var blastBlocked = false
     private val ignored = HashSet<Int>()
     private var groundTicks = 0
     private var groundFails = 0
@@ -622,6 +623,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val mobs = seen.filter { (noticeAt[it.id] ?: 0) <= tickCount }
         if (state == State.FIGHT || mobs.isNotEmpty()) {
             if (mobs.isEmpty()) {
+                blastBlocked = false
                 hypeStage = 0
                 hypeBeat = 0
                 castDownPitch = 0f
@@ -1585,7 +1587,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
         if (firstSeen.size > 2000) { firstSeen.retainAll(all.map { it.id }.toSet()); mine.retainAll(firstSeen) }
         // anything actually hitting us counts too (self-defence)
-        if (p.hurtTime > 0) all.filter { it.distanceTo(p) <= 3.5f && p.hasLineOfSight(it) }.forEach { mine += it.id }
+        if (p.hurtTime > 0) all.filter { it.distanceTo(p) <= 3.5f && p.hasLineOfSight(it) }.forEach { mine += it.id; ignored -= it.id; inReach.remove(it.id) }
         return all.filter { e ->
             e.id !in ignored && e.distanceTo(p) <= r && (! onlyMine.value || e.id in mine) && ! deadTag(e)
         }
@@ -1596,7 +1598,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private fun fight(p: LocalPlayer, mobs: List<LivingEntity>) {
         val hypeSlot = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
         // no mana: the Hyperion is still a sword, swing it instead of standing there
-        val hype = hypeSlot?.takeIf { com.github.noamm9.utils.ManaGuard.canCast(manaCost.value) }
+        val hype = hypeSlot?.takeIf { ! blastBlocked && com.github.noamm9.utils.ManaGuard.canCast(manaCost.value) }
         if (hypeSlot != null && hype == null) hold(hypeSlot)
         val reach = if (hype != null) blastRange.value else 3.2
         // a creature that's in reach but never loses health (out of the blast, immune, already dead): leave it
@@ -1605,7 +1607,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             val (t, hp) = inReach[m.id] ?: (0 to m.health)
             val n = if (m.health < hp - 0.01f) 0 else t + 1
             inReach[m.id] = n to m.health
-            if (n > inReachLimit) { ignored += m.id; inReach.remove(m.id) }
+            if (n > inReachLimit && p.hurtTime == 0) { ignored += m.id; inReach.remove(m.id) }
         }
         if (inReach.size > 200) inReach.keys.retainAll(mobs.map { it.id }.toSet())
         for (m in mobs) {
@@ -1649,7 +1651,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     if (! blastSafe(p, p.yRot, p.xRot)) { // this look would teleport us off the edge: straight down instead
                         castDownPitch = 90f
                         if (abs(p.xRot - 90f) > 0.5f) { hypeStage = 1; return }
-                        if (! blastSafe(p, p.yRot, 90f)) { status = "Hyperion not safe here"; return }
+                        if (! blastSafe(p, p.yRot, 90f)) { // no safe blast from here: fight it with the sword instead
+                            blastBlocked = true
+                            hypeStage = 0
+                            return
+                        }
                     }
                     hold(hype)
                     ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
