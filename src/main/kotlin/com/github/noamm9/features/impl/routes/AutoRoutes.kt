@@ -992,7 +992,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
      * One tick of getting to [goal] while no route is running: fights back, AOTVs on long straight stretches,
      * otherwise walks (with Assist Path when installed). Reports STUCK once walking made no progress for 2 seconds.
      */
-    fun travelTick(goal: Vec3, tolerance: Double = 1.5): Travel {
+    fun travelTick(goal: Vec3, tolerance: Double = 1.5, hopWait: (() -> Int)? = null, allowHop: Boolean = true): Travel {
         val p = mc.player ?: return Travel.STUCK
         val pos = p.position()
         if (horizontal(pos, goal) < tolerance && abs(pos.y - goal.y) < 3.0) {
@@ -1007,10 +1007,10 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         }
         if (fight()) return Travel.MOVING
         val flat = horizontal(pos, goal)
-        if (fastTravel.value && p.onGround() && flat > 10.0 && abs(goal.y - pos.y) < 6.0 && aotvLeap(pos, goal)) {
+        if (allowHop && fastTravel.value && p.onGround() && flat > 10.0 && abs(goal.y - pos.y) < 6.0 && aotvLeap(pos, goal)) {
             if (phase == Phase.AOTV_WAIT) {
                 phase = Phase.MOVE
-                travelWait = 6
+                travelWait = hopWait?.invoke() ?: 6
             }
             return Travel.MOVING
         }
@@ -1019,7 +1019,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         if (travelStuck) {
             travelStuck = false
             // one AOTV hop to get unstuck before giving up
-            return if (aotvLeap(pos, goal.add(0.0, 1.0, 0.0))) Travel.MOVING.also { phase = Phase.MOVE; travelWait = 6 } else Travel.STUCK
+            return if (aotvLeap(pos, goal.add(0.0, 1.0, 0.0))) Travel.MOVING.also { phase = Phase.MOVE; travelWait = hopWait?.invoke() ?: 6 } else Travel.STUCK
         }
         return Travel.MOVING
     }

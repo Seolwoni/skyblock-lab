@@ -46,7 +46,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val reelMax by SliderSetting("Reel Delay Max", 9, 1, 17, 1, " ticks").withDescription("Longest wait after the bite (17 at most, so the fish doesn't get away)")
     private val castMin by SliderSetting("Cast Delay Min", 4, 1, 60, 1, " ticks").withDescription("Shortest wait before casting again")
     private val castMax by SliderSetting("Cast Delay Max", 18, 1, 60, 1, " ticks")
-    private val humanDelay by ToggleSetting("Human Delay", true).withDescription("Most delays land in the lower third of the range with the odd slow reaction, instead of evenly spread (like Reel Assist)")
+    private val timingModel by DropdownSetting("Timing Model", 2, listOf("Even", "Reel Assist", "Human")).withDescription(
+        "Even: any tick in the range equally. Reel Assist: mostly the lower third with the odd slow reaction. Human: skewed reaction times, a rhythm that drifts over minutes, each delay leaning on the last one, slight fatigue over time, no tick count twice in a row"
+    )
+    private val slipChance by SliderSetting("Slow Reactions", 6, 0, 30, 1, "%").withDescription("Human model: how often a clearly slow reaction happens").showIf { timingModel.value == 2 }
+    private val drift by SliderSetting("Rhythm Drift", 20, 0, 50, 1, "%").withDescription("Human model: how far the overall speed wanders over minutes").showIf { timingModel.value == 2 }
+    private val fatigue by SliderSetting("Fatigue", 8, 0, 40, 1, "%/h").withDescription("Human model: how much slower reactions get per hour of fishing (up to 2 hours)").showIf { timingModel.value == 2 }
+    private val lookAtCatch by ToggleSetting("Look At The Catch", true).withDescription("After a sea creature or a good catch, waits a bit longer before casting again, like reading what came up")
+    private val breakChance by SliderSetting("Short Breaks", 2.0, 0.0, 15.0, 0.5, "%").withDescription("Chance per cast of a 2-6 s pause before casting (checking chat, the inventory...)")
     private val castTimeout by SliderSetting("Recast After", 45, 10, 120, 5, " s").withDescription("Reels in and casts again if nothing bites for this long")
     private val groundRecast by ToggleSetting("Recast If Hook Lands On Ground", true).withDescription("Casts again when the hook settles somewhere that isn't water / lava; stops after 3 misses in a row")
     private val hookDive by ToggleSetting("Detect By Hook Dive", true).withDescription("Also reels in when the hook suddenly dives (vanilla bite), not only on the \"!!!\" sign")
@@ -67,6 +74,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val hotspots by ToggleSetting("Go To Hotspots", false).section("Hotspots").withDescription(
         "Finds the nearest fishing Hotspot, walks to a spot on the shore next to it and casts into it. When it goes away, moves on to the next one. With none around it fishes where you started"
     )
+    private val hopMin by SliderSetting("AOTV Gap Min", 5, 2, 40, 1, " ticks").withDescription("Shortest wait between AOTV hops on the way (same timing model as casting)")
+    private val hopMax by SliderSetting("AOTV Gap Max", 18, 2, 60, 1, " ticks")
+    private val walkSome by SliderSetting("Walk Instead", 15, 0, 80, 5, "%").withDescription("Chance to walk a stretch instead of hopping with the AOTV")
     private val hotspotRange by SliderSetting("Search Range", 64, 16, 160, 8, " blocks").withDescription("How far it looks for a Hotspot")
     private val hotspotRadius by SliderSetting("Hotspot Size", 3.0, 1.0, 6.0, 0.5, " blocks").withDescription("How close to the Hotspot's centre the hook has to land; it adjusts the aim until it does")
     private val stayHome by ToggleSetting("Return To Spot", true).withDescription("Walks back to the fishing spot if you get pushed away from it")
@@ -81,6 +91,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT }
 
     private val RANDOM = Random()
+    private var timing = com.github.noamm9.utils.HumanTiming()
+    private var hopThisStretch = true
+    private var stretchLeft = 0
+    private var justCaughtSomething = false
     private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
     private val NPC_CLASSES = setOf("Villager", "WanderingTrader")
 
@@ -156,6 +170,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (rod() == null) return info("&cNo fishing rod in the hotbar.")
         anchorYaw = p.yRot
         anchorPitch = p.xRot
+        timing = com.github.noamm9.utils.HumanTiming()
         offYaw = 0f; offPitch = 0f; moveLen = 0
         nextMoveIn = nextMoveDelay()
         running = true
@@ -195,11 +210,26 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val lo = minOf(min, max)
         val hi = maxOf(min, max)
         if (hi <= lo) return lo
-        if (! humanDelay.value) return rand(lo, hi)
+        if (timingModel.value == 0) return rand(lo, hi)
+        if (timingModel.value == 2) {
+            timing.slipChance = slipChance.value / 100.0
+            timing.drift = drift.value / 100.0
+            timing.fatiguePerHour = fatigue.value / 100.0
+            return timing.next(lo, hi)
+        }
         val span = (hi - lo).toDouble()
         val v = if (RANDOM.nextDouble() < 0.08) lo + span * (0.6 + 0.4 * RANDOM.nextDouble())
         else lo + span * 0.3 + RANDOM.nextGaussian() * span * 0.15
         return Math.round(v).toInt().coerceIn(lo, hi)
+    }
+
+    /** Wait before the next cast: the timing model, plus reading the catch and the odd short break. */
+    private fun castWait(): Int {
+        var t = delay(castMin.value, castMax.value)
+        if (lookAtCatch.value && justCaughtSomething) t += timing.uniform(8, 25)
+        justCaughtSomething = false
+        t += timing.maybeBreak(breakChance.value, 40, 120)
+        return t
     }
 
     private fun nextMoveDelay() = (jitterEvery.value * 20 * (0.8 + 0.4 * RANDOM.nextDouble())).toInt()
@@ -286,6 +316,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (stopHealth.value > 0 && p.health / p.maxHealth * 100f < stopHealth.value) return stop("health is low")
         if (hitCooldown > 0) hitCooldown--
         if (ownMoveTicks > 0) ownMoveTicks--
+        timing.tick()
         if (failsafe.value) {
             if (expectedSlot >= 0 && p.inventory.selectedSlot != expectedSlot) return failStop("your held item was changed")
             val sc = mc.gui.screen()
@@ -312,11 +343,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             if (mobs.isEmpty()) {
                 state = State.CAST
                 returning = true
-                wait = delay(castMin.value, castMax.value)
+                wait = castWait()
                 status = "back to fishing"
                 return
             }
             if (state != State.FIGHT && p.fishing != null) rod()?.let { hold(it); use(p) } // pull the line in first
+            justCaughtSomething = true
             state = State.FIGHT
             fight(p, mobs)
             return
@@ -343,7 +375,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 hold(rod)
                 if (hook != null) { // a line is still out: pull it in first
                     use(p)
-                    wait = delay(castMin.value, castMax.value)
+                    wait = castWait()
                     return
                 }
                 use(p)
@@ -359,7 +391,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 if (hook == null) {
                     if (++timer > 20) { // hook never came / line broke
                         state = State.CAST
-                        wait = delay(castMin.value, castMax.value)
+                        wait = castWait()
                     }
                     return
                 }
@@ -378,7 +410,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     if (hs != null && inFluidTicks == 8 && ! landedIn(p, hook, hs)) {
                         hold(rod); use(p)
                         state = State.CAST
-                        wait = delay(castMin.value, castMax.value)
+                        wait = castWait()
                         return
                     }
                     if (hs == null && timer % 200 == 0 && nearestHotspot(p) != null) { // one appeared
@@ -398,7 +430,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     hold(rod)
                     use(p)
                     state = State.CAST
-                    wait = delay(castMin.value, castMax.value)
+                    wait = castWait()
                     if (++groundFails >= 3) return stop("the hook keeps landing on the ground - look at the ${fluidName()}")
                     status = "hook on the ground, recasting ($groundFails/3)"
                     return
@@ -407,7 +439,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     hold(rod)
                     use(p)
                     state = State.CAST
-                    wait = delay(castMin.value, castMax.value)
+                    wait = castWait()
                     status = "nothing bit, recasting"
                 }
             }
@@ -416,7 +448,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 hold(rod)
                 if (hook != null) use(p)
                 state = State.CAST
-                wait = delay(castMin.value, castMax.value)
+                wait = castWait()
                 status = "reeled in"
             }
 
@@ -532,7 +564,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val goal = stand ?: return run { state = State.FIND }
         ownMoveTicks = 20 // our own AOTV / walking: not the server's doing
         expectedSlot = - 1
-        when (AutoRoutes.travelTick(goal, 0.6)) {
+        if (--stretchLeft <= 0) { // decide per stretch of ~2-4 s whether to hop or walk
+            hopThisStretch = RANDOM.nextInt(100) >= walkSome.value
+            stretchLeft = timing.uniform(40, 80)
+        }
+        when (AutoRoutes.travelTick(goal, 0.6, { delay(hopMin.value, hopMax.value) }, hopThisStretch)) {
             AutoRoutes.Travel.ARRIVED -> {
                 AutoRoutes.releaseAll()
                 val hs = hotspot
@@ -544,7 +580,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 offYaw = 0f; offPitch = 0f; moveLen = 0
                 returning = true
                 state = State.CAST
-                wait = delay(castMin.value, castMax.value)
+                wait = castWait()
                 status = "at the spot"
             }
             AutoRoutes.Travel.STUCK -> if (++travelStuck > 5) {
