@@ -26,6 +26,7 @@ import com.github.noamm9.utils.render.Render2D.drawString
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.tags.FluidTags
 import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.Mob
 import net.minecraft.world.entity.decoration.ArmorStand
@@ -115,7 +116,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val breakEveryMax by SliderSetting("Break Every Max", 45, 5, 180, 1, " min").showIf { longBreaks.value }
     private val breakLenMin by SliderSetting("Break Length Min", 60, 10, 900, 10, " s").showIf { longBreaks.value }
     private val breakLenMax by SliderSetting("Break Length Max", 240, 10, 1800, 10, " s").showIf { longBreaks.value }
-    private val showMarkers by ToggleSetting("Show Markers", true).section("Display").withDescription("A box where the hook lands and a highlight on your sea creatures")
+    private val showMarkers by ToggleSetting("Show Markers", true).section("Display").withDescription("A box where the hook lands and a highlight on your sea creatures (works with Kill Sea Creatures off too)")
+    private val creatureTracer by ToggleSetting("Creature Tracer", true).withDescription("A line from the middle of your screen to each of your sea creatures")
 
     private val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
     private val chatInfo by ToggleSetting("Chat Messages", true)
@@ -219,6 +221,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val reels = ArrayDeque<Reel>()
     private val firstSeen = HashSet<Int>()
     private val mine = HashSet<Int>()
+    private val seenAt = HashMap<Int, Int>()
 
     // noticing sea creatures
     private val noticeAt = HashMap<Int, Int>()
@@ -261,21 +264,49 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     val c = com.github.noamm9.ui.clickgui.components.settings.Style.accentColor
                     event.ctx.renderBoxBounds(l.x - 0.3, l.y - 0.1, l.z - 0.3, l.x + 0.3, l.y + 0.5, l.z + 0.3, c, c.withAlpha(70), phase = true, lineWidth = 2)
                 }
+                val pt = mc.deltaTracker.getGameTimeDeltaPartialTick(true)
                 for (id in mineAlive) {
                     val e = level.getEntity(id) ?: continue
+                    if (! e.isAlive) continue
                     val c = com.github.noamm9.ui.clickgui.components.settings.Style.accent2
-                    event.ctx.renderBoxBounds(e.boundingBox.inflate(0.1), c, c.withAlpha(45), phase = true, lineWidth = 2)
+                    // interpolated so the box doesn't lag behind a moving mob
+                    val at = e.getPosition(pt)
+                    val bb = e.boundingBox.move(at.subtract(e.position())).inflate(0.1)
+                    event.ctx.renderBoxBounds(bb, c, c.withAlpha(45), phase = true, lineWidth = 2)
+                    if (creatureTracer.value) event.ctx.renderTracer(Vec3(at.x, bb.minY + (bb.maxY - bb.minY) / 2, at.z), c, 1.5)
+                    val tag = tagOf(e) ?: e.name.string
+                    val dist = mc.player?.distanceTo(e)?.toInt() ?: 0
+                    event.ctx.renderString("$tag §7${dist}m", at.x, bb.maxY + 0.6, at.z, java.awt.Color.WHITE, 1.1f, phase = true)
                 }
             }
         }
         register<com.github.noamm9.event.impl.RenderWorldEvent> {
-            if (! running || ! showRoute.value || state != State.TRAVEL) return@register
+            if (! running || ! showRoute.value) return@register
             val p = mc.player ?: return@register
-            var from = p.position().add(0.0, 0.1, 0.0)
-            for (i in pathIndex until path.size) {
-                val c = Vec3.atBottomCenterOf(path[i]).add(0.0, 0.1, 0.0)
-                with(com.github.noamm9.utils.render.world.Render3D) { event.ctx.renderLine(from, c, java.awt.Color(167, 107, 250), 2, phase = true) }
-                from = c
+            with(com.github.noamm9.utils.render.world.Render3D) {
+                // where we're fishing / heading: a tall beam you can see from far away, with the distance
+                val spot = hotspot?.takeIf { it.isAlive }?.position() ?: stand
+                if (spot != null) {
+                    val beam = if (hotspot != null) java.awt.Color(236, 72, 153) else java.awt.Color(80, 220, 255)
+                    val d = p.position().distanceTo(spot)
+                    event.ctx.renderBoxBounds(spot.x - 0.25, spot.y, spot.z - 0.25, spot.x + 0.25, spot.y + 30, spot.z + 0.25, beam.withAlpha(160), beam.withAlpha(55), phase = true, lineWidth = 1)
+                    hotspot?.let { event.ctx.renderCircle(Vec3(spot.x, spot.y - 1.5, spot.z), hotspotRadius.value, beam, 2, phase = true) }
+                    val label = (if (hotspot != null) "Hotspot" else "Fishing spot") + " §7${d.toInt()}m"
+                    event.ctx.renderString(label, spot.x, spot.y + 2.5, spot.z, beam, (1.2 + d / 40).coerceAtMost(4.0), phase = true)
+                }
+                if (state != State.TRAVEL) return@register
+                // the walk: purple fading to pink, with a dot on every turn
+                val left = path.size - pathIndex
+                var from = p.position().add(0.0, 0.1, 0.0)
+                for (i in pathIndex until path.size) {
+                    val c = Vec3.atBottomCenterOf(path[i]).add(0.0, 0.1, 0.0)
+                    val t = if (left <= 1) 1f else (i - pathIndex).toFloat() / (left - 1)
+                    val col = java.awt.Color((167 + (236 - 167) * t).toInt(), (107 + (72 - 107) * t).toInt(), (250 + (153 - 250) * t).toInt())
+                    event.ctx.renderLine(from, c, col, 3, phase = true)
+                    val turn = i + 1 < path.size && i > 0 && (path[i + 1].x - path[i].x != path[i].x - path[i - 1].x || path[i + 1].z - path[i].z != path[i].z - path[i - 1].z)
+                    if (turn || i == path.size - 1) event.ctx.renderBoxBounds(c.x - 0.08, c.y - 0.05, c.z - 0.08, c.x + 0.08, c.y + 0.11, c.z + 0.08, col, col, phase = true, lineWidth = 1)
+                    from = c
+                }
             }
             hop?.let { h ->
                 val col = if (h.ether) java.awt.Color(236, 72, 153) else java.awt.Color(120, 200, 255)
@@ -573,6 +604,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             return
         }
 
+        claimOwn(p)
         // sea creatures first, the moment one comes up
         val seen = if (killCreatures.value && mc.gui.screen() == null) creatures(p) else emptyList()
         if (mineAlive.isNotEmpty()) mineAlive.removeIf { id -> val e = p.level().getEntity(id); (e == null || ! e.isAlive).also { if (it && e != null) kills++ } }
@@ -1448,19 +1480,44 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     // ------------------------------------------------------------------ sea creatures
 
+    /**
+     * Works out which new mobs are ours. Looks around each of our reels (not around the player, so a hook far
+     * below or above still counts) and gives a new mob 30 ticks to settle, because the server can spawn it a
+     * little off and move it into place.
+     */
+    private fun claimOwn(p: LocalPlayer) {
+        while (reels.isNotEmpty() && tickCount - reels.first().tick > 60) reels.removeFirst()
+        if (reels.isEmpty()) return
+        for (r in reels) {
+            val box = net.minecraft.world.phys.AABB(r.at, r.at).inflate(10.0, 10.0, 10.0)
+            for (e in p.level().getEntitiesOfClass(Mob::class.java, box) { it.isAlive && it.javaClass.simpleName !in NPC_CLASSES }) {
+                if (e.id in mine) continue
+                val first = seenAt.getOrPut(e.id) { tickCount }
+                if (first < r.tick || tickCount - first > 30) continue // was already there before we reeled in
+                if (e.position().distanceTo(r.at) <= 8.0) {
+                    mine += e.id
+                    mineAlive += e.id
+                    firstSeen += e.id
+                    creaturesCaught++
+                }
+            }
+        }
+        if (seenAt.size > 3000) seenAt.keys.retainAll(mine)
+    }
+
+    /** The SkyBlock name tag that floats over a mob ("[Lv45] Sea Walker 1,200/1,200❤"), if there is one. */
+    private fun tagOf(e: Entity): String? {
+        val box = e.boundingBox.inflate(0.4, 2.5, 0.4)
+        return e.level().getEntitiesOfClass(ArmorStand::class.java, box)
+            .mapNotNull { it.customName?.string }
+            .firstOrNull { "❤" in it }
+    }
+
     private fun creatures(p: LocalPlayer): List<LivingEntity> {
         val r = killRange.value
         val scan = maxOf(r, 24.0)
         val all = p.level().getEntitiesOfClass(Mob::class.java, p.boundingBox.inflate(scan, 8.0, scan)) { e ->
             e.isAlive && e.health > 0f && e.javaClass.simpleName !in NPC_CLASSES
-        }
-        // the first time we see a mob, decide if it's ours: it showed up by our hook within 2 s of us reeling in
-        for (e in all) if (firstSeen.add(e.id)) {
-            if (reels.any { tickCount - it.tick in 0 .. 40 && e.position().distanceTo(it.at) <= 7.0 }) {
-                mine += e.id
-                mineAlive += e.id
-                creaturesCaught++
-            }
         }
         if (firstSeen.size > 2000) { firstSeen.retainAll(all.map { it.id }.toSet()); mine.retainAll(firstSeen) }
         // anything actually hitting us counts too (self-defence)
