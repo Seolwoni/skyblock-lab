@@ -58,6 +58,8 @@ object ThreeWeirdosSolver: PuzzleSolver {
         }
     }
 
+    internal fun autoAction(): PuzzleAction? = correctPos?.let { PuzzleAction.Click(it, "weirdos-${it.toShortString()}") }
+
     override fun onRenderWorld(ctx: RenderContext) {
         if (! inThreeWeirdos) return
 

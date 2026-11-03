@@ -32,6 +32,14 @@ object IceFillSolver: PuzzleSolver {
         }
     }
 
+    internal fun autoAction(): PuzzleAction? {
+        val p = NoammAddons.mc.player ?: return null
+        val all = puzzles.toList().sortedBy { it.start.distSqr(p.blockPosition()) }
+        val path = all.flatMap { it.path }
+        if (path.isEmpty()) return null
+        return PuzzleAction.Walk(path, "icefill-${path.size}")
+    }
+
     override fun onRenderWorld(ctx: RenderContext) = puzzles.forEach { it.draw(ctx) }
     override fun reset() = puzzles.clear()
 

@@ -50,6 +50,19 @@ object WaterBoardSolver: PuzzleSolver {
         ThreadUtils.loop(500, { patternId != - 1 }) { solve() }
     }
 
+    /** The next lever, once its time has come (the solution is timed from the first water lever flip). */
+    internal fun autoAction(): PuzzleAction? {
+        if (patternId == - 1 || solution.isEmpty()) return null
+        val (lever, time) = solution.toMap()
+            .flatMap { (l, times) -> times.drop(l.clickCount).map { l to it } }
+            .minByOrNull { (l, t) -> t + if (l == LEVER.WATER) 0.01 else 0.0 } ?: return null
+        val ticks = (time * 20).toInt()
+        val ready = if (waterLeverTick == - 1L) ticks == 0 else waterLeverTick + ticks <= DungeonListener.currentTime
+        if (! ready) return null
+        val pos = BlockPos.containing(lever.getPos())
+        return PuzzleAction.Click(pos, "water-${lever.name}-${lever.clickCount}")
+    }
+
     override fun onRenderWorld(ctx: RenderContext) {
         if (patternId == - 1 || solution.isEmpty()) return
         val solution = solution.toMap()

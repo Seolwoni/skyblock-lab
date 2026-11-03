@@ -37,6 +37,13 @@ object TeleportMazeSolver: PuzzleSolver {
         scan(center)
     }
 
+    internal fun autoAction(): PuzzleAction? {
+        if (! inTpMaze) return null
+        val top = orderedPads?.takeIf { it.size >= 2 }?.take(2) ?: return null
+        if (top[0].totalAngle == top[1].totalAngle) return null
+        return PuzzleAction.Walk(listOf(top[0].pos.below()), "tp-${top[0].pos.toShortString()}")
+    }
+
     override fun onRenderWorld(ctx: RenderContext) {
         if (! inTpMaze) return
         val c = cells ?: return

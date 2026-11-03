@@ -63,6 +63,12 @@ object TicTacToeSolver: PuzzleSolver {
         if (event.pos !in bestMoves) event.isCanceled = true
     }
 
+    internal fun autoAction(): PuzzleAction? {
+        if (! inTicTacToe) return null
+        val move = bestMoves.firstOrNull() ?: return null
+        return PuzzleAction.Click(move, "ttt-${bestMoves.joinToString { it.toShortString() }}-${badMoves.size}")
+    }
+
     override fun onRenderWorld(ctx: RenderContext) {
         if (! inTicTacToe) return
         val boxes = mutableMapOf<Long, Pair<BlockPos, Color>>()

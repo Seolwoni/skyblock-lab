@@ -36,17 +36,22 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
     private val toggleKey by KeybindSetting("Start / Stop Key").withDescription("Press in a dungeon to start the run from the room you are in, press again to stop")
     private val clearRooms by ToggleSetting("Clear Rooms", true).section("Rooms").withDescription("Kills the mobs of every room it visits (Auto Routes, Whole room mode)")
     private val doSecrets by ToggleSetting("Do Secrets", true).withDescription("Follows the room's Secret Routes route when there is one")
-    private val skipPuzzles by ToggleSetting("Skip Puzzle Rooms", true).withDescription("Walks through puzzle rooms but does not try to finish them")
+    private val solvePuzzles by ToggleSetting("Solve Puzzles", true).withDescription("Goes into puzzle rooms that Auto Puzzles can solve (turn Auto Puzzles and the matching Puzzle Solver on). Other puzzles are skipped")
+    private val order by com.github.noamm9.config.types.DropdownSetting("Order", 0, listOf("Clear first", "Blood rush first")).withDescription(
+        "Clear first: every room, then Blood. Blood rush first: rooms on the way to Blood (and the keys) first, open Blood, camp, then the rest"
+    )
     private val skipTraps by ToggleSetting("Skip Trap Room", false)
     private val skipFairy by ToggleSetting("Skip Fairy Room", true)
     private val roomTimeout by SliderSetting("Time Per Room", 90, 20, 300, 5, " s").withDescription("Moves on if a room takes longer than this")
     private val openDoors by ToggleSetting("Open Wither Doors", true).section("Doors & Keys").withDescription("Picks up wither keys it sees and opens wither doors on the way")
     private val fetchKeys by SliderSetting("Key Search Range", 40, 0, 96, 4, " blocks").withDescription("How far it goes out of its way to pick up a key it can see (0 = only keys on the way)")
     private val endAtBlood by ToggleSetting("Open Blood", true).withDescription("When every other room is done, gets the blood key, opens the blood door and stops inside Blood")
+    private val campBlood by ToggleSetting("Camp Blood", true).section("Blood").withDescription("Stays in Blood and kills the blood mobs (Hyperion if you have one) until the Watcher is done")
+    private val campTimeout by SliderSetting("Camp Time Limit", 180, 30, 400, 10, " s")
     private val showPath by ToggleSetting("Show Path", true).section("Debug").withDescription("Draws the doors and room it is heading to")
     private val chatInfo by ToggleSetting("Chat Messages", true)
 
-    private enum class State { IDLE, PICK, TRAVEL, DOOR, KEY, ROOM, DONE }
+    private enum class State { IDLE, PICK, TRAVEL, DOOR, KEY, ROOM, CAMP, DONE }
 
     private var state = State.IDLE
     private var target: UniqueRoom? = null
@@ -115,6 +120,7 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
 
     private fun stop(reason: String?) {
         AutoRoutes.forceClear = false
+        AutoRoutes.campMode = false
         AutoRoutes.stopRun(null)
         AutoRoutes.releaseAll()
         AssistBridge.logEnd(reason ?: "stopped", "rooms done ${finished.size}")
@@ -150,6 +156,7 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
             State.DOOR -> door()
             State.KEY -> key()
             State.ROOM -> room()
+            State.CAMP -> camp()
             State.DONE, State.IDLE -> {}
         }
     }
@@ -160,18 +167,24 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
         val start = here ?: return setState(State.PICK, "not in a room")
         val (prev, doorOf) = bfs(graph, start)
 
+        val blood = DungeonScanner.uniqueRooms.values.firstOrNull { it.data.type == RoomType.BLOOD }
+        val bloodDone = blood == null || blood.name in finished
+        if (here?.data?.type == RoomType.BLOOD && ! bloodDone) return startCamp(here)
+
+        if (order.value == 1 && endAtBlood.value && ! bloodDone) {
+            // blood rush: straight to Blood when the doors allow it, else the rooms on the way there first
+            if (blood != null && blood in prev) return goTo(blood, prev, doorOf)
+            val rush = com.github.noamm9.utils.dungeons.map.handlers.DungeonTree.getBloodRush().toSet()
+            prev.keys.filter { it in rush && needsDoing(it) }.minByOrNull { distance(prev, it) }?.let { return goTo(it, prev, doorOf) }
+        }
+
         val candidates = prev.keys.filter { needsDoing(it) }
         val next = candidates.minByOrNull { distance(prev, it) }
         if (next != null) return goTo(next, prev, doorOf)
 
         // everything else is done: Blood
-        if (endAtBlood.value) {
-            val blood = DungeonScanner.uniqueRooms.values.firstOrNull { it.data.type == RoomType.BLOOD }
-            if (blood != null && blood in prev && here != blood) return goTo(blood, prev, doorOf)
-            if (here?.data?.type == RoomType.BLOOD) {
-                setState(State.DONE, "in Blood")
-                return stop("finished - you are in Blood")
-            }
+        if (endAtBlood.value && ! bloodDone && blood != null) {
+            if (blood in prev && here != blood) return goTo(blood, prev, doorOf)
         }
         setState(State.DONE, "nothing left")
         stop("finished - no rooms left to do")
@@ -181,7 +194,7 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
         if (r.name in finished) return false
         when (r.data.type) {
             RoomType.ENTRANCE, RoomType.BLOOD -> return false
-            RoomType.PUZZLE -> if (skipPuzzles.value) return false
+            RoomType.PUZZLE -> if (! solvePuzzles.value || ! AutoPuzzles.supports(r.name)) return false
             RoomType.TRAP -> if (skipTraps.value) return false
             RoomType.FAIRY -> if (skipFairy.value) return false
             else -> {}
@@ -311,8 +324,9 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
 
     private fun beginRoom() {
         roomTicks = 0
-        val room = target
-        if (room == null || room.data.type == RoomType.BLOOD) return
+        val room = target ?: return
+        if (room.data.type == RoomType.BLOOD) return startCamp(room)
+        if (room.data.type == RoomType.PUZZLE) return // Auto Puzzles works while Auto Routes is idle; room() waits for the tick
         AutoRoutes.forceClear = clearRooms.value
         if (! doSecrets.value && ! clearRooms.value) {
             finished += room.name
@@ -326,11 +340,20 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
 
     private fun room() {
         val room = target ?: return setState(State.PICK, "")
-        if (room.data.type == RoomType.BLOOD) {
-            setState(State.DONE, "in Blood")
-            return stop("finished - you are in Blood")
-        }
+        if (room.data.type == RoomType.BLOOD) return startCamp(room)
         roomTicks++
+        if (room.data.type == RoomType.PUZZLE) {
+            val st = room.mainRoom.state
+            val solved = st == RoomState.CLEARED || st == RoomState.GREEN
+            if (! solved && roomTicks <= roomTimeout.value * 20) {
+                status = "solving ${room.name}"
+                return
+            }
+            AutoRoutes.releaseAll()
+            finished += room.name
+            if (! solved) info("&e${room.name} wasn't solved in time, moving on.")
+            return setState(State.PICK, "${room.name} ${if (solved) "solved" else "skipped"}")
+        }
         val timeUp = roomTicks > roomTimeout.value * 20
         if (AutoRoutes.isRunning && ! timeUp) {
             status = "clearing ${room.name}"
@@ -341,6 +364,44 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
         finished += room.name
         AssistBridge.logEvent("room ${room.name} done (${AutoRoutes.lastStopReason ?: "ok"})")
         setState(State.PICK, "${room.name} done")
+    }
+
+    private fun startCamp(blood: UniqueRoom) {
+        target = blood
+        waypoints.clear()
+        if (! campBlood.value) {
+            finished += blood.name
+            if (order.value == 1) return setState(State.PICK, "blood open")
+            setState(State.DONE, "in Blood")
+            return stop("finished - you are in Blood")
+        }
+        AutoRoutes.campMode = true
+        AutoRoutes.forceClear = true
+        roomTicks = 0
+        setState(State.CAMP, "camping Blood")
+        info("&dCamping Blood.")
+    }
+
+    private fun camp() {
+        val blood = target ?: return setState(State.PICK, "")
+        roomTicks++
+        val st = blood.mainRoom.state
+        val done = st == RoomState.CLEARED || st == RoomState.GREEN
+        if (! done && roomTicks <= campTimeout.value * 20) {
+            status = if (AutoRoutes.campTick()) "killing blood mobs" else "waiting for blood mobs"
+            if (! AutoRoutes.isRunning && status.startsWith("waiting")) AutoRoutes.releaseAll()
+            return
+        }
+        AutoRoutes.campMode = false
+        AutoRoutes.forceClear = false
+        AutoRoutes.releaseAll()
+        finished += blood.name
+        info(if (done) "&aBlood is done." else "&eBlood camp time is up.")
+        if (order.value == 1) setState(State.PICK, "blood done, clearing the rest")
+        else {
+            setState(State.DONE, "blood done")
+            stop("finished - Blood is done")
+        }
     }
 
     // ------------------------------------------------------------------ layout

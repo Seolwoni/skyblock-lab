@@ -41,6 +41,12 @@ object BoulderSolver: PuzzleSolver {
         solve()
     }
 
+    internal fun autoAction(): PuzzleAction? {
+        if (! inBoulder) return null
+        val next = currentSolution.firstOrNull() ?: return null
+        return PuzzleAction.Click(next.click, "boulder-${currentSolution.size}-${next.click.toShortString()}")
+    }
+
     override fun onRenderWorld(ctx: RenderContext) {
         if (! inBoulder || currentSolution.isEmpty()) return
         if (showAll.value) currentSolution.forEach { renderBox(ctx, it) }

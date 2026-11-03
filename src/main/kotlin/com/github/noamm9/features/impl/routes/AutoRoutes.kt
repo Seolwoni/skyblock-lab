@@ -155,6 +155,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     private var targetHealth = - 1f
     private var targetId = - 1
 
+    /** Set by Auto Dungeon in Blood: blood mobs are players too, so anything that isn't a teammate or the Watcher counts. */
+    @JvmField var campMode = false
+
     /** Set by Auto Dungeon: clear the whole room whatever Clear is set to. */
     @JvmField var forceClear = false
     /** Why the last run stopped (read by Auto Dungeon). */
@@ -712,7 +715,8 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val mobs = p.level().getEntitiesOfClass(LivingEntity::class.java, area) { e ->
             e.isAlive && e.health > 0f && e !is ArmorStand && e !is Bat && e != p && e.id !in ignored &&
                 e.javaClass.simpleName != "WitherBoss" &&
-                (e !is Player || e.gameProfile.name in MINIBOSSES || e.name.string in MINIBOSSES) &&
+                (e !is Player || e.gameProfile.name in MINIBOSSES || e.name.string in MINIBOSSES || (campMode && isBloodMob(e))) &&
+                ! e.name.string.contains("Watcher") &&
                 DungeonScanner.getRoomCentre(e.blockX, e.blockZ) in centres
         }
         if (mobs.isEmpty()) return null
@@ -720,6 +724,39 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val special = if (hypePriority.value) starredAndMinis(p, area) else emptySet()
         fun weight(e: LivingEntity) = if (e.id in special) 3 else 1
         return mobs.maxWithOrNull(compareBy<LivingEntity> { m -> mobs.filter { it.distanceToSqr(m) <= r2 }.sumOf(::weight) }.thenBy { - p.distanceToSqr(it) })
+    }
+
+    private fun isBloodMob(e: Player): Boolean {
+        if (e.isInvisible) return false
+        val n = e.gameProfile.name
+        return com.github.noamm9.utils.dungeons.DungeonListener.dungeonTeammates.none { it.name == n } && n != mc.player?.gameProfile?.name
+    }
+
+    /** One tick of fighting in place (Blood camp): true while it has something to hit. */
+    fun campTick(): Boolean {
+        if (hitCooldown > 0) hitCooldown--
+        if (ignored.isNotEmpty()) ignored.entries.removeIf { e -> e.setValue(e.value - 1); e.value <= 0 }
+        val p = mc.player ?: return false
+        val target = findRoomTarget(p) ?: return false.also { fightTarget = null }
+        fightTarget = target
+        val slot = if (useHype.value) PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } else null
+        if (slot != null) {
+            hypeFight(p, target, slot)
+            return true
+        }
+        val dist = p.eyePosition.distanceTo(target.boundingBox.clipNearest(p.eyePosition))
+        if (dist > attackRange.value) {
+            walkTowards(p.position(), target.position())
+            return true
+        }
+        releaseMovement()
+        if (weaponSlot.value in 1 .. 9) PlayerUtils.swapToSlot(weaponSlot.value - 1)
+        if (! turnTo(target.boundingBox.center, 4f) || hitCooldown > 0) return true
+        hitCooldown = hitDelay.value
+        sendRotation()
+        mc.gameMode?.attack(p, target)
+        p.swing(InteractionHand.MAIN_HAND)
+        return true
     }
 
     /** Entity ids of starred mobs and minibosses in [area]. */

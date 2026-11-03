@@ -130,6 +130,12 @@ object QuizSolver: PuzzleSolver {
         if (! clickedAnswer.isCorrect) event.cancel()
     }
 
+    internal fun autoAction(): PuzzleAction? {
+        if (! inQuiz || triviaAnswers == null) return null
+        val answer = triviaOptions.firstOrNull { it.isCorrect } ?: return null
+        return PuzzleAction.Click(answer.blockPos, "quiz-$stage-${answer.blockPos.toShortString()}")
+    }
+
     override fun onRenderWorld(ctx: RenderContext) {
         if (! inQuiz || triviaAnswers == null) return
         triviaOptions.forEach { answer ->
