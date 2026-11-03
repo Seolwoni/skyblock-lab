@@ -92,14 +92,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val stayHome by ToggleSetting("Return To Spot", true).withDescription("Walks back to the fishing spot if you get pushed away from it")
 
     private val autoSell by ToggleSetting("Auto Sell", false).section("Auto Sell").withDescription(
-        "When the inventory is nearly full: opens the SkyBlock Menu (hotbar slot below), clicks the Booster Cookie, sells the junk to the NPC, closes it and goes back to fishing"
+        "When the inventory is nearly full: opens the SkyBlock Menu (hotbar slot below), clicks the Booster Cookie, sells only the items on your sell list to the NPC, closes it and goes back to fishing"
     )
     private val sellWhenFree by SliderSetting("Sell When Free Slots", 3, 0, 15, 1).withDescription("Sells once this few empty slots are left")
     private val menuSlot by SliderSetting("Menu Slot", 9, 1, 9, 1).withDescription("Hotbar slot of the SkyBlock Menu (the Nether Star)")
-    private val sellCheap by ToggleSetting("Sell Cheap Junk", true).withDescription("Also sells Common / Uncommon items worth less than the price below on the bazaar or auction house (items with no known price are kept)")
-    private val sellBelow by SliderSetting("Junk Price", 2.0, 0.1, 50.0, 0.1, "k coins")
-    private val sellListKey by KeybindSetting("Add To Sell List Key").withDescription("In any inventory, point at an item and press this to add it to (or remove it from) the sell list. Items on the list are always sold")
-    val sellList by com.github.noamm9.config.types.TextInputSetting("Sell List", "").hidden()
+    private val sellListKey by KeybindSetting("Add To Sell List Key").withDescription("In any inventory, point at an item and press this to add it to (or remove it from) the sell list. Only items on the list are ever sold")
+    val sellList by com.github.noamm9.config.types.TextInputSetting("Sell List", "").withDescription("The items Auto Sell may sell, by name, separated by | (fill it with the key above, or type names here)")
+    private val clearSellList by com.github.noamm9.config.types.ButtonSetting("Clear Sell List") {
+        sellList.value = ""
+        NotificationManager.push("Sell List", "&fCleared")
+    }.withDescription("Empties the sell list")
 
     private val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe").withDescription(
         "Stops (doesn't try to hide anything): when the server teleports or turns you, changes your held item, or opens a menu by itself"
@@ -1065,17 +1067,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     private fun freeSlots(p: LocalPlayer) = (0 until 36).count { p.inventory.getItem(it).isEmpty }
 
-    /** Is this stack junk to sell: on the sell list, or (Sell Cheap Junk) a cheap Common / Uncommon item. */
+    /** Only what's on your sell list is ever sold. */
     private fun shouldSell(stack: net.minecraft.world.item.ItemStack): Boolean {
         if (stack.isEmpty || stack.item == Items.FISHING_ROD) return false
         val name = itemKey(stack) ?: return false
-        if (name in sellNames()) return true
-        if (! sellCheap.value) return false
-        val rarity = com.github.noamm9.utils.items.ItemUtils.getRarity(stack)
-        if (rarity != com.github.noamm9.utils.items.ItemRarity.COMMON && rarity != com.github.noamm9.utils.items.ItemRarity.UNCOMMON) return false
-        val id = stack.skyblockId.ifBlank { return false }
-        val price = (com.github.noamm9.init.NetworkLoop.getPrice(id) as? Number)?.toDouble() ?: return false
-        return price < sellBelow.value * 1000
+        return name in sellNames()
     }
 
     /** Inventory indexes (not the hotbar) holding junk. */
