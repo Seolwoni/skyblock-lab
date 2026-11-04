@@ -75,6 +75,7 @@ internal fun AutoFishing.relinkBobber() {
     val own = p.level().getEntitiesOfClass(FishingHook::class.java, p.boundingBox.inflate(40.0)) { it.playerOwner === p && ! it.isRemoved }
         .minByOrNull { it.distanceToSqr(p) } ?: return
     p.fishing = own
+    statRelink++
     journal.log("re-linked a hook the game hadn't linked")
 }
 

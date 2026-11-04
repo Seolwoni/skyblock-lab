@@ -58,6 +58,7 @@ internal fun AutoFishing.rememberedHotspot(p: LocalPlayer): Vec3? {
 }
 
 internal fun AutoFishing.findHotspot(p: LocalPlayer) {
+    if (! hotspots.value) return goToFluid(p)
     val hs = nearestHotspot(p)
     if (hs == null) {
         // none in sight: head for one seen earlier, it'll show up once we're close
@@ -90,9 +91,8 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
         // nothing known: ask the radar (busy for a moment while it reads)
         if (radarStep(p)) return
         hotspot = null
-        if (stand == null) stand = p.position()
-        status = "no hotspot nearby, fishing here"
-        state = AutoFishing.State.CAST
+        status = "no hotspot nearby"
+        goToFluid(p)
         return
     }
     scouting = false
@@ -104,6 +104,7 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
     }
     hotspot = hs
     hotspotAt = hs.position()
+    hotspotsVisited++
     stand = spot
     aimTries = 0
     travelStuck = 0
@@ -206,7 +207,8 @@ internal fun AutoFishing.arrive(p: LocalPlayer) {
         return
     }
     val hs = hotspot
-    if (hs != null) aimAt(p, hs) else aimTarget = null
+    val ft = fishTarget
+    if (hs != null) aimAt(p, hs) else if (ft != null) aimAtPoint(p, ft) else aimTarget = null
     offYaw = 0f; offPitch = 0f; moveLen = 0
     // the spot is where we really stand now (block centre), so "pushed away" and centring agree on it
     stand = Vec3.atBottomCenterOf(BlockPos.containing(p.position()))

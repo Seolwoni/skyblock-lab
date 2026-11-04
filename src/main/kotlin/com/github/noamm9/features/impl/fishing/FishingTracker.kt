@@ -99,6 +99,15 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
         }
     }
 
+    /** Running totals, for the Auto Fishing session report (it takes the difference from the start). */
+    fun numbers(): Map<String, Long> = mapOf(
+        "casts" to casts.toLong(), "reels" to reels.toLong(), "doubleHooks" to doubleHooks.toLong(),
+        "coins" to items.values.sumOf { it.second }, "trophies" to trophies.values.sumOf { it.sum() }.toLong()
+    )
+
+    /** The item that made the most coins so far ("Magma Core x23"). */
+    fun topItem(): String? = items.entries.maxByOrNull { it.value.second }?.takeIf { it.value.second > 0 }?.let { "${it.key} x${it.value.first}" }
+
     fun reset() {
         casts = 0; reels = 0; doubleHooks = 0; lavaCasts = 0
         creatures.clear(); items.clear(); trophies.clear()

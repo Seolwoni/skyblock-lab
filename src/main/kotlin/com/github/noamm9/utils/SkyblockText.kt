@@ -92,6 +92,12 @@ object SkyblockText {
     /** The marker Hypixel floats over a waiting bobber ("?" or a countdown like "1.2"): the hook is in the water. */
     val WAITING_MARKER = Regex("^(?:\\?|\\d+(?:\\.\\d+)?s?)$")
     const val REBOOT = "This server will restart soon"
+    /** Area name (tab list) -> the warp back there. */
+    val WARPS: Map<String, String> = linkedMapOf(
+        "Crimson Isle" to "warp crimson", "Backwater Bayou" to "warp bayou", "Jerry" to "warp jerry",
+        "Spider's Den" to "warp spider", "The Park" to "warp park", "Galatea" to "warp galatea",
+        "Crystal Hollows" to "warp ch", "Dwarven Mines" to "warp mines", "Hub" to "warp hub", "Private Island" to "warp home"
+    )
     /** The Golden Fish (lava trophy fish that shows up after ~15 min of fishing): its chat line / floating name. */
     const val GOLDEN_FISH = "Golden Fish"
 

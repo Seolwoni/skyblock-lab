@@ -155,6 +155,7 @@ internal fun AutoFishing.claim(e: Entity, how: String = "") {
     val name = creatureName(e) ?: return
     val rare = rareList.value.split('|').map { it.trim() }.filter { it.isNotEmpty() }.firstOrNull { name.contains(it, ignoreCase = true) } ?: return
     rareIds += e.id
+    rareLog += rare
     if (rareAlert.value) {
         NotificationManager.push("Rare sea creature!", "&6$rare &fcame up for you")
         com.github.noamm9.utils.ChatUtils.showTitle("§6§l$rare", "§fcame up for you")

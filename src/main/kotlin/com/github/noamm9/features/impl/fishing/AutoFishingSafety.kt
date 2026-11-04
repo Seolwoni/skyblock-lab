@@ -45,6 +45,7 @@ internal fun AutoFishing.escapeLava(p: LocalPlayer) {
     if (p.fishing != null) rod()?.let { hold(it); use(p) }
     val back = lastSafe
     status = "in lava, getting out"
+    if (lavaTicks == 0) statLava++
     lavaTicks++
     mc.options.keyJump.isDown = true
     mc.options.keySprint.isDown = true

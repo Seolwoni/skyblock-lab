@@ -118,6 +118,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val aotvRange by SliderSetting("AOTV Distance", 12, 8, 16, 1, " blocks").withDescription("How far your AOTV teleports (8 + Transmission Tuners)")
     internal val useRadar by ToggleSetting("Use Hotspot Radar", true).withDescription("No hotspot in sight or remembered: reads a Hotspot Radar in the hotbar, twice from two places, and goes where the two lines cross")
     internal val readShared by ToggleSetting("Hotspots From Chat", true).withDescription("Remembers hotspot positions people share in chat (any message with \"hotspot\" and x y z)")
+    internal val spotSearch by SliderSetting("Find Water Within", 48, 16, 96, 4, " blocks").withDescription("With no hotspot (or hotspots off) and not already looking at water / lava: how far to look for the nearest pool to walk to")
+    internal val resumeAfterReboot by ToggleSetting("Come Back After Reboot", true).withDescription("Only after the server's own restart warning: if you're moved within 3 minutes, warp back to the island and carry on fishing. Any other move still stops")
+    internal val warpCommand by com.github.noamm9.config.types.TextInputSetting("Warp Command", "").withDescription("The command back to your fishing island, without the slash (empty = the usual one, e.g. warp crimson)")
     internal val hotspotRange by SliderSetting("Search Range", 200, 16, 400, 8, " blocks").withDescription("How far it looks for a Hotspot. Hotspots seen earlier are remembered for 3 minutes, even after they're out of sight")
     internal val useEther by ToggleSetting("Etherwarp On The Way", true).withDescription("Plans etherwarps (and AOTV hops) to get to far or high spots, checking where each one lands, like Secret Routes does")
     internal val showRoute by ToggleSetting("Show Route", true).withDescription("Draws the planned walk and the next etherwarp / AOTV landing in the world")
@@ -161,7 +164,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val chatInfo by ToggleSetting("Chat Messages", true)
     internal val statusHud by ToggleSetting("Status HUD", true)
 
-    internal enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT, SELL, BREAK }
+    internal enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT, SELL, BREAK, RESUME }
 
     internal val RANDOM = Random()
     internal var timing = com.github.noamm9.utils.HumanTiming()
@@ -298,7 +301,26 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val deaths = ArrayDeque<Pair<Int, Vec3>>()   // tick, where one of ours died (split check)
     internal var arrivedAt = - 1000
     internal var nearGoalTicks = 0
-    internal var goldenSeenAt = - 100000     // creature health at our last blast (immunity check)
+    internal var goldenSeenAt = - 100000
+    internal var fishTarget: Vec3? = null           // the water / lava point we walked to (no hotspot)
+    internal var rebootAt = 0L
+    internal var rebootSpot: Vec3? = null
+    internal var rebootHotspot = false
+    internal var rebootArea: String? = null
+    internal var resumeStage = 0
+    internal var resumeWait = 0
+    internal var warpTries = 0
+    // session report
+    internal var trackerAtStart: Map<String, Long> = emptyMap()
+    internal var breakMs = 0L
+    internal var hotspotsVisited = 0
+    internal val rareLog = ArrayList<String>()
+    internal var statGround = 0
+    internal var statRelink = 0
+    internal var statSplash = 0
+    internal var statDrift = 0
+    internal var statLava = 0
+    internal var lastReport: List<String> = emptyList()     // creature health at our last blast (immunity check)
 
     // noticing sea creatures
     internal val noticeAt = HashMap<Int, Int>()
@@ -323,6 +345,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
         register<com.github.noamm9.event.impl.ChatMessageEvent> {
             if (running && event.unformattedText.contains(com.github.noamm9.utils.SkyblockText.REBOOT, ignoreCase = true)) {
+                armReboot()
                 NotificationManager.push("Server restarting", "&fThe server will restart soon - Auto Fishing keeps going until you're moved")
                 com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_BELL.value(), 1f, 0.8f)
                 journal.log("server reboot warning")
@@ -343,7 +366,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
         register<WorldChangeEvent> {
             remembered.clear(); radarLines.clear(); radarStage = 0
-            if (running) stop("world changed")
+            if (running) { if (rebootWindow()) beginResume() else stop("world changed") }
         }
         register<com.github.noamm9.event.impl.KeyboardEvent.KeyPressed> {
             if (event.action != com.mojang.blaze3d.platform.InputConstants.PRESS) return@register
@@ -452,7 +475,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             }
         }
         register<MainThreadPacketReceivedEvent.Pre> {
-            if (! running || ! failsafe.value || ownMoveTicks > 0) return@register
+            if (! running || ! failsafe.value || ownMoveTicks > 0 || state == State.RESUME) return@register
             val name = event.packet.javaClass.simpleName
             if (event.packet is ClientboundPlayerPositionPacket || name.contains("PlayerRotation")) mc.execute { if (running) failStop("the server moved or turned you") }
         }
@@ -473,6 +496,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         State.FIGHT -> "Attacking"
         State.SELL -> "Selling"
         State.BREAK -> "On a break"
+        State.RESUME -> "Coming back"
     }
 
     internal fun clock(ms: Long): String {
@@ -606,8 +630,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         nextMoveIn = nextMoveDelay()
         running = true
         returning = false
-        state = if (hotspots.value) State.FIND else State.CAST
-        stand = if (hotspots.value) null else Vec3.atBottomCenterOf(BlockPos.containing(p.position()))
+        state = State.FIND
+        stand = null
+        fishTarget = null
+        trackerAtStart = FishingTracker.numbers()
+        breakMs = 0L; hotspotsVisited = 0; rareLog.clear()
+        statGround = 0; statRelink = 0; statSplash = 0; statDrift = 0; statLava = 0
         hotspot = null
         badHotspots.clear()
         aimTries = 0
@@ -627,6 +655,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     internal fun stop(reason: String?) {
+        if (running) runCatching { writeReport(reason ?: "stopped") }
         if (running) journal.log("stop  ${reason ?: "-"}  (state=$state, kills=$kills, creatures=$creaturesCaught)")
         if (running) releaseCentre()
         centreTarget = null
@@ -742,6 +771,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     internal fun tick() {
+        if (state == State.RESUME) return resumeTick()
         relinkBobber()
         val guiOpen = mc.gui.screen() != null
         if (guiWasOpen && ! guiOpen) guiLockUntil = tickCount + timing.uniform(15, 50) // a person needs a moment after closing a menu
@@ -892,6 +922,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     if (hook != null) { hold(rod); use(p) }
                     val len = timing.uniform(minOf(breakLenMin.value, breakLenMax.value), maxOf(breakLenMin.value, breakLenMax.value))
                     breakUntil = System.currentTimeMillis() + len * 1000L
+                    breakMs += len * 1000L
                     glanceIn = timing.uniform(60, 200)
                     state = State.BREAK
                     info("&7Taking a break for ${len / 60}m ${len % 60}s.")
@@ -947,6 +978,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 val s0 = settledAt
                 if (driftRecast.value && s0 != null && hook.hookedIn == null && ! bitten(hook) &&
                     kotlin.math.hypot(hook.x - s0.x, hook.z - s0.z) > 2.5) {
+                    statDrift++
                     journal.log("hook drifted ${"%.1f".format(kotlin.math.hypot(hook.x - s0.x, hook.z - s0.z))} blocks, recasting")
                     hold(rod); use(p)
                     state = State.CAST
@@ -959,6 +991,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 if (particleRecast.value && timer > 30 && dustAt.size >= 8 && tickCount - lastParticleRecast > 60 && ! waitingMarker(hook)) {
                     lastParticleRecast = tickCount
                     journal.log("splash particles at the hook (${dustAt.size}), recasting")
+                    statSplash++
                     dustAt.clear()
                     hold(rod); use(p)
                     state = State.CAST
@@ -1011,6 +1044,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     use(p)
                     state = State.CAST
                     wait = castWait()
+                    statGround++
                     if (++groundFails >= 3) return stop("the hook keeps landing on the ground - look at the ${fluidName()}")
                     status = "hook on the ground, recasting ($groundFails/3)"
                     return
