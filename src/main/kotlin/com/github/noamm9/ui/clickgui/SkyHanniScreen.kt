@@ -39,6 +39,7 @@ import com.github.noamm9.ui.clickgui.SkyHanniTheme.CARD_GAP
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.CARD_PAD
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.DESC_SCALE
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.LINE_H
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.line
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.MARGIN_X
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.MARGIN_Y
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.ROW_H
