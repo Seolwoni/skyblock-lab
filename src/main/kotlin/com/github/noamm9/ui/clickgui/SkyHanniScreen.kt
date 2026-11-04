@@ -45,7 +45,6 @@ import com.github.noamm9.ui.clickgui.SkyHanniTheme.ROW_H
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.SIDEBAR_W
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.TITLE_H
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.bg
-import com.github.noamm9.ui.clickgui.SkyHanniTheme.candidate
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.card
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.cardHover
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.cardOff
@@ -55,13 +54,10 @@ import com.github.noamm9.ui.clickgui.SkyHanniTheme.glass
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.glassA
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.icons
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.inside
-import com.github.noamm9.ui.clickgui.SkyHanniTheme.line
-import com.github.noamm9.ui.clickgui.SkyHanniTheme.lines
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.logoFrom
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.logoTo
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.offDot
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.onDot
-import com.github.noamm9.ui.clickgui.SkyHanniTheme.out
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.panel
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.panelTop
 import com.github.noamm9.ui.clickgui.SkyHanniTheme.textDim
