@@ -134,6 +134,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val breakLenMin by SliderSetting("Break Length Min", 60, 10, 900, 10, " s").showIf { longBreaks.value }
     internal val breakLenMax by SliderSetting("Break Length Max", 240, 10, 1800, 10, " s").showIf { longBreaks.value }
     internal val showMarkers by ToggleSetting("Show Markers", true).section("Display").withDescription("A box where the hook lands and a highlight on your sea creatures (works with Kill Sea Creatures off too)")
+    internal val creatureGlow by ToggleSetting("Creature Outline", true).withDescription("Outlines your sea creatures' actual shape (the game's glow), on top of the box")
     internal val creatureTracer by ToggleSetting("Creature Tracer", true).withDescription("A line from the middle of your screen to each of your sea creatures")
 
     internal val standCentre by ToggleSetting("Stand In Block Centre", true).section("Safety").withDescription("Before casting and before fighting, steps (sneaking, so it can't walk off an edge) to the exact middle of a safe block: solid ground under it, no lava in or under it")
@@ -311,6 +312,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             NotificationManager.push("Sell List", if (added) "&fAdded &d$name" else "&fRemoved &d$name")
             event.isCanceled = true
         }
+        register<com.github.noamm9.event.impl.CheckEntityGlowEvent> {
+            if (! running || ! showMarkers.value || ! creatureGlow.value || event.entity.id !in mineAlive) return@register
+            event.color = if (event.entity.id in rareIds) java.awt.Color(255, 196, 64) else com.github.noamm9.ui.clickgui.components.settings.Style.accent2
+        }
         register<com.github.noamm9.event.impl.RenderWorldEvent> { runCatching { com.github.noamm9.utils.Humanize.frame(); trackFrame() } }
         register<com.github.noamm9.event.impl.RenderWorldEvent> {
             if (! running || ! showMarkers.value) return@register
@@ -328,11 +333,26 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     // interpolated so the box doesn't lag behind a moving mob
                     val at = e.getPosition(pt)
                     val bb = e.boundingBox.move(at.subtract(e.position())).inflate(0.1)
-                    event.ctx.renderBoxBounds(bb, c, c.withAlpha(45), phase = true, lineWidth = 2)
-                    if (creatureTracer.value) event.ctx.renderTracer(Vec3(at.x, bb.minY + (bb.maxY - bb.minY) / 2, at.z), c, 1.5)
-                    val tag = tagOf(e) ?: e.name.string
+                    // fades in when it becomes ours; a rare one breathes
+                    val age = System.currentTimeMillis() - (claimedAt[id] ?: 0L)
+                    val fadeIn = (age / 300f).coerceIn(0f, 1f)
+                    val pulse = if (id in rareIds) 0.75f + 0.25f * kotlin.math.sin(age / 180.0).toFloat() else 1f
+                    val a = fadeIn * pulse
+                    event.ctx.renderBoxBounds(bb, c.withAlpha((255 * a).toInt()), c.withAlpha((40 * a).toInt()), phase = true, lineWidth = 2)
+                    if (creatureTracer.value) event.ctx.renderTracer(Vec3(at.x, bb.minY + (bb.maxY - bb.minY) / 2, at.z), c.withAlpha((170 * a).toInt()), 1.2)
+                    // label: name, then a health bar and the distance
+                    val raw = (tagOf(e) ?: e.name.string).replace(Regex("§."), "")
+                    val name = creatureName(e) ?: raw.substringBefore('❤').trim()
+                    val hp = Regex("([\\d,.]+[kKmMbB]?)/([\\d,.]+[kKmMbB]?)❤").find(raw)
+                    val frac = hp?.let { (parseShort(it.groupValues[1]) / parseShort(it.groupValues[2]).coerceAtLeast(1.0)).coerceIn(0.0, 1.0) }
+                        ?: (e as? LivingEntity)?.let { (it.health / it.maxHealth).toDouble().coerceIn(0.0, 1.0) } ?: 1.0
                     val dist = mc.player?.distanceTo(e)?.toInt() ?: 0
-                    event.ctx.renderString("$tag §7${dist}m", at.x, bb.maxY + 0.6, at.z, java.awt.Color.WHITE, 1.1f, phase = true)
+                    val nameCol = if (id in rareIds) "§6§l" else "§f"
+                    val barCol = when { frac > 0.6 -> "§a"; frac > 0.3 -> "§e"; else -> "§c" }
+                    val filled = (frac * 12).toInt().coerceIn(0, 12)
+                    val bar = barCol + "▮".repeat(filled) + "§8" + "▮".repeat(12 - filled)
+                    event.ctx.renderString("$nameCol$name", at.x, bb.maxY + 0.85, at.z, java.awt.Color.WHITE, 1.15f, phase = true)
+                    event.ctx.renderString("$bar §7${dist}m", at.x, bb.maxY + 0.5, at.z, java.awt.Color.WHITE, 0.9f, phase = true)
                 }
             }
         }
@@ -460,6 +480,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     override fun onDisable() {
         super.onDisable()
         if (running) stop(null)
+    }
+
+    /** "1.2k" -> 1200.0, "3,400" -> 3400.0 */
+    internal fun parseShort(v: String): Double {
+        val t = v.replace(",", "")
+        val mult = when (t.lastOrNull()?.lowercaseChar()) { 'k' -> 1e3; 'm' -> 1e6; 'b' -> 1e9; else -> 1.0 }
+        return (t.trimEnd('k', 'K', 'm', 'M', 'b', 'B').toDoubleOrNull() ?: 0.0) * mult
     }
 
     internal fun info(msg: String) {

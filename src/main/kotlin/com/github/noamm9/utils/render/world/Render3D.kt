@@ -225,22 +225,53 @@ object Render3D {
         matrixStack.translate(camera.pos.reverse())
         val pose = pose()
 
+        val styled = outline && runCatching { com.github.noamm9.features.impl.dev.ClickGui.espStyle.value != 0 }.getOrDefault(false)
         if (fill) RenderBatcher.filledBatch(phase).addFilledBoxVertices(
             pose,
             minX,
             minY, minZ, maxX, maxY, maxZ, fillColor.red / 255f,
-            fillColor.green / 255f, fillColor.blue / 255f, fillColor.alpha / 255f
+            fillColor.green / 255f, fillColor.blue / 255f, fillColor.alpha / 255f * (if (styled && fillColor !== outlineColor) 0.7f else 1f)
         )
 
         val outlineAlpha = if (fill && fillColor === outlineColor) 1f else outlineColor.alpha / 255f
-        if (outline) RenderBatcher.lineBatch(phase).addLineBoxVertices(
-            pose,
-            minX,
-            minY, minZ, maxX, maxY, maxZ, outlineColor.red / 255f,
-            outlineColor.green / 255f, outlineColor.blue / 255f, outlineAlpha, lineWidth.toFloat()
-        )
+        if (outline) {
+            val style = runCatching { com.github.noamm9.features.impl.dev.ClickGui.espStyle.value }.getOrDefault(0)
+            val r = outlineColor.red / 255f
+            val g = outlineColor.green / 255f
+            val b = outlineColor.blue / 255f
+            val w = lineWidth.toFloat()
+            val batch = RenderBatcher.lineBatch(phase)
+            if (style != 0) { // soft halo: two wide, faint passes under the crisp line
+                val glow = runCatching { com.github.noamm9.features.impl.dev.ClickGui.espGlow.value }.getOrDefault(35) / 100f
+                batch.addLineBoxVertices(pose, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, outlineAlpha * 0.16f * glow / 0.35f, w * 4.2f)
+                batch.addLineBoxVertices(pose, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, outlineAlpha * 0.28f * glow / 0.35f, w * 2.2f)
+            }
+            if (style == 2) cornerBrackets(pose, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, outlineAlpha, w * 1.15f, phase)
+            else batch.addLineBoxVertices(pose, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, outlineAlpha, w)
+        }
 
         matrixStack.popPose()
+    }
+
+    /** Corner brackets: three short strokes out of each of the 8 corners (28% of each edge). */
+    private fun cornerBrackets(
+        pose: com.mojang.blaze3d.vertex.PoseStack.Pose,
+        x1: Double, y1: Double, z1: Double, x2: Double, y2: Double, z2: Double,
+        r: Float, g: Float, b: Float, a: Float, w: Float, phase: Boolean
+    ) {
+        val batch = RenderBatcher.lineBatch(phase)
+        val lx = ((x2 - x1) * 0.28).toFloat()
+        val ly = ((y2 - y1) * 0.28).toFloat()
+        val lz = ((z2 - z1) * 0.28).toFloat()
+        for (cx in listOf(x1, x2)) for (cy in listOf(y1, y2)) for (cz in listOf(z1, z2)) {
+            val x = cx.toFloat(); val y = cy.toFloat(); val z = cz.toFloat()
+            val sx = if (cx == x1) 1f else - 1f
+            val sy = if (cy == y1) 1f else - 1f
+            val sz = if (cz == z1) 1f else - 1f
+            batch.line(pose, x, y, z, x + lx * sx, y, z, r, g, b, a, w)
+            batch.line(pose, x, y, z, x, y + ly * sy, z, r, g, b, a, w)
+            batch.line(pose, x, y, z, x, y, z + lz * sz, r, g, b, a, w)
+        }
     }
 
     fun RenderContext.renderBoxBounds(
