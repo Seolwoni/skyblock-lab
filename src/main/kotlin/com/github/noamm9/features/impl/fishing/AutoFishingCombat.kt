@@ -1,4 +1,4 @@
-package com.github.noamm9.features.impl.misc
+package com.github.noamm9.features.impl.fishing
 
 //#if CHEAT
 import com.github.noamm9.NoammAddons.mc

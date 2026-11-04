@@ -235,6 +235,7 @@ listOf("jarCheat", "jarLegit").forEach { taskName ->
 }
 
 tasks.named<Test>("test") {
+    useJUnitPlatform()
     failOnNoDiscoveredTests = false
     workingDir = temporaryDir
 }

@@ -1,4 +1,4 @@
-package com.github.noamm9.features.impl.misc
+package com.github.noamm9.features.impl.fishing
 
 import com.github.noamm9.config.types.ButtonSetting
 import com.github.noamm9.config.types.SliderSetting
@@ -31,6 +31,7 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private val timerWarn by SliderSetting("Timer Warn After", 20, 5, 60, 1, " s").withDescription("The timer turns red after this long without a bite")
     private val baitAlert by ToggleSetting("Bait Alerts", true).section("Bait").withDescription("Tells you when the bait in your last hotbar slot (Fishing Bag) changes or runs low")
     private val lowBait by SliderSetting("Low Bait At", 20, 1, 200, 1).withDescription("Warns once the bait count drops to this")
+    private val hideOtherHooks by ToggleSetting("Hide Other Hooks", false).section("Bobber").withDescription("Hides other players' bobbers and fishing lines, so only yours shows")
     val resetButton by ButtonSetting("Reset Tracker") { reset() }
 
     private val trophyMsg = com.github.noamm9.utils.SkyblockText.TROPHY_CATCH
@@ -62,6 +63,10 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private val seenStands = HashSet<Int>()
 
     override fun init() {
+        register<com.github.noamm9.event.impl.CheckEntityRenderEvent> {
+            val e = event.entity
+            if (hideOtherHooks.value && e is net.minecraft.world.entity.projectile.FishingHook && e.playerOwner !== mc.player) event.isCanceled = true
+        }
         register<TickEvent.Start> { com.github.noamm9.utils.Safely("FishingTracker tick") { tick() } }
         register<ChatMessageEvent> {
             val t = event.unformattedText.removeFormatting()

@@ -1,4 +1,4 @@
-package com.github.noamm9.features.impl.visual
+package com.github.noamm9.features.impl.fishing
 
 import com.github.noamm9.config.types.ColorSetting
 import com.github.noamm9.config.types.ToggleSetting

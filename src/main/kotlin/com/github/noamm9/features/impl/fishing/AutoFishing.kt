@@ -1,4 +1,4 @@
-package com.github.noamm9.features.impl.misc
+package com.github.noamm9.features.impl.fishing
 
 //#if CHEAT
 import com.github.noamm9.config.types.DropdownSetting
@@ -142,6 +142,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val creatureTracer by ToggleSetting("Creature Tracer", true).withDescription("A line from the middle of your screen to each of your sea creatures")
 
     internal val standCentre by ToggleSetting("Stand In Block Centre", true).section("Safety").withDescription("Before casting and before fighting, steps (sneaking, so it can't walk off an edge) to the exact middle of a safe block: solid ground under it, no lava in or under it")
+    internal val checkButton by com.github.noamm9.config.types.ButtonSetting("Fishing Check") { runCatching { fishingCheck() }.onFailure { info("&cCheck failed: ${it.message}") } }
+        .section("Server Check").withDescription("Prints what the mod can see right now: hotbar item IDs, floating texts nearby (hotspot / bite / name tags), the hook, tab stats, mana and bait. Stand by the water with the rod out")
+    internal val copyLogButton by com.github.noamm9.config.types.ButtonSetting("Copy Log Path") {
+        mc.keyboardHandler.clipboard = journal.path
+        info("&7Fishing log: &f${journal.path} &8(copied)")
+    }.withDescription("Copies where fishing.log is, to send it over after a test")
     internal val stopAfterMin by SliderSetting("Stop After", 0, 0, 600, 10, " min").withDescription("Ends the session on its own after this long (0 = never)")
     internal val stopAfterKills by SliderSetting("Stop After Kills", 0, 0, 5000, 50).withDescription("Ends the session after this many sea creature kills (0 = never)")
     internal val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
@@ -377,7 +383,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     val filled = (frac * 12).toInt().coerceIn(0, 12)
                     val bar = barCol + "▮".repeat(filled) + "§8" + "▮".repeat(12 - filled)
                     event.ctx.renderString("$nameCol$name", at.x, bb.maxY + 0.85, at.z, java.awt.Color.WHITE, 1.15f, phase = true)
-                    event.ctx.renderString("$bar §7${dist}m", at.x, bb.maxY + 0.5, at.z, java.awt.Color.WHITE, 0.9f, phase = true)
+                    // how long it has been alive: it despawns at ~6 min
+                    val ageS = (age / 1000).toInt()
+                    val ageCol = if (ageS >= 300) "§c" else if (ageS >= 240) "§e" else "§8"
+                    event.ctx.renderString("$bar §7${dist}m $ageCol${ageS / 60}:${"%02d".format(ageS % 60)}", at.x, bb.maxY + 0.5, at.z, java.awt.Color.WHITE, 0.9f, phase = true)
                 }
             }
         }

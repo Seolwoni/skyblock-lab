@@ -1,6 +1,6 @@
 package com.github.noamm9.mixin;
 
-import com.github.noamm9.features.impl.visual.LavaToWater;
+import com.github.noamm9.features.impl.fishing.LavaToWater;
 import net.minecraft.client.renderer.block.FluidModel;
 import net.minecraft.client.renderer.block.FluidStateModelSet;
 import net.minecraft.world.level.material.FluidState;

@@ -1,4 +1,4 @@
-package com.github.noamm9.features.impl.misc
+package com.github.noamm9.features.impl.fishing
 
 //#if CHEAT
 import com.github.noamm9.NoammAddons.mc
@@ -129,11 +129,8 @@ internal fun AutoFishing.radarCross(): Vec3? {
     if (radarLines.size < 2) return null
     val (a, da) = radarLines[radarLines.size - 2]
     val (b, db) = radarLines.last()
-    val cross = da.x * db.z - da.z * db.x
-    if (abs(cross) < kotlin.math.sin(Math.toRadians(15.0))) return null // nearly parallel
-    val t = ((b.x - a.x) * db.z - (b.z - a.z) * db.x) / cross
-    if (t < 0) return null // behind the first reading
-    return Vec3(a.x + da.x * t, (a.y + b.y) / 2, a.z + da.z * t)
+    val c = FishingMath.cross(a.x, a.z, da.x, da.z, b.x, b.z, db.x, db.z) ?: return null // parallel or behind
+    return Vec3(c[0], (a.y + b.y) / 2, c[1])
 }
 
 /** Somewhere to stand near a guessed point (it may be over water / lava or a little off). */

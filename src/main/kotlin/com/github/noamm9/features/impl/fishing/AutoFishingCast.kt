@@ -1,4 +1,4 @@
-package com.github.noamm9.features.impl.misc
+package com.github.noamm9.features.impl.fishing
 
 //#if CHEAT
 import com.github.noamm9.NoammAddons.mc
@@ -121,14 +121,9 @@ internal fun AutoFishing.surfaceY(pos: BlockPos): Double {
  * 0.6 blocks/tick along the look, 0.92 drag, 0.03 gravity). Null if it hits a block on the way.
  */
 internal fun AutoFishing.landing(p: LocalPlayer, yaw: Float, pitch: Float, surface: Double): Vec3? {
-    val r = Math.PI / 180.0
-    val f2 = kotlin.math.cos(- yaw * r - Math.PI)
-    val f3 = kotlin.math.sin(- yaw * r - Math.PI)
-    val f4 = - kotlin.math.cos(- pitch * r)
-    val f5 = kotlin.math.sin(- pitch * r)
-    var pos = Vec3(p.x - f3 * 0.3, p.eyeY, p.z - f2 * 0.3)
-    var v = Vec3(- f3, (- (f5 / f4)).coerceIn(- 5.0, 5.0), - f2)
-    v = v.scale(0.6 / v.length() + 0.5) // vanilla: 0.6 / length + 0.5 (the 0.5 has a tiny random spread)
+    val t = FishingMath.throwStart(yaw, pitch) // vanilla: 0.6 / length + 0.5 (the 0.5 has a tiny random spread)
+    var pos = Vec3(p.x + t.offX, p.eyeY, p.z + t.offZ)
+    var v = Vec3(t.vx, t.vy, t.vz)
     val level = p.level()
     repeat(160) {
         val next = pos.add(v)
@@ -136,7 +131,7 @@ internal fun AutoFishing.landing(p: LocalPlayer, yaw: Float, pitch: Float, surfa
         if (hit.type != net.minecraft.world.phys.HitResult.Type.MISS) return null
         if (next.y <= surface && v.y < 0) return next
         pos = next
-        v = Vec3(v.x * 0.92, v.y * 0.92 - 0.03, v.z * 0.92)
+        v = Vec3(v.x * FishingMath.DRAG, v.y * FishingMath.DRAG - FishingMath.GRAVITY, v.z * FishingMath.DRAG)
     }
     return null
 }
