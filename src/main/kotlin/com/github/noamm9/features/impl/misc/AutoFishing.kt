@@ -272,6 +272,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             NotificationManager.push("Sell List", if (added) "&fAdded &d$name" else "&fRemoved &d$name")
             event.isCanceled = true
         }
+        register<com.github.noamm9.event.impl.RenderWorldEvent> { runCatching { trackFrame() } }
         register<com.github.noamm9.event.impl.RenderWorldEvent> {
             if (! running || ! showMarkers.value) return@register
             val level = mc.level ?: return@register
@@ -473,6 +474,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private fun stop(reason: String?) {
         if (running) releaseCentre()
         centreTarget = null
+        track = null
         running = false
         hop = null
         AutoRoutes.releaseAll()
@@ -634,6 +636,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val mobs = seen.filter { (noticeAt[it.id] ?: 0) <= tickCount }
         if (state == State.FIGHT || mobs.isNotEmpty()) {
             if (mobs.isEmpty()) {
+                track = null
                 blastBlocked = false
                 hypeStage = 0
                 hypeBeat = 0
@@ -1106,12 +1109,58 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (hopWait > 0) hopWait--
         if (tryHop(p)) return
 
-        val yaw = Math.toDegrees(kotlin.math.atan2(target.z - p.z, target.x - p.x)).toFloat() - 90f
-        turn(p, yaw, 8f + RANDOM.nextFloat() * 6f, 12f)
+        // steer at a point a few blocks further along the path (rounds the corners), the view gliding after it
+        // every frame; falls back to the next node when cutting the corner would cross anything unsafe
+        val look = lookAhead(p) ?: target
+        val yaw = Math.toDegrees(kotlin.math.atan2(look.z - p.z, look.x - p.x)).toFloat() - 90f
+        if (walkPitch == 0f || RANDOM.nextInt(120) == 0) walkPitch = 7f + RANDOM.nextFloat() * 8f
+        walkGoalYaw = yaw
+        walkGoalPitch = walkPitch
+        walkSteer = true
+        ownMoveTicks = 20
         val dy = node.y - p.blockPosition().y
-        mc.options.keyUp.isDown = abs(wrap(yaw - p.yRot)) < 50f
+        mc.options.keyUp.isDown = abs(wrap(yaw - p.yRot)) < 60f
         mc.options.keyJump.isDown = p.onGround() && (dy > 0 || p.horizontalCollision)
         mc.options.keySprint.isDown = path.size - pathIndex > 4 && ! nearLava(p.blockPosition(), 2)
+    }
+
+    private var walkSteer = false
+    private var walkGoalYaw = 0f
+    private var walkGoalPitch = 0f
+    private var walkPitch = 0f
+
+    /** The point ~2.5 blocks ahead along the path, if the straight line there is safe ground all the way. */
+    private fun lookAhead(p: LocalPlayer): Vec3? {
+        var left = 2.3 + RANDOM.nextDouble() * 0.6
+        var prev = p.position()
+        val y0 = p.blockPosition().y
+        for (i in pathIndex until path.size) {
+            val c = Vec3.atBottomCenterOf(path[i])
+            if (path[i].y != y0) return if (i == pathIndex) null else prev // steps / drops: go node by node
+            val seg = horizontalDist(prev, c)
+            if (seg >= left) {
+                val pt = prev.add((c.x - prev.x) * left / seg, 0.0, (c.z - prev.z) * left / seg)
+                return if (lineSafe(p.position(), pt)) pt else null
+            }
+            left -= seg
+            prev = c
+        }
+        return if (lineSafe(p.position(), prev)) prev else null
+    }
+
+    /** Solid, lava-free ground under every step of the straight line (and a block of margin from lava). */
+    private fun lineSafe(a: Vec3, b: Vec3): Boolean {
+        val lvl = mc.level ?: return false
+        val n = (horizontalDist(a, b) / 0.3).toInt().coerceAtLeast(1)
+        for (i in 0 .. n) {
+            val t = i / n.toDouble()
+            val bp = BlockPos.containing(a.x + (b.x - a.x) * t, a.y + 0.1, a.z + (b.z - a.z) * t)
+            val under = bp.below()
+            if (lvl.getBlockState(under).getCollisionShape(lvl, under).isEmpty) return false
+            if (! lvl.getBlockState(bp).getCollisionShape(lvl, bp).isEmpty) return false
+            if (isLava(bp) || isLava(under) || nearLava(bp, 1)) return false
+        }
+        return true
     }
 
     /** AOTV to a path node 9-12 blocks ahead when the stretch is straight, level, in sight and away from lava. */
@@ -1678,28 +1727,114 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             if (p.distanceTo(m) <= whipRange.value) waiting.remove(m.id)
             else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > giveUp.value * 20) { ignored += m.id; waiting.remove(m.id) }
         }
-        val target = mobs.filter { p.distanceTo(it) <= whipRange.value && p.hasLineOfSight(it) }.minByOrNull { it.distanceToSqr(p) }
+        // stick with the creature we're already on while it's still in range; switch only when it's gone
+        val inRange = mobs.filter { p.distanceTo(it) <= whipRange.value && p.hasLineOfSight(it) }
+        val target = inRange.firstOrNull { it == track } ?: inRange.minByOrNull { it.distanceToSqr(p) }
         if (target == null) {
-            val far = mobs.minByOrNull { it.distanceToSqr(p) } ?: return
-            status = "waiting for ${far.name.string}"
-            val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(far.boundingBox.center, 0.6))
-            if (abs(wrap(rot.yaw - p.yRot)) > 22f || abs(rot.pitch - p.xRot) > 18f) turn(p, rot.yaw, rot.pitch, 9f)
+            val far = mobs.minByOrNull { it.distanceToSqr(p) }
+            track = far // keep a loose eye on it while it comes closer
+            trackLoose = true
+            status = if (far != null) "waiting for ${far.name.string}" else "fighting"
             return
         }
         if (! centered(p)) { status = "stepping to the middle of the block"; return }
+        if (track != target) { track = target; trackSettle = 0 }
+        trackLoose = false
+        ownMoveTicks = 20
         status = "whipping ${target.name.string}"
+        val err = trackError(p, target)
+        if (err < 3.5f) trackSettle++ else trackSettle = 0
         if (hypeBeat > 0) { hypeBeat--; return }
-        val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(target.boundingBox.center, 0.35))
-        if (! turn(p, rot.yaw, rot.pitch, 5f)) return
-        if (p.inventory.selectedSlot != slot) { // take it out once we're looking at it, then a beat
-            hold(slot)
-            hypeBeat = delay(2, 7)
+        if (p.inventory.selectedSlot != slot) { // take the whip out once we're more or less facing it
+            if (err < 25f) { hold(slot); hypeBeat = delay(2, 7) }
             return
         }
-        if (hitCooldown > 0) return
+        // swing only once the aim has stayed on it for a moment, then keep tracking between swings
+        if (hitCooldown > 0 || trackSettle < 3) return
         use(p)
         p.swing(InteractionHand.MAIN_HAND)
         hitCooldown = delay(whipDelay.value, whipDelay.value * 2 + 2)
+    }
+
+    // ------------------------------------------------------------------ smooth tracking (every frame)
+
+    private var track: LivingEntity? = null
+    private var trackLoose = false
+    private var trackSettle = 0
+    private var trackVelYaw = 0f
+    private var trackVelPitch = 0f
+    private var trackLastNs = 0L
+    private var trackOff = Vec3.ZERO       // where on the body we aim; drifts slowly, not a new point every tick
+    private var trackOffGoal = Vec3.ZERO
+    private var trackOffNext = 0L
+    private var trackMaxSpeed = 300f
+
+    /** Walking: the same spring, a bit softer, after the steering point. */
+    private fun steerFrame(p: LocalPlayer, dt: Float) {
+        if (dt <= 0f) return
+        val errY = wrap(walkGoalYaw - p.yRot)
+        val errP = walkGoalPitch - p.xRot
+        val k = 28f
+        val c = 2f * kotlin.math.sqrt(k)
+        trackVelYaw += (k * errY - c * trackVelYaw) * dt
+        trackVelPitch += (k * errP - c * trackVelPitch) * dt
+        val max = 260f
+        val sp = kotlin.math.hypot(trackVelYaw.toDouble(), trackVelPitch.toDouble()).toFloat()
+        if (sp > max) { trackVelYaw *= max / sp; trackVelPitch *= max / sp }
+        p.yRot += trackVelYaw * dt
+        p.xRot = (p.xRot + trackVelPitch * dt).coerceIn(- 90f, 90f)
+        p.yHeadRot = p.yRot
+    }
+
+    private fun trackPoint(e: Entity, pt: Float): Vec3 {
+        val pos = e.getPosition(pt)
+        return Vec3(pos.x, pos.y + e.bbHeight * 0.55, pos.z).add(trackOff)
+    }
+
+    private fun trackError(p: LocalPlayer, e: Entity): Float {
+        val rot = MathUtils.calcYawPitch(trackPoint(e, 1f))
+        return kotlin.math.hypot(wrap(rot.yaw - p.yRot).toDouble(), (rot.pitch - p.xRot).toDouble()).toFloat()
+    }
+
+    /**
+     * Follows [track] smoothly every frame with a critically damped spring and a top speed, so the view glides
+     * after the creature and trails it slightly when it moves, instead of stepping 20 times a second.
+     */
+    private fun trackFrame() {
+        val now = System.nanoTime()
+        val dt = ((now - trackLastNs) / 1e9f).coerceIn(0f, 0.05f)
+        trackLastNs = now
+        val p = mc.player ?: return
+        val e = track
+        if (running && state == State.TRAVEL && walkSteer && hop == null) { steerFrame(p, dt); return }
+        walkSteer = walkSteer && state == State.TRAVEL
+        if (! running || e == null || ! e.isAlive || state != State.FIGHT) { trackVelYaw = 0f; trackVelPitch = 0f; return }
+        if (dt <= 0f) return
+        val ms = System.currentTimeMillis()
+        if (ms >= trackOffNext) { // pick a new spot on its body every 0.4-1.2 s
+            val w = e.bbWidth * 0.25
+            val h = e.bbHeight * 0.2
+            trackOffGoal = Vec3((RANDOM.nextDouble() * 2 - 1) * w, (RANDOM.nextDouble() * 2 - 1) * h, (RANDOM.nextDouble() * 2 - 1) * w)
+            trackOffNext = ms + 400 + RANDOM.nextInt(800)
+            trackMaxSpeed = 220f + RANDOM.nextFloat() * 200f
+        }
+        trackOff = trackOff.lerp(trackOffGoal, (dt * 3f).toDouble().coerceAtMost(1.0))
+        val rot = MathUtils.calcYawPitch(trackPoint(e, mc.deltaTracker.getGameTimeDeltaPartialTick(true)))
+        var errY = wrap(rot.yaw - p.yRot)
+        var errP = rot.pitch - p.xRot
+        if (trackLoose) { // only keep it roughly in view while waiting
+            errY = if (abs(errY) > 20f) errY - kotlin.math.sign(errY) * 20f else 0f
+            errP = if (abs(errP) > 15f) errP - kotlin.math.sign(errP) * 15f else 0f
+        }
+        val k = 55f
+        val c = 2f * kotlin.math.sqrt(k)
+        trackVelYaw += (k * errY - c * trackVelYaw) * dt
+        trackVelPitch += (k * errP - c * trackVelPitch) * dt
+        val sp = kotlin.math.hypot(trackVelYaw.toDouble(), trackVelPitch.toDouble()).toFloat()
+        if (sp > trackMaxSpeed) { trackVelYaw *= trackMaxSpeed / sp; trackVelPitch *= trackMaxSpeed / sp }
+        p.yRot += trackVelYaw * dt
+        p.xRot = (p.xRot + trackVelPitch * dt).coerceIn(- 90f, 90f)
+        p.yHeadRot = p.yRot
     }
 
     private fun fight(p: LocalPlayer, mobs: List<LivingEntity>) {
