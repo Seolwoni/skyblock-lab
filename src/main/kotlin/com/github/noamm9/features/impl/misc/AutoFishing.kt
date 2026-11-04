@@ -79,6 +79,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val onlyMine by ToggleSetting("Only My Sea Creatures", true).withDescription(
         "Only fights creatures that came up at your hook right after you reeled in (and anything that hits you). Other people's creatures are left alone"
     )
+    internal val creatureCap by SliderSetting("Sea Creature Cap", 10, 0, 30, 1).withDescription("Stops casting while this many of your sea creatures are alive (no new ones come up past the cap anyway). 0 = off")
+    internal val rareAlert by ToggleSetting("Rare Creature Alert", true).withDescription("Title, sound and a gold highlight when one of the creatures in the list below comes up for you")
+    internal val rareList by com.github.noamm9.config.types.TextInputSetting("Rare Creatures", "Thunder|Lord Jawbus|Water Hydra|Sea Emperor|Loch Emperor|Great White Shark|Phantom Fisher|Grim Reaper|Yeti|Reindrake|Titanoboa|Plhlegblast|Fiery Scuttler|Ragnarok|Abyssal Miner|Wiki Tiki|Carrot King|Nessie").withDescription("Names, separated by |")
     internal val useCatchMsgs by ToggleSetting("Use Catch Messages", true).withDescription("A creature named in your own catch message is yours for sure; once the server sends these, only they count (other people's creatures never message you)")
     internal val ownWindow by SliderSetting("My Creature Window", 1.0, 0.3, 3.0, 0.1, " s").withDescription("A creature counts as yours only if it appears within this long after YOU reel in. Lower it if other people's creatures get picked up")
     internal val ownDistance by SliderSetting("My Creature Distance", 4.0, 1.5, 8.0, 0.5, " blocks").withDescription("...and only this close to where your hook was")
@@ -256,6 +259,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val chase = HashMap<Int, Pair<Int, Double>>() // id -> ticks coming at us, last distance
     internal var claimsLeft = 0
     internal var catchMsgsWork = false
+    internal val claimedAt = HashMap<Int, Long>()   // id -> when it became ours (despawn warning)
+    internal val despawnWarned = HashSet<Int>()
+    internal val rareIds = HashSet<Int>()
+    internal var hotspotAt: Vec3? = null            // where the hotspot was when we picked it (it can move)
+    internal val castHp = HashMap<Int, Float>()
+    internal var immuneWait = 0     // creature health at our last blast (immunity check)
 
     // noticing sea creatures
     internal val noticeAt = HashMap<Int, Int>()
@@ -315,7 +324,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 for (id in mineAlive) {
                     val e = level.getEntity(id) ?: continue
                     if (! e.isAlive) continue
-                    val c = com.github.noamm9.ui.clickgui.components.settings.Style.accent2
+                    val c = if (id in rareIds) java.awt.Color(255, 196, 64) else com.github.noamm9.ui.clickgui.components.settings.Style.accent2
                     // interpolated so the box doesn't lag behind a moving mob
                     val at = e.getPosition(pt)
                     val bb = e.boundingBox.move(at.subtract(e.position())).inflate(0.1)
@@ -463,6 +472,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         anchorYaw = p.yRot
         anchorPitch = p.xRot
         seenAt.clear(); seenPos.clear(); reels.clear(); catches.clear(); chase.clear(); claimsLeft = 0
+        claimedAt.clear(); despawnWarned.clear(); rareIds.clear(); castHp.clear()
         tickCount += 100 // anything seen from now on is "after" any stale reel
         timing = com.github.noamm9.utils.HumanTiming()
         lastLookYaw = null
@@ -663,6 +673,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         // sea creatures first, the moment one comes up
         val seen = if (killCreatures.value && mc.gui.screen() == null) creatures(p) else emptyList()
         if (mineAlive.isNotEmpty()) mineAlive.removeIf { id -> val e = p.level().getEntity(id); (e == null || ! e.isAlive).also { if (it && e != null) kills++ } }
+        val nowMs = System.currentTimeMillis()
+        for (id in mineAlive) {
+            val at = claimedAt[id] ?: continue
+            if (nowMs - at > 330_000 && despawnWarned.add(id)) // ~6 min and they despawn
+                NotificationManager.push("Sea creature", "&fOne of yours is about to despawn &7(5.5 min old)")
+        }
         // a person needs a moment to notice something new: each creature gets its own notice time
         for (m in seen) noticeAt.getOrPut(m.id) { tickCount + delay(noticeMin.value, noticeMax.value) }
         if (noticeAt.size > 200) noticeAt.keys.retainAll(seen.map { it.id }.toSet())
@@ -749,6 +765,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     return
                 }
                 manaWait = 0
+                if (creatureCap.value > 0 && mineAlive.size >= creatureCap.value) {
+                    status = "at the sea creature cap (${mineAlive.size}/${creatureCap.value})"
+                    return
+                }
                 // settle on this cast's aim (with its wobble) first, then land on it exactly
                 val ty = anchorYaw + offYaw + wobYaw
                 val tp = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
@@ -782,10 +802,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 timer++
                 if (inFluid(hook)) inFluidTicks++
                 if (inFluidTicks == 8) lastLanding = hook.position()
-                status = "waiting ${timer / 20}s in ${fluidName()}" + if (hotspot != null) " (hotspot)" else ""
+                status = "waiting ${timer / 20}s in ${fluidName()}" + (if (hotspot != null) " (hotspot)" else "") + (if (mineAlive.isNotEmpty()) " - ${mineAlive.size} alive" else "")
                 if (hotspots.value) {
                     val hs = hotspot
-                    if (hs != null && ! hs.isAlive) { // the hotspot ended: next one
+                    val moved = hs != null && hotspotAt != null && hs.position().distanceTo(hotspotAt!!) > 3.0
+                    val gone = hs != null && (! hs.isAlive || hs.isRemoved || p.level().getEntity(hs.id) !== hs)
+                    // every 5 s: is there a closer / new hotspot in sight while ours isn't (e.g. it moved as a new entity)
+                    val elsewhere = hs != null && timer % 100 == 0 && nearestHotspot(p)?.let { it !== hs && it.position().distanceTo(hs.position()) > 3.0 && hs.distanceTo(p) > 20f } == true
+                    if (moved || gone || elsewhere) { // the hotspot ended or moved: go after it
+                        if (hs != null) badHotspots -= hs.id
+                        info(if (moved) "&7The hotspot moved, following it." else "&7Hotspot gone, looking for the next one.")
                         hold(rod); use(p)
                         hotspot = null
                         state = State.FIND

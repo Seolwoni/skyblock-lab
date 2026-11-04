@@ -29,12 +29,17 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private val showTrophy by ToggleSetting("Trophy Fish", true).withDescription("Counts trophy fish by tier (Bronze / Silver / Gold / Diamond) from the catch message")
     private val bobberTimer by ToggleSetting("Bobber Timer", true).section("Bobber").withDescription("Shows how long the hook has been out, above the hook")
     private val timerWarn by SliderSetting("Timer Warn After", 20, 5, 60, 1, " s").withDescription("The timer turns red after this long without a bite")
+    private val baitAlert by ToggleSetting("Bait Alerts", true).section("Bait").withDescription("Tells you when the bait in your last hotbar slot (Fishing Bag) changes or runs low")
+    private val lowBait by SliderSetting("Low Bait At", 20, 1, 200, 1).withDescription("Warns once the bait count drops to this")
     val resetButton by ButtonSetting("Reset Tracker") { reset() }
 
     private val trophyMsg = Regex("TROPHY FISH! You caught an? (.+?) (BRONZE|SILVER|GOLD|DIAMOND)\\.?$")
     private val tierColor = mapOf("BRONZE" to "§6", "SILVER" to "§7", "GOLD" to "§e", "DIAMOND" to "§b")
     private val trophies = LinkedHashMap<String, IntArray>() // fish -> bronze, silver, gold, diamond
     private var castAt = 0L
+    private var baitName: String? = null
+    private var baitWarned = false
+    private var baitTick = 0
     private var biteAt = 0L
 
     private val creatureTag = Regex("^(?:\\[Lv\\d+] )?(.+?) [\\d,.]+[kKmMbB]?(?:/[\\d,.]+[kKmMbB]?)?❤")
@@ -95,8 +100,29 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
         activeMs = 0; lastReel = 0
     }
 
+    /** The bait in the last hotbar slot: its name and the "Bait Remaining: N" count from the lore. */
+    private fun watchBait(p: net.minecraft.client.player.LocalPlayer) {
+        if (! baitAlert.value || ++baitTick % 40 != 0 || p.fishing == null) return
+        val stack = p.inventory.getItem(8)
+        if (stack.isEmpty) return
+        val lore = with(com.github.noamm9.utils.items.ItemUtils) { stack.lore }.map { it.removeFormatting() }
+        val count = lore.firstNotNullOfOrNull { Regex("Bait Remaining: ([\\d,]+)").find(it)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull() }
+        val name = lore.firstNotNullOfOrNull { Regex("^(?:Selected|Current|Using)(?: Bait)?: (.+)$").find(it)?.groupValues?.get(1) } ?: stack.hoverName.string.removeFormatting()
+        if (baitName != null && baitName != name) com.github.noamm9.ui.notification.NotificationManager.push("Bait changed", "&f$baitName &7-> &f$name")
+        baitName = name
+        if (count != null) {
+            if (count <= lowBait.value && ! baitWarned) {
+                baitWarned = true
+                com.github.noamm9.ui.notification.NotificationManager.push("Low bait", "&f$count &7left")
+                com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_BELL.value(), 1f, 1f)
+            }
+            if (count > lowBait.value) baitWarned = false
+        }
+    }
+
     private fun tick() {
         val p = mc.player ?: return
+        watchBait(p)
         val now = System.currentTimeMillis()
         if (lastTick != 0L && lastReel != 0L && now - lastReel < pauseAfter.value * 1000L) activeMs += now - lastTick
         lastTick = now

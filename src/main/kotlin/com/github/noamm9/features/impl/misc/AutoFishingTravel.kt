@@ -103,6 +103,7 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
         return
     }
     hotspot = hs
+    hotspotAt = hs.position()
     stand = spot
     aimTries = 0
     travelStuck = 0

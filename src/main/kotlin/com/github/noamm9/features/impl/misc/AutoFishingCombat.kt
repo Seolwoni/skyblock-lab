@@ -110,6 +110,15 @@ internal fun AutoFishing.claim(e: Entity) {
     mineAlive += e.id
     firstSeen += e.id
     creaturesCaught++
+    claimedAt[e.id] = System.currentTimeMillis()
+    val name = creatureName(e) ?: return
+    val rare = rareList.value.split('|').map { it.trim() }.filter { it.isNotEmpty() }.firstOrNull { name.contains(it, ignoreCase = true) } ?: return
+    rareIds += e.id
+    if (rareAlert.value) {
+        NotificationManager.push("Rare sea creature!", "&6$rare &fcame up for you")
+        mc.gui.setTitle(net.minecraft.network.chat.Component.literal("§6§l$rare"))
+        com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1f, 1.2f)
+    }
 }
 
 /** "Sea Walker" from "[Lv45] Sea Walker 1,200/1,200❤" (colour codes and symbols stripped). */
@@ -300,6 +309,18 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                     }
                 }
                 hold(hype)
+                // a creature that took nothing from the last blast is probably still immune (just spawned): wait a moment
+                val m0 = close.minByOrNull { it.distanceToSqr(p) }
+                if (m0 != null) {
+                    val before = castHp[m0.id]
+                    if (before != null && m0.health >= before - 0.01f && hitCooldown == 0 && hypeBeat == 0 && (immuneWait++ % 2 == 0)) {
+                        hypeBeat = delay(14, 24)
+                        status = "${m0.name.string} took no damage, waiting a moment"
+                        castHp[m0.id] = m0.health
+                        return
+                    }
+                    castHp[m0.id] = m0.health
+                }
                 ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
                 use(p)
                 hitCooldown = delay(hitDelay.value, hitDelay.value * 2 + 4)
