@@ -60,7 +60,25 @@ internal fun AutoFishing.nearFluid(hook: FishingHook, tag: net.minecraft.tags.Ta
     return false
 }
 
-internal fun AutoFishing.inFluid(hook: FishingHook) = when (fluid.value) {
+/** The "?" / countdown Hypixel floats over a bobber that's waiting in the water. */
+internal fun AutoFishing.waitingMarker(hook: FishingHook): Boolean =
+    com.github.noamm9.utils.FloatingText.near(hook.level(), hook.boundingBox.inflate(1.0, 2.5, 1.0))
+        .any { (_, t) -> com.github.noamm9.utils.SkyblockText.WAITING_MARKER.matches(t.replace(Regex("§."), "").trim()) }
+
+/**
+ * Hypixel sometimes spawns our hook without linking it to the player (player.fishing stays null), which
+ * would leave us waiting for a hook forever: find the hook we own nearby and link it back.
+ */
+internal fun AutoFishing.relinkBobber() {
+    val p = mc.player ?: return
+    if (p.fishing != null) return
+    val own = p.level().getEntitiesOfClass(FishingHook::class.java, p.boundingBox.inflate(40.0)) { it.playerOwner === p && ! it.isRemoved }
+        .minByOrNull { it.distanceToSqr(p) } ?: return
+    p.fishing = own
+    journal.log("re-linked a hook the game hadn't linked")
+}
+
+internal fun AutoFishing.inFluid(hook: FishingHook) = waitingMarker(hook) || when (fluid.value) {
     1 -> hook.isInWater || nearFluid(hook, FluidTags.WATER)
     2 -> hook.isInLava || nearFluid(hook, FluidTags.LAVA)
     else -> hook.isInWater || hook.isInLava || nearFluid(hook, FluidTags.WATER) || nearFluid(hook, FluidTags.LAVA)

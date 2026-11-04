@@ -64,6 +64,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val lookAtCatch by ToggleSetting("Look At The Catch", true).withDescription("After a sea creature or a good catch, waits a bit longer before casting again, like reading what came up")
     internal val breakChance by SliderSetting("Short Breaks", 2.0, 0.0, 15.0, 0.5, "%").withDescription("Chance per cast of a 2-6 s pause before casting (checking chat, the inventory...)")
     internal val castTimeout by SliderSetting("Recast After", 45, 10, 120, 5, " s").withDescription("Reels in and casts again if nothing bites for this long")
+    internal val driftRecast by ToggleSetting("Recast If Hook Drifts", true).withDescription("Once the hook has settled, if it slides off (it caught on a mob), reel in and cast again")
+    internal val particleRecast by ToggleSetting("Recast On Splash Particles", true).withDescription("A burst of dust particles at the hook means it didn't land in the water: reel in and cast again")
+    internal val slugfish by ToggleSetting("Slugfish Mode", false).withDescription("Ignores bites for the first 21 s after a cast (Slugfish only bite after 20 s)")
+    internal val slugPet by ToggleSetting("Slug Pet", false).withDescription("With the Slug pet the wait is halved (11 s)").showIf { slugfish.value }
     internal val groundRecast by ToggleSetting("Recast If Hook Lands On Ground", true).withDescription("Casts again when the hook settles somewhere that isn't water / lava; stops after 3 misses in a row")
     internal val hookDive by ToggleSetting("Detect By Hook Dive", true).withDescription("Also reels in when the hook suddenly dives (vanilla bite), not only on the \"!!!\" sign")
 
@@ -265,7 +269,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val journal = com.github.noamm9.utils.Journal("fishing")
     internal var lastLoggedState: State? = null
     internal var biteAt: Vec3? = null               // where the hook was at the bite (it can vanish before we reel)
-    internal var tabStats = ""                      // "SCC 21% · DHC 8%" from the tab list
+    internal var tabStats = ""
+    internal var guiWasOpen = false
+    internal var guiLockUntil = 0           // no reacting to a bite right after closing a menu
+    internal var settledAt: Vec3? = null    // where the hook came to rest (drift check)
+    internal var lastParticleRecast = - 1000
+    internal val dustAt = ArrayDeque<Int>()   // ticks of dust particles seen right at the hook                      // "SCC 21% · DHC 8%" from the tab list
     internal val claimedAt = HashMap<Int, Long>()   // id -> when it became ours (despawn warning)
     internal val despawnWarned = HashSet<Int>()
     internal val rareIds = HashSet<Int>()
@@ -291,13 +300,23 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
         register<com.github.noamm9.event.impl.ChatMessageEvent> { if (readShared.value) com.github.noamm9.utils.Safely("AutoFishing shared hotspot") { readSharedHotspot(event.unformattedText) } }
         register<com.github.noamm9.event.impl.ChatMessageEvent> {
+            if (running && event.unformattedText.contains(com.github.noamm9.utils.SkyblockText.REBOOT, ignoreCase = true)) {
+                NotificationManager.push("Server restarting", "&fThe server will restart soon - Auto Fishing keeps going until you're moved")
+                com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_BELL.value(), 1f, 0.8f)
+                journal.log("server reboot warning")
+            }
+        }
+        register<com.github.noamm9.event.impl.ChatMessageEvent> {
             if (! running) return@register
             val t = event.unformattedText.replace(Regex("§."), "").trim()
             val lastReel = reels.lastOrNull()?.tick ?: return@register
             if (tickCount - lastReel > 30 || t.length > 160) return@register
             if (Regex("^(?:\\[[^]]+] )*[A-Za-z0-9_]{2,16}: ").containsMatchIn(t)) return@register // a player talking
             if (t.contains(com.github.noamm9.utils.SkyblockText.DOUBLE_HOOK, ignoreCase = true)) { claimsLeft++; return@register }
-            catches += tickCount to t.lowercase()
+            // a known catch line names the creature even when the text doesn't ("What is this creature!?" = Yeti)
+            val known = com.github.noamm9.utils.SkyblockText.creatureFromCatch(t)
+            catches += tickCount to (t.lowercase() + (known?.let { " | " + it.lowercase() } ?: ""))
+            if (known != null) journal.log("catch line: $known")
             claimsLeft++
         }
         register<WorldChangeEvent> {
@@ -402,6 +421,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         register<MainThreadPacketReceivedEvent.Pre> {
             val pk = event.packet
             if (running && radarStage == 1 && pk is net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket) radarParticle(pk.x, pk.y, pk.z)
+            if (running && state == State.WAIT_BITE && pk is net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket && pk.particle.type == net.minecraft.core.particles.ParticleTypes.DUST) {
+                val h = mc.player?.fishing
+                if (h != null && h.position().distanceToSqr(pk.x, pk.y, pk.z) < 1.6 * 1.6) dustAt += tickCount
+            }
         }
         register<MainThreadPacketReceivedEvent.Pre> {
             if (! running || ! failsafe.value || ownMoveTicks > 0) return@register
@@ -680,6 +703,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     internal fun tick() {
+        relinkBobber()
+        val guiOpen = mc.gui.screen() != null
+        if (guiWasOpen && ! guiOpen) guiLockUntil = tickCount + timing.uniform(15, 50) // a person needs a moment after closing a menu
+        guiWasOpen = guiOpen
         if (state != lastLoggedState) { journal.log("state ${lastLoggedState ?: "-"} -> $state  ($status)"); lastLoggedState = state }
         if (tickCount % 40 == 0) tabStats = readTabStats()
         val goalHit = when {
@@ -862,7 +889,32 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     return
                 }
                 timer++
+                if (timer == 1) { settledAt = null; dustAt.clear() }
                 if (inFluid(hook)) inFluidTicks++
+                // settled: remember where; then a slide of 2.5+ blocks means it caught on a mob
+                if (inFluidTicks == 20) settledAt = hook.position()
+                val s0 = settledAt
+                if (driftRecast.value && s0 != null && hook.hookedIn == null && ! bitten(hook) &&
+                    kotlin.math.hypot(hook.x - s0.x, hook.z - s0.z) > 2.5) {
+                    journal.log("hook drifted ${"%.1f".format(kotlin.math.hypot(hook.x - s0.x, hook.z - s0.z))} blocks, recasting")
+                    hold(rod); use(p)
+                    state = State.CAST
+                    wait = castWait()
+                    status = "hook drifted off, recasting"
+                    return
+                }
+                // a burst of dust at the hook = it didn't go in (after the cast's own splash, not too often)
+                while (dustAt.isNotEmpty() && tickCount - dustAt.first() > 20) dustAt.removeFirst()
+                if (particleRecast.value && timer > 30 && dustAt.size >= 8 && tickCount - lastParticleRecast > 60 && ! waitingMarker(hook)) {
+                    lastParticleRecast = tickCount
+                    journal.log("splash particles at the hook (${dustAt.size}), recasting")
+                    dustAt.clear()
+                    hold(rod); use(p)
+                    state = State.CAST
+                    wait = castWait()
+                    status = "hook not in the ${fluidName()}, recasting"
+                    return
+                }
                 if (inFluidTicks == 8) lastLanding = hook.position()
                 status = "waiting ${timer / 20}s in ${fluidName()}" + (if (hotspot != null) " (hotspot)" else "") + (if (mineAlive.isNotEmpty()) " - ${mineAlive.size} alive" else "")
                 if (hotspots.value) {
@@ -893,6 +945,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     }
                 }
                 if (bitten(hook)) {
+                    if (tickCount < guiLockUntil) return // just closed a menu: not yet
+                    if (slugfish.value && timer < (if (slugPet.value) 220 else 420)) return // Slugfish bite only after 20 s
                     biteAt = hook.position()
                     journal.log("bite after ${timer / 20.0}s  (${fluidName()})")
                     state = State.REEL
