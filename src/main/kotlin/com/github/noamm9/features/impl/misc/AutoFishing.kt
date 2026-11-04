@@ -40,212 +40,216 @@ import kotlin.math.abs
  * Fishes by itself in water or lava, with Reel Assist's feel: delays that cluster low with the odd slow reaction,
  * small eased head movements around the bobber every 12-18 s, every turn eased (Assist Core's when installed),
  * and following your aim if you move the camera yourself. Sea creatures are killed as soon as they come up.
+ *
+ * This file holds the settings, state and main loop. The rest lives next to it:
+ * AutoFishingCast (throw solver, reading the hook), AutoFishingCombat (sea creatures, fights, tracking),
+ * AutoFishingTravel (Hotspots, walking, hops), AutoFishingSafety (block centre, lava) and AutoFishingSell.
  */
 object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in on the bite, recasts and kills sea creatures as soon as they come up. Human-like delays and smooth head movement (Reel Assist style).") {
-    private val toggleKey by KeybindSetting("Start / Stop Key").withDescription("Look at the water or lava and press it to start, press again to stop")
-    private val fluid by DropdownSetting("Fluid", 0, listOf("Auto", "Water", "Lava")).withDescription("Auto: works out water or lava from where the hook lands. Only used to tell a hook that fell on the ground")
+    internal val toggleKey by KeybindSetting("Start / Stop Key").withDescription("Look at the water or lava and press it to start, press again to stop")
+    internal val fluid by DropdownSetting("Fluid", 0, listOf("Auto", "Water", "Lava")).withDescription("Auto: works out water or lava from where the hook lands. Only used to tell a hook that fell on the ground")
 
-    private val reelMin by SliderSetting("Reel Delay Min", 2, 1, 17, 1, " ticks").section("Timing").withDescription("Shortest wait after the bite before reeling in")
-    private val reelMax by SliderSetting("Reel Delay Max", 9, 1, 17, 1, " ticks").withDescription("Longest wait after the bite (17 at most, so the fish doesn't get away)")
-    private val castMin by SliderSetting("Cast Delay Min", 6, 1, 60, 1, " ticks").withDescription("Shortest wait before casting again")
-    private val castMax by SliderSetting("Cast Delay Max", 34, 1, 80, 1, " ticks")
-    private val hesitate by SliderSetting("Hesitation", 12, 0, 40, 1, "%").withDescription("Chance that a cast comes a little later than usual (0.3-1 s more)")
-    private val aimWobble by SliderSetting("Cast Aim Wobble", 0.5, 0.0, 2.0, 0.1, "°").withDescription("Each cast is aimed a tiny bit differently, like a hand that never lands on the exact same spot")
-    private val timingModel by DropdownSetting("Timing Model", 2, listOf("Even", "Reel Assist", "Human")).withDescription(
+    internal val reelMin by SliderSetting("Reel Delay Min", 2, 1, 17, 1, " ticks").section("Timing").withDescription("Shortest wait after the bite before reeling in")
+    internal val reelMax by SliderSetting("Reel Delay Max", 9, 1, 17, 1, " ticks").withDescription("Longest wait after the bite (17 at most, so the fish doesn't get away)")
+    internal val castMin by SliderSetting("Cast Delay Min", 6, 1, 60, 1, " ticks").withDescription("Shortest wait before casting again")
+    internal val castMax by SliderSetting("Cast Delay Max", 34, 1, 80, 1, " ticks")
+    internal val hesitate by SliderSetting("Hesitation", 12, 0, 40, 1, "%").withDescription("Chance that a cast comes a little later than usual (0.3-1 s more)")
+    internal val aimWobble by SliderSetting("Cast Aim Wobble", 0.5, 0.0, 2.0, 0.1, "°").withDescription("Each cast is aimed a tiny bit differently, like a hand that never lands on the exact same spot")
+    internal val timingModel by DropdownSetting("Timing Model", 2, listOf("Even", "Reel Assist", "Human")).withDescription(
         "Even: any tick in the range equally. Reel Assist: mostly the lower third with the odd slow reaction. Human: skewed reaction times, a rhythm that drifts over minutes, each delay leaning on the last one, slight fatigue over time, no tick count twice in a row"
     )
-    private val slipChance by SliderSetting("Slow Reactions", 6, 0, 30, 1, "%").withDescription("Human model: how often a clearly slow reaction happens").showIf { timingModel.value == 2 }
-    private val drift by SliderSetting("Rhythm Drift", 20, 0, 50, 1, "%").withDescription("Human model: how far the overall speed wanders over minutes").showIf { timingModel.value == 2 }
-    private val fatigue by SliderSetting("Fatigue", 8, 0, 40, 1, "%/h").withDescription("Human model: how much slower reactions get per hour of fishing (up to 2 hours)").showIf { timingModel.value == 2 }
-    private val lookAtCatch by ToggleSetting("Look At The Catch", true).withDescription("After a sea creature or a good catch, waits a bit longer before casting again, like reading what came up")
-    private val breakChance by SliderSetting("Short Breaks", 2.0, 0.0, 15.0, 0.5, "%").withDescription("Chance per cast of a 2-6 s pause before casting (checking chat, the inventory...)")
-    private val castTimeout by SliderSetting("Recast After", 45, 10, 120, 5, " s").withDescription("Reels in and casts again if nothing bites for this long")
-    private val groundRecast by ToggleSetting("Recast If Hook Lands On Ground", true).withDescription("Casts again when the hook settles somewhere that isn't water / lava; stops after 3 misses in a row")
-    private val hookDive by ToggleSetting("Detect By Hook Dive", true).withDescription("Also reels in when the hook suddenly dives (vanilla bite), not only on the \"!!!\" sign")
+    internal val slipChance by SliderSetting("Slow Reactions", 6, 0, 30, 1, "%").withDescription("Human model: how often a clearly slow reaction happens").showIf { timingModel.value == 2 }
+    internal val drift by SliderSetting("Rhythm Drift", 20, 0, 50, 1, "%").withDescription("Human model: how far the overall speed wanders over minutes").showIf { timingModel.value == 2 }
+    internal val fatigue by SliderSetting("Fatigue", 8, 0, 40, 1, "%/h").withDescription("Human model: how much slower reactions get per hour of fishing (up to 2 hours)").showIf { timingModel.value == 2 }
+    internal val lookAtCatch by ToggleSetting("Look At The Catch", true).withDescription("After a sea creature or a good catch, waits a bit longer before casting again, like reading what came up")
+    internal val breakChance by SliderSetting("Short Breaks", 2.0, 0.0, 15.0, 0.5, "%").withDescription("Chance per cast of a 2-6 s pause before casting (checking chat, the inventory...)")
+    internal val castTimeout by SliderSetting("Recast After", 45, 10, 120, 5, " s").withDescription("Reels in and casts again if nothing bites for this long")
+    internal val groundRecast by ToggleSetting("Recast If Hook Lands On Ground", true).withDescription("Casts again when the hook settles somewhere that isn't water / lava; stops after 3 misses in a row")
+    internal val hookDive by ToggleSetting("Detect By Hook Dive", true).withDescription("Also reels in when the hook suddenly dives (vanilla bite), not only on the \"!!!\" sign")
 
-    private val lookJitter by ToggleSetting("Look Movement", true).section("Look").withDescription("Small eased head movements around the bobber now and then, like a person holding the rod")
-    private val jitterDegrees by SliderSetting("Movement Size", 1.0, 0.2, 4.0, 0.1, "°")
-    private val jitterEvery by SliderSetting("Movement Every", 15, 3, 60, 1, " s").withDescription("On average; each wait is 80-120% of this")
-    private val smoothTurns by ToggleSetting("Smooth Turning", true).withDescription("Eases every turn (to sea creatures and back). Uses Assist Core's turning when it's installed")
+    internal val lookJitter by ToggleSetting("Look Movement", true).section("Look").withDescription("Small eased head movements around the bobber now and then, like a person holding the rod")
+    internal val jitterDegrees by SliderSetting("Movement Size", 1.0, 0.2, 4.0, 0.1, "°")
+    internal val jitterEvery by SliderSetting("Movement Every", 15, 3, 60, 1, " s").withDescription("On average; each wait is 80-120% of this")
+    internal val smoothTurns by ToggleSetting("Smooth Turning", true).withDescription("Eases every turn (to sea creatures and back). Uses Assist Core's turning when it's installed")
 
-    private val rodSlot by SliderSetting("Rod Slot", 0, 0, 9, 1).section("Items").withDescription("Hotbar slot (1-9) of the rod. 0 = first fishing rod in the hotbar")
-    private val killCreatures by ToggleSetting("Kill Sea Creatures", true).section("Sea Creatures")
-    private val killRange by SliderSetting("Detect Range", 14.0, 4.0, 24.0, 0.5, " blocks").withDescription("A sea creature that comes up within this range is killed right away")
-    private val blastRange by SliderSetting("Hyperion Reach", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("Casts once a creature is this close (the blast hits around you)")
-    private val onlyMine by ToggleSetting("Only My Sea Creatures", true).withDescription(
+    internal val rodSlot by SliderSetting("Rod Slot", 0, 0, 9, 1).section("Items").withDescription("Hotbar slot (1-9) of the rod. 0 = first fishing rod in the hotbar")
+    internal val killCreatures by ToggleSetting("Kill Sea Creatures", true).section("Sea Creatures")
+    internal val killRange by SliderSetting("Detect Range", 14.0, 4.0, 24.0, 0.5, " blocks").withDescription("A sea creature that comes up within this range is killed right away")
+    internal val blastRange by SliderSetting("Hyperion Reach", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("Casts once a creature is this close (the blast hits around you)")
+    internal val onlyMine by ToggleSetting("Only My Sea Creatures", true).withDescription(
         "Only fights creatures that came up at your hook right after you reeled in (and anything that hits you). Other people's creatures are left alone"
     )
-    private val ownWindow by SliderSetting("My Creature Window", 1.0, 0.3, 3.0, 0.1, " s").withDescription("A creature counts as yours only if it appears within this long after YOU reel in. Lower it if other people's creatures get picked up")
-    private val ownDistance by SliderSetting("My Creature Distance", 4.0, 1.5, 8.0, 0.5, " blocks").withDescription("...and only this close to where your hook was")
-    private val noticeMin by SliderSetting("Notice Delay Min", 8, 0, 40, 1, " ticks").withDescription("How long it takes to notice a sea creature that came up, before reacting")
-    private val noticeMax by SliderSetting("Notice Delay Max", 26, 0, 60, 1, " ticks")
-    private val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")
-    private val manaCost by SliderSetting("Mana Per Cast", 300, 0, 1000, 10).withDescription("Wither Impact's mana cost for you. Below it, the Hyperion swings as a sword instead of casting (no more standing there with no mana)")
-    private val pauseMana by SliderSetting("Pause Below Mana", 35, 0, 90, 5, "%").withDescription("Stops casting the rod while mana is under this, so no new sea creatures come up until it has refilled (0 = never pause)")
-    private val weaponType by DropdownSetting("Weapon", 0, listOf("Hyperion", "Soul Whip", "Flaming Flay")).withDescription(
+    internal val ownWindow by SliderSetting("My Creature Window", 1.0, 0.3, 3.0, 0.1, " s").withDescription("A creature counts as yours only if it appears within this long after YOU reel in. Lower it if other people's creatures get picked up")
+    internal val ownDistance by SliderSetting("My Creature Distance", 4.0, 1.5, 8.0, 0.5, " blocks").withDescription("...and only this close to where your hook was")
+    internal val noticeMin by SliderSetting("Notice Delay Min", 8, 0, 40, 1, " ticks").withDescription("How long it takes to notice a sea creature that came up, before reacting")
+    internal val noticeMax by SliderSetting("Notice Delay Max", 26, 0, 60, 1, " ticks")
+    internal val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")
+    internal val manaCost by SliderSetting("Mana Per Cast", 300, 0, 1000, 10).withDescription("Wither Impact's mana cost for you. Below it, the Hyperion swings as a sword instead of casting (no more standing there with no mana)")
+    internal val pauseMana by SliderSetting("Pause Below Mana", 35, 0, 90, 5, "%").withDescription("Stops casting the rod while mana is under this, so no new sea creatures come up until it has refilled (0 = never pause)")
+    internal val weaponType by DropdownSetting("Weapon", 0, listOf("Hyperion", "Soul Whip", "Flaming Flay")).withDescription(
         "Hyperion: Wither Impact looking down. Soul Whip / Flaming Flay: aims at the creature and right-clicks (Flay), no teleport. Falls back to the Hyperion if the whip isn't in the hotbar"
     )
-    private val whipRange by SliderSetting("Whip Range", 11.0, 4.0, 14.0, 0.5, " blocks").withDescription("How close a creature has to be before the whip is used (Flay reaches about 13 forward)").showIf { weaponType.value != 0 }
-    private val whipDelay by SliderSetting("Whip Delay", 6, 2, 30, 1, " ticks").withDescription("Time between whip swings (a little random on top)").showIf { weaponType.value != 0 }
-    private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) of the weapon. 0 = Hyperion / Astraea / Scylla / Valkyrie if found")
-    private val hitDelay by SliderSetting("Hit Delay", 4, 1, 20, 1, " ticks")
+    internal val whipRange by SliderSetting("Whip Range", 11.0, 4.0, 14.0, 0.5, " blocks").withDescription("How close a creature has to be before the whip is used (Flay reaches about 13 forward)").showIf { weaponType.value != 0 }
+    internal val whipDelay by SliderSetting("Whip Delay", 6, 2, 30, 1, " ticks").withDescription("Time between whip swings (a little random on top)").showIf { weaponType.value != 0 }
+    internal val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) of the weapon. 0 = Hyperion / Astraea / Scylla / Valkyrie if found")
+    internal val hitDelay by SliderSetting("Hit Delay", 4, 1, 20, 1, " ticks")
 
-    private val hotspots by ToggleSetting("Go To Hotspots", false).section("Hotspots").withDescription(
+    internal val hotspots by ToggleSetting("Go To Hotspots", false).section("Hotspots").withDescription(
         "Finds the nearest fishing Hotspot, walks to a spot on the shore next to it and casts into it. When it goes away, moves on to the next one. With none around it fishes where you started"
     )
-    private val hopMin by SliderSetting("AOTV Gap Min", 5, 2, 40, 1, " ticks").withDescription("Shortest wait between etherwarps / AOTV hops on the way (same timing model as casting)")
-    private val hopMax by SliderSetting("AOTV Gap Max", 18, 2, 60, 1, " ticks")
-    private val walkSome by SliderSetting("Walk Instead", 15, 0, 80, 5, "%").withDescription("Chance to walk a stretch instead of hopping, when walking is possible")
-    private val aotvRange by SliderSetting("AOTV Distance", 12, 8, 16, 1, " blocks").withDescription("How far your AOTV teleports (8 + Transmission Tuners)")
-    private val hotspotRange by SliderSetting("Search Range", 200, 16, 400, 8, " blocks").withDescription("How far it looks for a Hotspot. Hotspots seen earlier are remembered for 3 minutes, even after they're out of sight")
-    private val useEther by ToggleSetting("Etherwarp On The Way", true).withDescription("Plans etherwarps (and AOTV hops) to get to far or high spots, checking where each one lands, like Secret Routes does")
-    private val showRoute by ToggleSetting("Show Route", true).withDescription("Draws the planned walk and the next etherwarp / AOTV landing in the world")
-    private val hotspotRadius by SliderSetting("Hotspot Size", 2.5, 1.0, 6.0, 0.5, " blocks").withDescription("How close to the Hotspot's centre the hook has to land; it adjusts the aim until it does")
-    private val stayHome by ToggleSetting("Return To Spot", true).withDescription("Walks back to the fishing spot if you get pushed away from it")
+    internal val hopMin by SliderSetting("AOTV Gap Min", 5, 2, 40, 1, " ticks").withDescription("Shortest wait between etherwarps / AOTV hops on the way (same timing model as casting)")
+    internal val hopMax by SliderSetting("AOTV Gap Max", 18, 2, 60, 1, " ticks")
+    internal val walkSome by SliderSetting("Walk Instead", 15, 0, 80, 5, "%").withDescription("Chance to walk a stretch instead of hopping, when walking is possible")
+    internal val aotvRange by SliderSetting("AOTV Distance", 12, 8, 16, 1, " blocks").withDescription("How far your AOTV teleports (8 + Transmission Tuners)")
+    internal val hotspotRange by SliderSetting("Search Range", 200, 16, 400, 8, " blocks").withDescription("How far it looks for a Hotspot. Hotspots seen earlier are remembered for 3 minutes, even after they're out of sight")
+    internal val useEther by ToggleSetting("Etherwarp On The Way", true).withDescription("Plans etherwarps (and AOTV hops) to get to far or high spots, checking where each one lands, like Secret Routes does")
+    internal val showRoute by ToggleSetting("Show Route", true).withDescription("Draws the planned walk and the next etherwarp / AOTV landing in the world")
+    internal val hotspotRadius by SliderSetting("Hotspot Size", 2.5, 1.0, 6.0, 0.5, " blocks").withDescription("How close to the Hotspot's centre the hook has to land; it adjusts the aim until it does")
+    internal val stayHome by ToggleSetting("Return To Spot", true).withDescription("Walks back to the fishing spot if you get pushed away from it")
 
-    private val autoSell by ToggleSetting("Auto Sell", false).section("Auto Sell").withDescription(
+    internal val autoSell by ToggleSetting("Auto Sell", false).section("Auto Sell").withDescription(
         "When the inventory is nearly full: opens the SkyBlock Menu (hotbar slot below), clicks the Booster Cookie, sells only the items on your sell list to the NPC, closes it and goes back to fishing"
     )
-    private val sellWhenFree by SliderSetting("Sell When Free Slots", 3, 0, 15, 1).withDescription("Sells once this few empty slots are left")
-    private val menuSlot by SliderSetting("Menu Slot", 9, 1, 9, 1).withDescription("Hotbar slot of the SkyBlock Menu (the Nether Star)")
-    private val sellListKey by KeybindSetting("Add To Sell List Key").withDescription("In any inventory, point at an item and press this to add it to (or remove it from) the sell list. Only items on the list are ever sold")
+    internal val sellWhenFree by SliderSetting("Sell When Free Slots", 3, 0, 15, 1).withDescription("Sells once this few empty slots are left")
+    internal val menuSlot by SliderSetting("Menu Slot", 9, 1, 9, 1).withDescription("Hotbar slot of the SkyBlock Menu (the Nether Star)")
+    internal val sellListKey by KeybindSetting("Add To Sell List Key").withDescription("In any inventory, point at an item and press this to add it to (or remove it from) the sell list. Only items on the list are ever sold")
     val sellList by com.github.noamm9.config.types.TextInputSetting("Sell List", "").withDescription("The items Auto Sell may sell, by name, separated by | (fill it with the key above, or type names here)")
-    private val clearSellList by com.github.noamm9.config.types.ButtonSetting("Clear Sell List") {
+    internal val clearSellList by com.github.noamm9.config.types.ButtonSetting("Clear Sell List") {
         sellList.value = ""
         NotificationManager.push("Sell List", "&fCleared")
     }.withDescription("Empties the sell list")
 
-    private val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe").withDescription(
+    internal val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe").withDescription(
         "Stops (doesn't try to hide anything): when the server teleports or turns you, your view jumps 70 degrees or more in an instant, your held item is changed, or a menu opens by itself"
     )
-    private val longBreaks by ToggleSetting("Long Breaks", true).section("Breaks").withDescription("Every so often reels in and takes a proper break, looking around now and then, like a person getting a drink")
-    private val breakEveryMin by SliderSetting("Break Every Min", 25, 5, 120, 1, " min").showIf { longBreaks.value }
-    private val breakEveryMax by SliderSetting("Break Every Max", 45, 5, 180, 1, " min").showIf { longBreaks.value }
-    private val breakLenMin by SliderSetting("Break Length Min", 60, 10, 900, 10, " s").showIf { longBreaks.value }
-    private val breakLenMax by SliderSetting("Break Length Max", 240, 10, 1800, 10, " s").showIf { longBreaks.value }
-    private val showMarkers by ToggleSetting("Show Markers", true).section("Display").withDescription("A box where the hook lands and a highlight on your sea creatures (works with Kill Sea Creatures off too)")
-    private val creatureTracer by ToggleSetting("Creature Tracer", true).withDescription("A line from the middle of your screen to each of your sea creatures")
+    internal val longBreaks by ToggleSetting("Long Breaks", true).section("Breaks").withDescription("Every so often reels in and takes a proper break, looking around now and then, like a person getting a drink")
+    internal val breakEveryMin by SliderSetting("Break Every Min", 25, 5, 120, 1, " min").showIf { longBreaks.value }
+    internal val breakEveryMax by SliderSetting("Break Every Max", 45, 5, 180, 1, " min").showIf { longBreaks.value }
+    internal val breakLenMin by SliderSetting("Break Length Min", 60, 10, 900, 10, " s").showIf { longBreaks.value }
+    internal val breakLenMax by SliderSetting("Break Length Max", 240, 10, 1800, 10, " s").showIf { longBreaks.value }
+    internal val showMarkers by ToggleSetting("Show Markers", true).section("Display").withDescription("A box where the hook lands and a highlight on your sea creatures (works with Kill Sea Creatures off too)")
+    internal val creatureTracer by ToggleSetting("Creature Tracer", true).withDescription("A line from the middle of your screen to each of your sea creatures")
 
-    private val standCentre by ToggleSetting("Stand In Block Centre", true).section("Safety").withDescription("Before casting and before fighting, steps (sneaking, so it can't walk off an edge) to the exact middle of a safe block: solid ground under it, no lava in or under it")
-    private val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
-    private val chatInfo by ToggleSetting("Chat Messages", true)
-    private val statusHud by ToggleSetting("Status HUD", true)
+    internal val standCentre by ToggleSetting("Stand In Block Centre", true).section("Safety").withDescription("Before casting and before fighting, steps (sneaking, so it can't walk off an edge) to the exact middle of a safe block: solid ground under it, no lava in or under it")
+    internal val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
+    internal val chatInfo by ToggleSetting("Chat Messages", true)
+    internal val statusHud by ToggleSetting("Status HUD", true)
 
-    private enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT, SELL, BREAK }
+    internal enum class State { FIND, TRAVEL, CAST, WAIT_BITE, REEL, FIGHT, SELL, BREAK }
 
-    private val RANDOM = Random()
-    private var timing = com.github.noamm9.utils.HumanTiming()
-    private var hopThisStretch = true
-    private var stretchLeft = 0
-    private var justCaughtSomething = false
-    private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
-    private val WHIPS = mapOf(1 to "SOUL_WHIP", 2 to "FLAMING_FLAY")
-    private val NPC_CLASSES = setOf("Villager", "WanderingTrader")
+    internal val RANDOM = Random()
+    internal var timing = com.github.noamm9.utils.HumanTiming()
+    internal var hopThisStretch = true
+    internal var stretchLeft = 0
+    internal var justCaughtSomething = false
+    internal val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
+    internal val WHIPS = mapOf(1 to "SOUL_WHIP", 2 to "FLAMING_FLAY")
+    internal val NPC_CLASSES = setOf("Villager", "WanderingTrader")
 
-    private var running = false
-    private var state = State.CAST
-    private var wait = 0
-    private var timer = 0
-    private var inFluidTicks = 0
-    private var hitCooldown = 0
-    private var status = "idle"
-    private var lastMobIds = emptySet<Int>()
-    private val waiting = HashMap<Int, Int>()
-    private val inReach = HashMap<Int, Pair<Int, Float>>() // id -> ticks in reach without losing health, last health
-    private var manaWait = 0
-    private var fightTicks = 0
-    private var blastBlocked = false
-    private var centreTicks = 0
-    private var centreTarget: Vec3? = null
-    private val ignored = HashSet<Int>()
-    private var groundTicks = 0
-    private var groundFails = 0
-    private var lastHookPos: Vec3? = null
+    internal var running = false
+    internal var state = State.CAST
+    internal var wait = 0
+    internal var timer = 0
+    internal var inFluidTicks = 0
+    internal var hitCooldown = 0
+    internal var status = "idle"
+    internal var lastMobIds = emptySet<Int>()
+    internal val waiting = HashMap<Int, Int>()
+    internal val inReach = HashMap<Int, Pair<Int, Float>>() // id -> ticks in reach without losing health, last health
+    internal var manaWait = 0
+    internal var fightTicks = 0
+    internal var blastBlocked = false
+    internal var centreTicks = 0
+    internal var centreTarget: Vec3? = null
+    internal val ignored = HashSet<Int>()
+    internal var groundTicks = 0
+    internal var groundFails = 0
+    internal var lastHookPos: Vec3? = null
 
     // look: where we fish (anchor) + a small eased offset
-    private var anchorYaw = 0f
-    private var anchorPitch = 0f
-    private var offYaw = 0f
-    private var offPitch = 0f
-    private var fromYaw = 0f
-    private var fromPitch = 0f
-    private var toYaw = 0f
-    private var toPitch = 0f
-    private var moveTick = 0
-    private var moveLen = 0
-    private var nextMoveIn = 0
-    private var returning = false
+    internal var anchorYaw = 0f
+    internal var anchorPitch = 0f
+    internal var offYaw = 0f
+    internal var offPitch = 0f
+    internal var fromYaw = 0f
+    internal var fromPitch = 0f
+    internal var toYaw = 0f
+    internal var toPitch = 0f
+    internal var moveTick = 0
+    internal var moveLen = 0
+    internal var nextMoveIn = 0
+    internal var returning = false
 
     // hotspots / location
-    private var hotspot: ArmorStand? = null
-    private var stand: Vec3? = null
-    private val badHotspots = HashSet<Int>()
-    private var aimTries = 0
-    private var travelStuck = 0
-    private var ownMoveTicks = 0
-    private var expectedSlot = - 1
-    private var lastLookYaw: Float? = null
-    private var lastLookPitch = 0f
+    internal var hotspot: ArmorStand? = null
+    internal var stand: Vec3? = null
+    internal val badHotspots = HashSet<Int>()
+    internal var aimTries = 0
+    internal var travelStuck = 0
+    internal var ownMoveTicks = 0
+    internal var expectedSlot = - 1
+    internal var lastLookYaw: Float? = null
+    internal var lastLookPitch = 0f
 
     // safe walking (own path, avoids lava / water)
-    private var path: List<BlockPos> = emptyList()
-    private var pathIndex = 0
-    private var pathGoal: Vec3? = null
-    private var lastSafe: Vec3? = null
-    private var lavaTicks = 0
-    private var hopWait = 0
-    private var repath = 0
+    internal var path: List<BlockPos> = emptyList()
+    internal var pathIndex = 0
+    internal var pathGoal: Vec3? = null
+    internal var lastSafe: Vec3? = null
+    internal var lavaTicks = 0
+    internal var hopWait = 0
+    internal var repath = 0
 
     // selling
-    private var sellStep = 0
-    private var sellTimer = 0
-    private var sellGap = 0
-    private var sellTitle: String? = null
-    private val sellQueue = ArrayDeque<Int>()
-    private var sellFails = 0
-    private var sold = 0
+    internal var sellStep = 0
+    internal var sellTimer = 0
+    internal var sellGap = 0
+    internal var sellTitle: String? = null
+    internal val sellQueue = ArrayDeque<Int>()
+    internal var sellFails = 0
+    internal var sold = 0
 
     // planned hops (etherwarp / AOTV) while travelling
-    private class Hop(val ether: Boolean, val slot: Int, val target: BlockPos?, val yaw: Float, val pitch: Float, val landing: Vec3)
-    private var hop: Hop? = null
-    private var hopPhase = 0
-    private var hopTimer = 0
-    private var hopFrom: Vec3 = Vec3.ZERO
-    private var planIn = 0
-    private val remembered = HashMap<Long, Pair<Vec3, Long>>() // block key -> position, last seen
-    private var scouting = false
+    internal class Hop(val ether: Boolean, val slot: Int, val target: BlockPos?, val yaw: Float, val pitch: Float, val landing: Vec3)
+    internal var hop: Hop? = null
+    internal var hopPhase = 0
+    internal var hopTimer = 0
+    internal var hopFrom: Vec3 = Vec3.ZERO
+    internal var planIn = 0
+    internal val remembered = HashMap<Long, Pair<Vec3, Long>>() // block key -> position, last seen
+    internal var scouting = false
 
     // aiming the cast
-    private var aimTarget: Vec3? = null
+    internal var aimTarget: Vec3? = null
     /** This cast's small hand wobble on top of the aim. */
-    private var wobYaw = 0f
-    private var wobPitch = 0f
+    internal var wobYaw = 0f
+    internal var wobPitch = 0f
 
     // session numbers for the status card
-    private var sessionStart = 0L
-    private var kills = 0
-    private var creaturesCaught = 0
-    private val mineAlive = HashSet<Int>()
-    private var lastLanding: Vec3? = null
-    private var nextBreakAt = 0L
-    private var breakUntil = 0L
-    private var glanceIn = 0
+    internal var sessionStart = 0L
+    internal var kills = 0
+    internal var creaturesCaught = 0
+    internal val mineAlive = HashSet<Int>()
+    internal var lastLanding: Vec3? = null
+    internal var nextBreakAt = 0L
+    internal var breakUntil = 0L
+    internal var glanceIn = 0
 
     // which creatures are ours: they come up at our hook right after we reel in
-    private class Reel(val tick: Int, val at: Vec3)
-    private val reels = ArrayDeque<Reel>()
-    private val firstSeen = HashSet<Int>()
-    private val mine = HashSet<Int>()
-    private val seenAt = HashMap<Int, Int>()
-    private val seenPos = HashMap<Int, Vec3>()
+    internal class Reel(val tick: Int, val at: Vec3)
+    internal val reels = ArrayDeque<Reel>()
+    internal val firstSeen = HashSet<Int>()
+    internal val mine = HashSet<Int>()
+    internal val seenAt = HashMap<Int, Int>()
+    internal val seenPos = HashMap<Int, Vec3>()
 
     // noticing sea creatures
-    private val noticeAt = HashMap<Int, Int>()
-    private var tickCount = 0
-    private var fightWait = 0
-    private var castDownPitch = 0f
-    private var hypeStage = 0
-    private var hypeBeat = 0
+    internal val noticeAt = HashMap<Int, Int>()
+    internal var tickCount = 0
+    internal var fightWait = 0
+    internal var castDownPitch = 0f
+    internal var hypeStage = 0
+    internal var hypeBeat = 0
 
     override fun init() {
         register<TickEvent.Start> {
@@ -346,9 +350,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }.also { it.themedPanel = false }
     }
 
-    private val fishIcon = net.minecraft.resources.Identifier.fromNamespaceAndPath(com.github.noamm9.NoammAddons.MOD_ID, "textures/gui/icons/fishing.png")
+    internal val fishIcon = net.minecraft.resources.Identifier.fromNamespaceAndPath(com.github.noamm9.NoammAddons.MOD_ID, "textures/gui/icons/fishing.png")
 
-    private fun stateLabel() = when (state) {
+    internal fun stateLabel() = when (state) {
         State.FIND -> "Looking for a hotspot"
         State.TRAVEL -> "Travelling"
         State.CAST -> if (returning) "Re-aiming" else "Casting"
@@ -359,13 +363,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         State.BREAK -> "On a break"
     }
 
-    private fun clock(ms: Long): String {
+    internal fun clock(ms: Long): String {
         val s = (ms / 1000).coerceAtLeast(0)
         return if (s >= 3600) "${s / 3600}h ${(s / 60) % 60}m" else if (s >= 60) "${s / 60}m ${s % 60}s" else "${s}s"
     }
 
     /** The status card: icon, state, kills per hour big, then sea creatures / session / per hour / next break. */
-    private fun drawCard(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, example: Boolean): Pair<Number, Number> {
+    internal fun drawCard(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, example: Boolean): Pair<Number, Number> {
         val st = com.github.noamm9.ui.clickgui.components.settings.Style
         val w = 150f
         val h = 92f
@@ -420,11 +424,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (running) stop(null)
     }
 
-    private fun info(msg: String) {
+    internal fun info(msg: String) {
         if (chatInfo.value) modMessage(msg)
     }
 
-    private fun start() {
+    internal fun start() {
         val p = mc.player ?: return
         if (rod() == null) return info("&cNo fishing rod in the hotbar.")
         anchorYaw = p.yRot
@@ -466,13 +470,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         info("&aAuto Fishing started. Press the key again to stop.")
     }
 
-    private fun failStop(why: String) {
+    internal fun failStop(why: String) {
         stop("stopped: $why")
         NotificationManager.push("Auto Fishing stopped", why)
         com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_PLING.value(), 1f, 0.6f)
     }
 
-    private fun stop(reason: String?) {
+    internal fun stop(reason: String?) {
         if (running) releaseCentre()
         centreTarget = null
         track = null
@@ -485,10 +489,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     // ------------------------------------------------------------------ timing
 
-    private fun rand(min: Int, max: Int) = if (max <= min) min else min + RANDOM.nextInt(max - min + 1)
+    internal fun rand(min: Int, max: Int) = if (max <= min) min else min + RANDOM.nextInt(max - min + 1)
 
     /** Reel Assist's delay: mostly the lower third of [min, max], 8% of the time a slow reaction. */
-    private fun delay(min: Int, max: Int): Int {
+    internal fun delay(min: Int, max: Int): Int {
         val lo = minOf(min, max)
         val hi = maxOf(min, max)
         if (hi <= lo) return lo
@@ -506,7 +510,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     /** Wait before the next cast: the timing model, plus reading the catch and the odd short break. */
-    private fun castWait(): Int {
+    internal fun castWait(): Int {
         var t = delay(castMin.value, castMax.value)
         if (lookAtCatch.value && justCaughtSomething) t += timing.uniform(8, 25)
         justCaughtSomething = false
@@ -515,11 +519,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         return t
     }
 
-    private fun nextMoveDelay() = (jitterEvery.value * 20 * (0.8 + 0.4 * RANDOM.nextDouble())).toInt()
+    internal fun nextMoveDelay() = (jitterEvery.value * 20 * (0.8 + 0.4 * RANDOM.nextDouble())).toInt()
 
     // ------------------------------------------------------------------ turning
 
-    private fun wrap(d: Float): Float {
+    internal fun wrap(d: Float): Float {
         var x = d % 360f
         if (x > 180f) x -= 360f
         if (x < - 180f) x += 360f
@@ -527,7 +531,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     /** Eased turn towards yaw / pitch. True once within [tol] degrees. */
-    private fun turn(p: LocalPlayer, yaw: Float, pitch: Float, tol: Float = 1.5f): Boolean {
+    internal fun turn(p: LocalPlayer, yaw: Float, pitch: Float, tol: Float = 1.5f): Boolean {
         val dy = wrap(yaw - p.yRot)
         val dp = pitch - p.xRot
         if (abs(dy) <= tol && abs(dp) <= tol) return true
@@ -539,7 +543,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     /** The small eased head movements around the bobber while waiting. Also follows the player's own camera moves. */
-    private fun lookMovement(p: LocalPlayer) {
+    internal fun lookMovement(p: LocalPlayer) {
         if (! lookJitter.value) return
         val expYaw = anchorYaw + offYaw + wobYaw
         val expPitch = anchorPitch + offPitch + wobPitch
@@ -570,23 +574,23 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
     // ------------------------------------------------------------------ main loop
 
-    private fun rod(): Int? {
+    internal fun rod(): Int? {
         if (rodSlot.value in 1 .. 9) return rodSlot.value - 1
         return PlayerUtils.findHotbarSlot { it.item == Items.FISHING_ROD }
     }
 
-    private fun hold(slot: Int) {
+    internal fun hold(slot: Int) {
         val p = mc.player ?: return
         if (p.inventory.selectedSlot != slot) p.inventory.selectedSlot = slot
         expectedSlot = slot
     }
 
-    private fun use(p: LocalPlayer) {
+    internal fun use(p: LocalPlayer) {
         mc.gameMode?.useItem(p, InteractionHand.MAIN_HAND)
         p.swing(InteractionHand.MAIN_HAND)
     }
 
-    private fun tick() {
+    internal fun tick() {
         val p = mc.player ?: return stop("no player")
         if (stopHealth.value > 0 && p.health / p.maxHealth * 100f < stopHealth.value) return stop("health is low")
         if (hitCooldown > 0) hitCooldown--
@@ -812,529 +816,23 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
     }
 
-    private fun wantsLava(hook: FishingHook?) = when (fluid.value) {
-        1 -> false
-        2 -> true
-        else -> hook != null && (hook.isInLava || nearFluid(hook, FluidTags.LAVA))
-    }
+    // ------------------------------------------------------------------ walking state (AutoFishingTravel.kt)
 
-    private fun fluidName() = if (wantsLava(mc.player?.fishing)) "lava" else "water"
+    internal var walkSteer = false
+    internal var walkGoalYaw = 0f
+    internal var walkGoalPitch = 0f
+    internal var walkPitch = 0f
 
-    /** The bobber floats on top, so its own in-water flag flickers: look at its block and the two below too. */
-    private fun nearFluid(hook: FishingHook, tag: net.minecraft.tags.TagKey<net.minecraft.world.level.material.Fluid>): Boolean {
-        // the hook can sit a little above, beside or under the surface (lava especially): look around it
-        val lvl = hook.level()
-        val pos = hook.blockPosition()
-        for (dy in 1 downTo - 3) for (dx in - 1 .. 1) for (dz in - 1 .. 1) {
-            if (dy == 1 && (dx != 0 || dz != 0)) continue
-            if ((dx != 0 || dz != 0) && dy < - 1) continue
-            if (lvl.getFluidState(pos.offset(dx, dy, dz)).`is`(tag)) return true
-        }
-        return false
-    }
+    // ------------------------------------------------------------------ long breaks
 
-    private fun inFluid(hook: FishingHook) = when (fluid.value) {
-        1 -> hook.isInWater || nearFluid(hook, FluidTags.WATER)
-        2 -> hook.isInLava || nearFluid(hook, FluidTags.LAVA)
-        else -> hook.isInWater || hook.isInLava || nearFluid(hook, FluidTags.WATER) || nearFluid(hook, FluidTags.LAVA)
-    }
-
-    /** True once the hook has clearly settled somewhere that isn't water / lava. */
-    private fun grounded(hook: FishingHook): Boolean {
-        // once it has been in the water / lava this cast, it didn't land on the ground; and a hook stuck in
-        // a mob (or SkyBlock's invisible stands over lava) isn't on the ground either
-        if (inFluidTicks >= 3 || hook.hookedIn != null || inFluid(hook)) {
-            groundTicks = 0
-            return false
-        }
-        val moved = lastHookPos?.distanceToSqr(hook.position()) ?: 1.0
-        lastHookPos = hook.position()
-        if (timer < 25) return false
-        val stuck = hook.onGround() || moved < 1.0E-4
-        groundTicks = if (stuck) groundTicks + 1 else 0
-        return groundTicks >= 10
-    }
-
-    /** SkyBlock puts a "!!!" stand over the hook on a bite (water and lava); vanilla pulls the hook down. */
-    private fun bitten(hook: FishingHook): Boolean {
-        val sign = hook.level().getEntitiesOfClass(ArmorStand::class.java, hook.boundingBox.inflate(1.5, 3.0, 1.5)) {
-            it.customName?.string?.contains("!!!") == true
-        }
-        if (sign.isNotEmpty()) return true
-        return hookDive.value && inFluidTicks > 10 && hook.deltaMovement.y < - 0.05
-    }
-
-    // ------------------------------------------------------------------ hotspots
-
-    private fun nearestHotspot(p: LocalPlayer): ArmorStand? {
-        val r = hotspotRange.value.toDouble()
-        val live = p.level().getEntitiesOfClass(ArmorStand::class.java, p.boundingBox.inflate(r, 64.0, r)) {
-            it.isAlive && it.customName?.string?.contains("HOTSPOT", ignoreCase = true) == true
-        }
-        val now = System.currentTimeMillis()
-        for (h in live) remembered[h.blockPosition().asLong()] = h.position() to now
-        return live.filter { it.id !in badHotspots }.minByOrNull { it.distanceToSqr(p) }
-    }
-
-    /** A hotspot seen earlier that is out of entity range now (remembered for 3 minutes). */
-    private fun rememberedHotspot(p: LocalPlayer): Vec3? {
-        val now = System.currentTimeMillis()
-        remembered.entries.removeIf { now - it.value.second > 180_000 }
-        return remembered.values.map { it.first }.filter { it.distanceTo(p.position()) > 40 }.minByOrNull { it.distanceTo(p.position()) }
-    }
-
-    private fun findHotspot(p: LocalPlayer) {
-        val hs = nearestHotspot(p)
-        if (hs == null) {
-            // none in sight: head for one seen earlier, it'll show up once we're close
-            val far = rememberedHotspot(p)
-            val spot = far?.let { shoreSpot(p, it) }
-            if (far != null && spot != null) {
-                hotspot = null
-                stand = spot
-                scouting = true
-                path = emptyList()
-                travelStuck = 0
-                state = State.TRAVEL
-                info("&7Heading for a hotspot seen earlier &8(${p.position().distanceTo(far).toInt()} blocks)")
-                return
-            }
-            if (far != null) remembered.remove(BlockPos.containing(far).asLong())
-            hotspot = null
-            if (stand == null) stand = p.position()
-            status = "no hotspot nearby, fishing here"
-            state = State.CAST
-            return
-        }
-        scouting = false
-        val spot = shoreSpot(p, hs.position())
-        if (spot == null) {
-            badHotspots += hs.id
-            status = "no place to stand by that hotspot"
-            return
-        }
-        hotspot = hs
-        stand = spot
-        aimTries = 0
-        travelStuck = 0
-        path = emptyList()
-        state = State.TRAVEL
-        info("&7Hotspot found &8(${p.position().distanceTo(hs.position()).toInt()} blocks)&7, going there.")
-    }
-
-    /** A block on the shore 4-10 blocks from the hotspot, with a clear view of it, as close to us as possible. */
-    private fun shoreSpot(p: LocalPlayer, centre: Vec3): Vec3? {
-        val level = p.level()
-        val c = BlockPos.containing(centre)
-        var best: Vec3? = null
-        var bestScore = Double.MAX_VALUE
-        for (dx in - 10 .. 10) for (dz in - 10 .. 10) {
-            val flat = kotlin.math.sqrt((dx * dx + dz * dz).toDouble())
-            if (flat < 4.0 || flat > 10.0) continue
-            for (dy in - 2 .. 5) {
-                val feet = BlockPos(c.x + dx, c.y + dy, c.z + dz)
-                val below = feet.below()
-                if (level.getBlockState(below).getCollisionShape(level, below).isEmpty) continue
-                if (! level.getFluidState(below).isEmpty) continue
-                if (! level.getBlockState(feet).getCollisionShape(level, feet).isEmpty || ! level.getFluidState(feet).isEmpty) continue
-                if (! level.getBlockState(feet.above()).getCollisionShape(level, feet.above()).isEmpty) continue
-                if (nearLava(feet, 1)) continue // never stand right at a lava edge
-                val eye = Vec3(feet.x + 0.5, feet.y + 1.62, feet.z + 0.5)
-                val clip = level.clip(net.minecraft.world.level.ClipContext(eye, centre.add(0.0, 0.3, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
-                if (clip.type != net.minecraft.world.phys.HitResult.Type.MISS && clip.location.distanceTo(centre) > 1.5) continue
-                val pos = Vec3(feet.x + 0.5, feet.y.toDouble(), feet.z + 0.5)
-                val score = pos.distanceTo(p.position()) + abs(flat - 7.0) * 2
-                if (score < bestScore) { bestScore = score; best = pos }
-                break
-            }
-        }
-        return best
-    }
-
-    private fun travel(p: LocalPlayer) {
-        val goal = stand ?: return run { state = State.FIND }
-        ownMoveTicks = 20 // our own walking / AOTV: not the server's doing
-        expectedSlot = - 1
-        if (horizontalDist(p.position(), goal) < 0.6 && abs(p.y - goal.y) < 1.5) {
-            stopWalking()
-            path = emptyList()
-            arrive(p)
-            return
-        }
-        // a hop in progress
-        if (hop != null) return doHop(p)
-        if (hopWait > 0) hopWait--
-
-        val flat = horizontalDist(p.position(), goal)
-        val rise = goal.y - p.y
-        if (pathGoal != goal || --repath <= 0) {
-            pathGoal = goal
-            path = if (flat < 70) findPath(p, BlockPos.containing(goal.x, goal.y + 0.1, goal.z)) ?: emptyList() else emptyList()
-            pathIndex = 0
-            repath = 100
-        }
-        // far, high, or no walkable way: plan an etherwarp / AOTV hop, checking where it lands
-        val needHop = path.isEmpty() || flat > 14 || rise > 3
-        if (useEther.value && needHop && hopWait <= 0 && p.onGround() && --planIn <= 0) {
-            planIn = 6
-            val walkable = path.isNotEmpty()
-            if (! walkable || RANDOM.nextInt(100) >= walkSome.value) planHop(p, goal)?.let {
-                hop = it
-                hopPhase = 0
-                hopTimer = 0
-                stopWalking()
-                status = (if (it.ether) "etherwarp" else "AOTV") + " (${p.position().distanceTo(goal).toInt()}m left)"
-                return doHop(p)
-            }
-        }
-        if (path.isEmpty()) {
-            stopWalking()
-            if (planIn == 6 && ++travelStuck > 25) {
-                hotspot?.let { badHotspots += it.id }
-                hotspot = null
-                scouting = false
-                state = State.FIND
-                status = "no safe way there"
-            }
-            else status = "planning a way there"
-            return
-        }
-        status = "going to ${if (hotspot != null) "the hotspot" else "the spot"} (${p.position().distanceTo(goal).toInt()}m)"
-        walkPath(p)
-    }
-
-    private fun arrive(p: LocalPlayer) {
-        if (scouting) { // got near a remembered hotspot: look for it properly now
-            scouting = false
-            remembered.clear()
-            state = State.FIND
-            return
-        }
-        val hs = hotspot
-        if (hs != null) aimAt(p, hs) else aimTarget = null
-        offYaw = 0f; offPitch = 0f; moveLen = 0
-        returning = true
-        state = State.CAST
-        wait = castWait()
-        status = "at the spot"
-    }
-
-    private fun horizontalDist(a: Vec3, b: Vec3) = kotlin.math.sqrt((a.x - b.x) * (a.x - b.x) + (a.z - b.z) * (a.z - b.z))
-
-    private fun stopWalking() {
-        mc.options.keyUp.isDown = false
-        mc.options.keyJump.isDown = false
-        mc.options.keySprint.isDown = false
-    }
-
-    private fun isLava(pos: BlockPos) = mc.level?.getFluidState(pos)?.`is`(FluidTags.LAVA) == true
-    private fun isFluid(pos: BlockPos) = mc.level?.getFluidState(pos)?.isEmpty == false
-
-    /** Lava within [r] blocks around (and just below) the feet. */
-    private fun nearLava(feet: BlockPos, r: Int): Boolean {
-        for (dx in - r .. r) for (dz in - r .. r) for (dy in - 2 .. 0) if (isLava(feet.offset(dx, dy, dz))) return true
-        return false
-    }
-
-    private fun standable(feet: BlockPos): Boolean {
-        val level = mc.level ?: return false
-        val below = feet.below()
-        if (level.getBlockState(below).getCollisionShape(level, below).isEmpty || isFluid(below)) return false
-        if (! level.getBlockState(feet).getCollisionShape(level, feet).isEmpty || isFluid(feet)) return false
-        val head = feet.above()
-        return level.getBlockState(head).getCollisionShape(level, head).isEmpty && ! isFluid(head)
-    }
-
-    /** A* over standable blocks: never steps into or next to lava, keeps a block's distance from edges when it can. */
-    private fun findPath(p: LocalPlayer, goal: BlockPos): List<BlockPos>? {
-        val start = p.blockPosition()
-        if (start.distManhattan(goal) > 160) return null
-        data class N(val pos: BlockPos, val g: Double, val f: Double)
-        val open = java.util.PriorityQueue<N>(compareBy { it.f })
-        val came = HashMap<BlockPos, BlockPos>()
-        val best = HashMap<BlockPos, Double>()
-        fun h(b: BlockPos) = kotlin.math.sqrt(b.distSqr(goal))
-        open += N(start, 0.0, h(start))
-        best[start] = 0.0
-        var expanded = 0
-        val dirs = listOf(1 to 0, - 1 to 0, 0 to 1, 0 to - 1, 1 to 1, 1 to - 1, - 1 to 1, - 1 to - 1)
-        while (open.isNotEmpty() && expanded++ < 6000) {
-            val cur = open.poll()
-            if (cur.pos.distManhattan(goal) <= 1 && abs(cur.pos.y - goal.y) <= 1) {
-                val out = ArrayList<BlockPos>()
-                var c: BlockPos? = cur.pos
-                while (c != null) { out += c; c = came[c] }
-                out.reverse()
-                return out
-            }
-            if (cur.g > (best[cur.pos] ?: Double.MAX_VALUE)) continue
-            for ((dx, dz) in dirs) {
-                for (dy in intArrayOf(0, 1, - 1, - 2, - 3)) {
-                    val n = cur.pos.offset(dx, dy, dz)
-                    if (! standable(n)) continue
-                    if (dx != 0 && dz != 0 && (! standable(cur.pos.offset(dx, 0, 0)) || ! standable(cur.pos.offset(0, 0, dz)))) continue
-                    if (dy == 1 && ! mc.level!!.getBlockState(cur.pos.above(2)).getCollisionShape(mc.level!!, cur.pos.above(2)).isEmpty) continue
-                    if (nearLava(n, 0)) continue
-                    val step = (if (dx != 0 && dz != 0) 1.414 else 1.0) + (if (dy != 0) 0.5 else 0.0) + (if (nearLava(n, 1)) 6.0 else 0.0)
-                    val g = cur.g + step
-                    if (g < (best[n] ?: Double.MAX_VALUE)) {
-                        best[n] = g
-                        came[n] = cur.pos
-                        open += N(n, g, g + h(n))
-                    }
-                    break // one height per direction (the first that fits)
-                }
-            }
-        }
-        return null
-    }
-
-    /** Walks the path node to node with eased turns; hops along long safe straight stretches with the AOTV. */
-    private fun walkPath(p: LocalPlayer) {
-        if (pathIndex >= path.size) return
-        // skip nodes we've already passed
-        while (pathIndex < path.size - 1 && horizontalDist(p.position(), Vec3.atBottomCenterOf(path[pathIndex])) < 0.7) pathIndex++
-        val node = path[pathIndex]
-        val target = Vec3.atBottomCenterOf(node)
-
-        // safety: never walk into a block that has lava in it or under it
-        val ahead = BlockPos.containing(p.x + p.deltaMovement.x * 4, p.y - 0.5, p.z + p.deltaMovement.z * 4)
-        if (isLava(ahead) || isLava(ahead.above()) || (mc.level!!.getBlockState(ahead).isAir && isLava(ahead.below()))) {
-            stopWalking()
-            repath = 0
-            status = "lava ahead, finding another way"
-            return
-        }
-
-        if (hopWait > 0) hopWait--
-        if (tryHop(p)) return
-
-        // steer at a point a few blocks further along the path (rounds the corners), the view gliding after it
-        // every frame; falls back to the next node when cutting the corner would cross anything unsafe
-        val look = lookAhead(p) ?: target
-        val yaw = Math.toDegrees(kotlin.math.atan2(look.z - p.z, look.x - p.x)).toFloat() - 90f
-        if (walkPitch == 0f || RANDOM.nextInt(120) == 0) walkPitch = 7f + RANDOM.nextFloat() * 8f
-        walkGoalYaw = yaw
-        walkGoalPitch = walkPitch
-        walkSteer = true
-        ownMoveTicks = 20
-        val dy = node.y - p.blockPosition().y
-        mc.options.keyUp.isDown = abs(wrap(yaw - p.yRot)) < 60f
-        mc.options.keyJump.isDown = p.onGround() && (dy > 0 || p.horizontalCollision)
-        mc.options.keySprint.isDown = path.size - pathIndex > 4 && ! nearLava(p.blockPosition(), 2)
-    }
-
-    private var walkSteer = false
-    private var walkGoalYaw = 0f
-    private var walkGoalPitch = 0f
-    private var walkPitch = 0f
-
-    /** The point ~2.5 blocks ahead along the path, if the straight line there is safe ground all the way. */
-    private fun lookAhead(p: LocalPlayer): Vec3? {
-        var left = 2.3 + RANDOM.nextDouble() * 0.6
-        var prev = p.position()
-        val y0 = p.blockPosition().y
-        for (i in pathIndex until path.size) {
-            val c = Vec3.atBottomCenterOf(path[i])
-            if (path[i].y != y0) return if (i == pathIndex) null else prev // steps / drops: go node by node
-            val seg = horizontalDist(prev, c)
-            if (seg >= left) {
-                val pt = prev.add((c.x - prev.x) * left / seg, 0.0, (c.z - prev.z) * left / seg)
-                return if (lineSafe(p.position(), pt)) pt else null
-            }
-            left -= seg
-            prev = c
-        }
-        return if (lineSafe(p.position(), prev)) prev else null
-    }
-
-    /** Solid, lava-free ground under every step of the straight line (and a block of margin from lava). */
-    private fun lineSafe(a: Vec3, b: Vec3): Boolean {
-        val lvl = mc.level ?: return false
-        val n = (horizontalDist(a, b) / 0.3).toInt().coerceAtLeast(1)
-        for (i in 0 .. n) {
-            val t = i / n.toDouble()
-            val bp = BlockPos.containing(a.x + (b.x - a.x) * t, a.y + 0.1, a.z + (b.z - a.z) * t)
-            val under = bp.below()
-            if (lvl.getBlockState(under).getCollisionShape(lvl, under).isEmpty) return false
-            if (! lvl.getBlockState(bp).getCollisionShape(lvl, bp).isEmpty) return false
-            if (isLava(bp) || isLava(under) || nearLava(bp, 1)) return false
-        }
-        return true
-    }
-
-    /** AOTV to a path node 9-12 blocks ahead when the stretch is straight, level, in sight and away from lava. */
-    private fun tryHop(p: LocalPlayer): Boolean {
-        if (hopWait > 0 || ! p.onGround() || RANDOM.nextInt(100) < walkSome.value) return false
-        val slot = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" } ?: return false
-        val from = p.position()
-        var pick = - 1
-        for (i in pathIndex until path.size) {
-            val d = horizontalDist(from, Vec3.atBottomCenterOf(path[i]))
-            if (d > 12.0) break
-            if (abs(path[i].y - p.blockPosition().y) > 1) break
-            if (d >= 9.0) pick = i
-        }
-        if (pick < 0) return false
-        val node = path[pick]
-        if (nearLava(node, 1)) return false
-        // every node on the way has to sit on the straight line (no corner to cut over a gap)
-        val end = Vec3.atBottomCenterOf(node)
-        for (i in pathIndex .. pick) {
-            val c = Vec3.atBottomCenterOf(path[i])
-            val t = ((c.x - from.x) * (end.x - from.x) + (c.z - from.z) * (end.z - from.z)) / ((end.x - from.x).let { it * it } + (end.z - from.z).let { it * it }).coerceAtLeast(0.01)
-            val px = from.x + (end.x - from.x) * t
-            val pz = from.z + (end.z - from.z) * t
-            if (kotlin.math.sqrt((c.x - px) * (c.x - px) + (c.z - pz) * (c.z - pz)) > 1.2) return false
-        }
-        val aim = end.add(0.0, 1.0, 0.0)
-        val clip = p.level().clip(net.minecraft.world.level.ClipContext(p.eyePosition, aim, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
-        if (clip.type != net.minecraft.world.phys.HitResult.Type.MISS) return false
-        hold(slot)
-        stopWalking()
-        val rot = MathUtils.calcYawPitch(aim)
-        if (! turn(p, rot.yaw, rot.pitch, 2f)) return true
-        use(p)
-        hopWait = delay(hopMin.value, hopMax.value)
-        pathIndex = pick
-        return true
-    }
-
-    // ------------------------------------------------------------------ hop planning (etherwarp / AOTV)
-
-    /** How good standing at [feet] is on the way to [goal] (lower is better). */
-    private fun hopScore(feet: Vec3, goal: Vec3) = horizontalDist(feet, goal) + abs(goal.y - feet.y) * 1.2
-
-    /**
-     * Picks the next hop towards [goal]:
-     * etherwarp - top faces of solid ground near the line to the goal (and the goal itself), each checked with
-     * Noamm's etherwarp prediction from a sneaking eye, never next to lava;
-     * AOTV - a few aims towards the goal, each traced to where the teleport stops and where we'd fall to.
-     * Only hops that get clearly closer count.
-     */
-    private fun planHop(p: LocalPlayer, goal: Vec3): Hop? {
-        val here = hopScore(p.position(), goal)
-        val etherSlot = PlayerUtils.findHotbarSlot { com.github.noamm9.utils.items.EtherwarpHelper.getEtherwarpDistance(it) != null }
-        if (etherSlot != null) {
-            val range = com.github.noamm9.utils.items.EtherwarpHelper.getEtherwarpDistance(p.inventory.getItem(etherSlot)) ?: 57.0
-            val sneakFeet = if (p.isCrouching) p.position() else p.position().subtract(0.0, 0.35, 0.0)
-            val cands = LinkedHashSet<BlockPos>()
-            cands += BlockPos.containing(goal.x, goal.y - 0.5, goal.z)
-            val dir = goal.subtract(p.position())
-            for (step in 1 .. 14) {
-                val t = step / 14.0
-                val pt = p.position().add(dir.scale(t))
-                for (ox in - 4 .. 4 step 2) for (oz in - 4 .. 4 step 2) {
-                    topBlock(BlockPos.containing(pt.x + ox, maxOf(pt.y, goal.y) + 6, pt.z + oz), 16)?.let { cands += it }
-                }
-            }
-            var best: Hop? = null
-            var bestScore = here - 6.0
-            var checked = 0
-            for (b in cands) {
-                if (checked > 220) break
-                val feet = b.above()
-                if (! standable(feet) || nearLava(feet, 1)) continue
-                val top = Vec3(b.x + 0.5, b.y + 0.98, b.z + 0.5)
-                if (top.distanceTo(p.eyePosition) > range) continue
-                val score = hopScore(Vec3.atBottomCenterOf(feet), goal)
-                if (score >= bestScore) continue
-                checked++
-                val rot = MathUtils.calcYawPitch(top)
-                val look = Vec3.directionFromRotation(rot.pitch, rot.yaw)
-                val land = com.github.noamm9.utils.items.EtherwarpHelper.getEtherPos(sneakFeet, look, range)
-                if (! land.succeeded || land.pos != b) continue
-                bestScore = score
-                best = Hop(true, etherSlot, b, rot.yaw, rot.pitch, Vec3.atBottomCenterOf(feet))
-            }
-            if (best != null) return best
-        }
-        val aotvSlot = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" } ?: return null
-        val baseYaw = Math.toDegrees(kotlin.math.atan2(goal.z - p.z, goal.x - p.x)).toFloat() - 90f
-        var best: Hop? = null
-        var bestScore = here - 4.0
-        for (dyaw in floatArrayOf(0f, - 12f, 12f, - 25f, 25f)) for (pitch in floatArrayOf(- 5f, - 20f, - 35f, - 50f, 5f)) {
-            val yaw = baseYaw + dyaw
-            val land = aotvLanding(p, yaw, pitch) ?: continue
-            val score = hopScore(land, goal)
-            if (score < bestScore) {
-                bestScore = score
-                best = Hop(false, aotvSlot, null, yaw, pitch, land)
-            }
-        }
-        return best
-    }
-
-    /** The highest solid block with two free blocks over it, scanning down [depth] blocks from [from]. */
-    private fun topBlock(from: BlockPos, depth: Int): BlockPos? {
-        val level = mc.level ?: return null
-        var b = from
-        repeat(depth) {
-            val below = b.below()
-            if (! level.getBlockState(below).getCollisionShape(level, below).isEmpty) return if (isFluid(below)) null else below
-            if (isFluid(below)) return null
-            b = below
-        }
-        return null
-    }
-
-    /** Where an AOTV with this aim leaves us standing: the teleport stops before the first block, then we fall. Null if unsafe. */
-    private fun aotvLanding(p: LocalPlayer, yaw: Float, pitch: Float): Vec3? {
-        val look = Vec3.directionFromRotation(pitch, yaw)
-        val eye = p.eyePosition
-        val end = eye.add(look.scale(aotvRange.value.toDouble()))
-        val hit = p.level().clip(net.minecraft.world.level.ClipContext(eye, end, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
-        val stop = if (hit.type == net.minecraft.world.phys.HitResult.Type.MISS) end else hit.location.subtract(look.scale(0.6))
-        if (stop.distanceTo(eye) < 5.0) return null
-        var feet = BlockPos.containing(stop.x, stop.y - 1.6, stop.z)
-        repeat(8) { // fall to the ground
-            if (isFluid(feet) || isFluid(feet.below())) return null
-            if (standable(feet)) return if (nearLava(feet, 1)) null else Vec3.atBottomCenterOf(feet)
-            feet = feet.below()
-        }
-        return null
-    }
-
-    private fun doHop(p: LocalPlayer) {
-        val h = hop ?: return
-        ownMoveTicks = 30
-        hold(h.slot)
-        when (hopPhase) {
-            0 -> { // sneak (etherwarp) or stand (AOTV), turn onto the aim
-                PlayerUtils.toggleSneak(h.ether)
-                if (! turn(p, h.yaw, h.pitch, 0.6f)) return
-                p.yRot = h.yaw; p.xRot = h.pitch
-                if (h.ether != p.isCrouching) return // the sneak hasn't reached the server yet
-                if (h.ether) { // check once more from where we really are
-                    val range = com.github.noamm9.utils.items.EtherwarpHelper.getEtherwarpDistance(p.inventory.getItem(h.slot)) ?: 57.0
-                    val land = com.github.noamm9.utils.items.EtherwarpHelper.getEtherPos(p.position(), Vec3.directionFromRotation(h.pitch, h.yaw), range)
-                    if (! land.succeeded || land.pos != h.target) { hop = null; PlayerUtils.toggleSneak(false); planIn = 0; return }
-                }
-                hopTimer = 0
-                hopFrom = p.position()
-                use(p)
-                hopPhase = 1
-            }
-            else -> { // wait for the teleport
-                if (p.position().distanceTo(hopFrom) > 2.0 || ++hopTimer > 15) {
-                    PlayerUtils.toggleSneak(false)
-                    hop = null
-                    hopWait = delay(hopMin.value, hopMax.value)
-                    repath = 0
-                    planIn = 0
-                }
-            }
-        }
-    }
-
-    private fun scheduleBreak() {
+    internal fun scheduleBreak() {
         val lo = minOf(breakEveryMin.value, breakEveryMax.value)
         val hi = maxOf(breakEveryMin.value, breakEveryMax.value)
         nextBreakAt = System.currentTimeMillis() + timing.uniform(lo * 60, hi * 60) * 1000L
     }
 
     /** On a break: stand still, now and then look around a little, then back to fishing. */
-    private fun onBreak(p: LocalPlayer) {
+    internal fun onBreak(p: LocalPlayer) {
         val left = breakUntil - System.currentTimeMillis()
         status = "on a break (${left / 60000}:${"%02d".format((left / 1000) % 60)})"
         if (left <= 0) {
@@ -1366,559 +864,17 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
     }
 
-    // ------------------------------------------------------------------ auto sell
+    // ------------------------------------------------------------------ tracking state (AutoFishingCombat.kt)
 
-    private fun sellNames() = sellList.value.split('|').filter { it.isNotBlank() }.toSet()
-
-    private fun itemKey(stack: net.minecraft.world.item.ItemStack): String? =
-        if (stack.isEmpty) null else stack.hoverName.string.replace(Regex("§."), "").trim().ifBlank { null }
-
-    private fun freeSlots(p: LocalPlayer) = (0 until 36).count { p.inventory.getItem(it).isEmpty }
-
-    /** Only what's on your sell list is ever sold. */
-    private fun shouldSell(stack: net.minecraft.world.item.ItemStack): Boolean {
-        if (stack.isEmpty || stack.item == Items.FISHING_ROD) return false
-        val name = itemKey(stack) ?: return false
-        return name in sellNames()
-    }
-
-    /** Inventory indexes (not the hotbar) holding junk. */
-    private fun sellables(p: LocalPlayer) = (9 until 36).filter { shouldSell(p.inventory.getItem(it)) }
-
-    private fun sell(p: LocalPlayer) {
-        ownMoveTicks = 20
-        sellTimer++
-        if (sellTimer > 600) return sellDone(p, false, "selling took too long")
-        if (sellGap > 0) { sellGap--; return }
-        val screen = mc.gui.screen() as? AbstractContainerScreen<*>
-        when (sellStep) {
-            0 -> { // put the rod away and open the SkyBlock Menu
-                if (p.fishing != null) { rod()?.let { hold(it); use(p) }; sellGap = delay(4, 10); return }
-                hold(menuSlot.value - 1)
-                sellGap = delay(3, 8)
-                sellStep = 1
-            }
-            1 -> {
-                use(p)
-                sellTimer = 0
-                sellStep = 2
-            }
-            2 -> { // wait for the menu, then click the cookie
-                if (screen == null || screen is InventoryScreen) { if (sellTimer > 40) sellDone(p, false, "the SkyBlock Menu didn't open"); return }
-                val menu = p.containerMenu
-                val top = menu.slots.filter { it.container !is net.minecraft.world.entity.player.Inventory }
-                val cookie = top.firstOrNull { it.item.item == Items.COOKIE || it.item.hoverName.string.contains("Cookie", true) }
-                    ?: return sellDone(p, false, "no Booster Cookie in the menu")
-                sellTitle = screen.title.string
-                GuiUtils.clickSlot(cookie.index, GuiUtils.ButtonType.LEFT)
-                sellTimer = 0
-                sellStep = 3
-                sellGap = delay(2, 5)
-            }
-            3 -> { // the sell menu: queue up the junk
-                if (screen == null || screen.title.string == sellTitle) { if (sellTimer > 40) sellDone(p, false, "the sell menu didn't open"); return }
-                sellQueue.clear()
-                for (slot in p.containerMenu.slots) {
-                    if (slot.container !is net.minecraft.world.entity.player.Inventory) continue
-                    if (slot.containerSlot < 9) continue // never the hotbar
-                    if (shouldSell(slot.item)) sellQueue += slot.index
-                }
-                sellStep = 4
-                sellGap = delay(5, 14) // look at the menu for a moment first
-            }
-            4 -> { // click them one by one at a human pace
-                if (screen == null) return sellDone(p, true, null)
-                val next = sellQueue.removeFirstOrNull()
-                if (next == null) {
-                    sellStep = 5
-                    sellGap = delay(4, 12)
-                    return
-                }
-                if (! p.containerMenu.slots.getOrNull(next)?.item.let { it != null && ! it.isEmpty }) return
-                GuiUtils.clickSlot(next, GuiUtils.ButtonType.LEFT)
-                sold++
-                sellGap = delay(4, 11) + if (RANDOM.nextInt(100) < 8) timing.uniform(6, 16) else 0
-            }
-            else -> sellDone(p, true, null)
-        }
-    }
-
-    private fun sellDone(p: LocalPlayer, ok: Boolean, why: String?) {
-        if (mc.gui.screen() != null) p.closeContainer()
-        if (ok) sellFails = 0 else {
-            sellFails++
-            info("&eAuto Sell: $why${if (sellFails >= 3) " - turned off until the next start" else ""}.")
-        }
-        expectedSlot = - 1
-        rod()?.let { hold(it) }
-        state = State.CAST
-        returning = true
-        wait = castWait()
-        status = if (ok) "sold junk ($sold so far)" else "couldn't sell"
-    }
-
-    /** In lava: jump and walk back to the last safe ground; stop if it doesn't work out. */
-    private fun escapeLava(p: LocalPlayer) {
-        ownMoveTicks = 20
-        if (p.fishing != null) rod()?.let { hold(it); use(p) }
-        val back = lastSafe
-        status = "in lava, getting out"
-        lavaTicks++
-        mc.options.keyJump.isDown = true
-        mc.options.keySprint.isDown = true
-        if (back != null) {
-            // aim at the last safe spot, a little above it so a teleport lands on top
-            val target = back.add(0.0, 1.2, 0.0)
-            val rot = MathUtils.calcYawPitch(target)
-            PlayerUtils.rotate(rot.yaw, rot.pitch)
-            mc.options.keyUp.isDown = true
-            // swimming alone often can't climb out: teleport back with AOTV, else the Hyperion, every half second
-            if (lavaTicks % 10 == 4) {
-                val tp = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" }
-                    ?: PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
-                if (tp != null) { hold(tp); use(p) }
-            }
-        }
-        if (lavaTicks > 200) {
-            stopWalking()
-            failStop("fell into lava and couldn't get out")
-            return
-        }
-        state = State.TRAVEL
-        repath = 0
-    }
-
-    /** A block you can safely stand in: solid, non-lava ground under it, room for the body, no lava in it. */
-    private fun safeStand(lvl: net.minecraft.world.level.Level, b: BlockPos): Boolean {
-        fun solid(x: BlockPos) = ! lvl.getBlockState(x).getCollisionShape(lvl, x).isEmpty
-        fun lava(x: BlockPos) = lvl.getFluidState(x).`is`(FluidTags.LAVA)
-        val under = b.below()
-        return solid(under) && ! lava(under) && ! solid(b) && ! solid(b.above()) && ! lava(b) && ! lava(b.above())
-    }
-
-    /**
-     * Keeps us in the exact middle of a safe block. Moves with WASD relative to where we're already looking
-     * (no turning), sneaking so it can never walk off an edge. True once we're there.
-     */
-    private fun centered(p: LocalPlayer): Boolean {
-        if (! standCentre.value || ! p.onGround()) return true
-        val lvl = p.level()
-        val here = BlockPos.containing(p.position())
-        var target = centreTarget
-        if (target == null || BlockPos.containing(target).distManhattan(here) > 2) {
-            val pick = (listOf(here) + listOf(here.north(), here.south(), here.east(), here.west(),
-                here.north().east(), here.north().west(), here.south().east(), here.south().west()))
-                .filter { safeStand(lvl, it) }
-                .minByOrNull { Vec3.atBottomCenterOf(it).distanceToSqr(p.position()) }
-                ?: return true // nowhere better nearby: stay
-            target = Vec3.atBottomCenterOf(pick)
-            centreTarget = target
-        }
-        val dx = target.x - p.x
-        val dz = target.z - p.z
-        if (dx * dx + dz * dz < 0.1 * 0.1 || ++centreTicks > 100) {
-            releaseCentre()
-            centreTicks = 0
-            return true
-        }
-        val yr = Math.toRadians(p.yRot.toDouble())
-        val f = dx * - kotlin.math.sin(yr) + dz * kotlin.math.cos(yr) // along where we look
-        val r = dx * - kotlin.math.cos(yr) + dz * - kotlin.math.sin(yr) // to our right
-        ownMoveTicks = 20
-        mc.options.keyShift.isDown = true
-        mc.options.keyUp.isDown = f > 0.05
-        mc.options.keyDown.isDown = f < - 0.05
-        mc.options.keyRight.isDown = r > 0.05
-        mc.options.keyLeft.isDown = r < - 0.05
-        return false
-    }
-
-    private fun releaseCentre() {
-        mc.options.keyShift.isDown = false
-        mc.options.keyUp.isDown = false
-        mc.options.keyDown.isDown = false
-        mc.options.keyRight.isDown = false
-        mc.options.keyLeft.isDown = false
-    }
-
-    /**
-     * True when a Wither Impact with this look can't drop us into lava: follows the 10-block teleport until
-     * something blocks the body, then checks there's solid ground (not lava) under where we'd end up.
-     */
-    private fun blastSafe(p: LocalPlayer, yaw: Float, pitch: Float): Boolean {
-        val lvl = p.level()
-        val look = Vec3.directionFromRotation(pitch, yaw)
-        val eyeH = p.eyeHeight.toDouble()
-        fun solid(b: BlockPos) = ! lvl.getBlockState(b).getCollisionShape(lvl, b).isEmpty
-        var end = p.position()
-        var d = 0.25
-        while (d <= 10.0) {
-            val feet = p.eyePosition.add(look.scale(d)).subtract(0.0, eyeH, 0.0)
-            val bp = BlockPos.containing(feet)
-            if (solid(bp) || solid(bp.above())) break
-            end = feet
-            d += 0.25
-        }
-        val at = BlockPos.containing(end)
-        if (lvl.getFluidState(at).`is`(FluidTags.LAVA) || lvl.getFluidState(at.above()).`is`(FluidTags.LAVA)) return false
-        for (dy in 1 .. 4) {
-            val b = at.below(dy - 1).below()
-            if (lvl.getFluidState(b).`is`(FluidTags.LAVA)) return false
-            if (solid(b)) return true
-        }
-        return false // nothing under us: we'd fall
-    }
-
-    // ------------------------------------------------------------------ aiming the cast
-
-    /** The fluid surface height at (or just below) [pos]. */
-    private fun surfaceY(pos: BlockPos): Double {
-        for (dy in 2 downTo - 6) {
-            val b = pos.offset(0, dy, 0)
-            if (isFluid(b) && ! isFluid(b.above())) return b.y + 0.88
-        }
-        return pos.y.toDouble()
-    }
-
-    /**
-     * Where a hook cast from here with this yaw / pitch comes down on a surface at [surface] (vanilla throw:
-     * 0.6 blocks/tick along the look, 0.92 drag, 0.03 gravity). Null if it hits a block on the way.
-     */
-    private fun landing(p: LocalPlayer, yaw: Float, pitch: Float, surface: Double): Vec3? {
-        val r = Math.PI / 180.0
-        val f2 = kotlin.math.cos(- yaw * r - Math.PI)
-        val f3 = kotlin.math.sin(- yaw * r - Math.PI)
-        val f4 = - kotlin.math.cos(- pitch * r)
-        val f5 = kotlin.math.sin(- pitch * r)
-        var pos = Vec3(p.x - f3 * 0.3, p.eyeY, p.z - f2 * 0.3)
-        var v = Vec3(- f3, (- (f5 / f4)).coerceIn(- 5.0, 5.0), - f2)
-        v = v.scale(0.6 / v.length() + 0.5) // vanilla: 0.6 / length + 0.5 (the 0.5 has a tiny random spread)
-        val level = p.level()
-        repeat(160) {
-            val next = pos.add(v)
-            val hit = level.clip(net.minecraft.world.level.ClipContext(pos, next, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
-            if (hit.type != net.minecraft.world.phys.HitResult.Type.MISS) return null
-            if (next.y <= surface && v.y < 0) return next
-            pos = next
-            v = Vec3(v.x * 0.92, v.y * 0.92 - 0.03, v.z * 0.92)
-        }
-        return null
-    }
-
-    /** Finds the yaw / pitch whose throw lands on [target]. */
-    private fun solveAim(p: LocalPlayer, target: Vec3): Pair<Float, Float>? {
-        val surface = surfaceY(BlockPos.containing(target))
-        val yaw = Math.toDegrees(kotlin.math.atan2(target.z - p.z, target.x - p.x)).toFloat() - 90f
-        val tries = ArrayList<Pair<Float, Double>>()
-        var pitch = - 55f
-        while (pitch <= 50f) {
-            landing(p, yaw, pitch, surface)?.let { tries += pitch to horizontalDist(it, target) }
-            pitch += 0.25f
-        }
-        val bestErr = tries.minOfOrNull { it.second } ?: return null
-        // a short and a high throw can land on the same spot: take the flatter one, like people do
-        val best = tries.filter { it.second <= bestErr + 0.25 }.maxByOrNull { it.first } ?: return null
-        return yaw to best.first
-    }
-
-    private fun aimAt(p: LocalPlayer, hs: ArmorStand) {
-        aimTarget = Vec3(hs.x, hs.y, hs.z)
-        aimTries = 0
-        val sol = solveAim(p, aimTarget!!)
-        if (sol != null) {
-            anchorYaw = sol.first
-            anchorPitch = sol.second
-        }
-        else {
-            val rot = MathUtils.calcYawPitch(hs.position())
-            anchorYaw = rot.yaw
-            anchorPitch = (rot.pitch - 8f).coerceIn(- 30f, 60f)
-        }
-        nextCastAim(p)
-    }
-
-    /** This cast's aim: the solved aim plus a small hand wobble. */
-    private fun nextCastAim(@Suppress("UNUSED_PARAMETER") p: LocalPlayer) {
-        val w = aimWobble.value.toFloat()
-        wobYaw = (RANDOM.nextFloat() * 2 - 1) * w
-        wobPitch = (RANDOM.nextFloat() * 2 - 1) * w * 0.6f
-    }
-
-    /** Is the hook inside the hotspot? If not, move the aim point by the miss and solve the throw again (8 tries). */
-    private fun landedIn(p: LocalPlayer, hook: FishingHook, hs: ArmorStand): Boolean {
-        val off = hook.position().subtract(hs.position())
-        if (kotlin.math.sqrt(off.x * off.x + off.z * off.z) <= hotspotRadius.value || aimTries >= 8) return true
-        aimTries++
-        val base = aimTarget ?: Vec3(hs.x, hs.y, hs.z)
-        aimTarget = Vec3(base.x - off.x * 0.85, base.y, base.z - off.z * 0.85)
-        solveAim(p, aimTarget!!)?.let { (y, pi) -> anchorYaw = y; anchorPitch = pi }
-        nextCastAim(p)
-        returning = true
-        status = "hook landed beside the hotspot, re-aiming ($aimTries)"
-        return false
-    }
-
-    // ------------------------------------------------------------------ sea creatures
-
-    /**
-     * Works out which new mobs are ours. Looks around each of our reels (not around the player, so a hook far
-     * below or above still counts) and gives a new mob 30 ticks to settle, because the server can spawn it a
-     * little off and move it into place.
-     */
-    private fun claimOwn(p: LocalPlayer) {
-        val lvl = p.level()
-        // remember when every mob around us first showed up, all the time - so a creature someone else
-        // fished up earlier is never mistaken for a new one just because we reeled in next to it
-        val around = lvl.getEntitiesOfClass(Mob::class.java, p.boundingBox.inflate(40.0, 24.0, 40.0)) { it.isAlive && it.javaClass.simpleName !in NPC_CLASSES }
-        for (e in around) if (e.id !in seenAt) { seenAt[e.id] = tickCount; seenPos[e.id] = e.position() }
-        if (seenAt.size > 3000) { val live = around.map { it.id }.toSet(); seenAt.keys.retainAll(live); seenPos.keys.retainAll(live) }
-
-        val window = (ownWindow.value * 20).toInt()
-        while (reels.isNotEmpty() && tickCount - reels.first().tick > window + 5) reels.removeFirst()
-        for (e in around) {
-            if (e.id in mine) continue
-            val first = seenAt[e.id] ?: continue
-            val at = seenPos[e.id] ?: continue
-            // ours only if it appeared AFTER one of our reels, within the window, right where our hook was
-            if (reels.any { first >= it.tick && first - it.tick <= window && at.distanceTo(it.at) <= ownDistance.value }) {
-                mine += e.id
-                mineAlive += e.id
-                firstSeen += e.id
-                creaturesCaught++
-            }
-        }
-    }
-
-    /** The SkyBlock name tag that floats over a mob ("[Lv45] Sea Walker 1,200/1,200❤"), if there is one. */
-    private fun tagOf(e: Entity): String? {
-        val box = e.boundingBox.inflate(0.4, 2.5, 0.4)
-        return e.level().getEntitiesOfClass(ArmorStand::class.java, box)
-            .mapNotNull { it.customName?.string }
-            .firstOrNull { "❤" in it }
-    }
-
-    /** "0❤" on its name tag: SkyBlock keeps a dying creature around for a moment. */
-    private fun deadTag(e: Entity) = tagOf(e)?.let { Regex("(?:^|\\s)0/[\\d,.]+[kKmMbB]?❤").containsMatchIn(it.replace(Regex("§."), "")) || it.replace(Regex("§."), "").contains(" 0❤") } == true
-
-    private fun creatures(p: LocalPlayer): List<LivingEntity> {
-        val r = killRange.value
-        val scan = maxOf(r, 24.0)
-        val all = p.level().getEntitiesOfClass(Mob::class.java, p.boundingBox.inflate(scan, 8.0, scan)) { e ->
-            e.isAlive && e.health > 0f && e.javaClass.simpleName !in NPC_CLASSES
-        }
-        if (firstSeen.size > 2000) { firstSeen.retainAll(all.map { it.id }.toSet()); mine.retainAll(firstSeen) }
-        // anything actually hitting us counts too (self-defence)
-        if (p.hurtTime > 0) all.filter { it.distanceTo(p) <= 3.5f && p.hasLineOfSight(it) }.forEach { mine += it.id; ignored -= it.id; inReach.remove(it.id) }
-        return all.filter { e ->
-            e.id !in ignored && e.distanceTo(p) <= r && (! onlyMine.value || e.id in mine) && ! deadTag(e)
-        }
-    }
-
-    private fun hasHype() = weaponSlot.value !in 1 .. 9 && PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } != null &&
-        WHIPS[weaponType.value]?.let { id -> PlayerUtils.findHotbarSlot { it.skyblockId == id } } == null // a whip needs no mana
-
-    /**
-     * Soul Whip / Flaming Flay: no teleport, so nothing can drop us in the lava. Takes the whip out, aims
-     * (eased, not dead centre) at the nearest creature in range and right-clicks Flay, a varied beat apart.
-     */
-    private fun whipFight(p: LocalPlayer, mobs: List<LivingEntity>, slot: Int) {
-        for (m in mobs) {
-            if (p.distanceTo(m) <= whipRange.value) waiting.remove(m.id)
-            else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > giveUp.value * 20) { ignored += m.id; waiting.remove(m.id) }
-        }
-        // stick with the creature we're already on while it's still in range; switch only when it's gone
-        val inRange = mobs.filter { p.distanceTo(it) <= whipRange.value && p.hasLineOfSight(it) }
-        val target = inRange.firstOrNull { it == track } ?: inRange.minByOrNull { it.distanceToSqr(p) }
-        if (target == null) {
-            val far = mobs.minByOrNull { it.distanceToSqr(p) }
-            track = far // keep a loose eye on it while it comes closer
-            trackLoose = true
-            status = if (far != null) "waiting for ${far.name.string}" else "fighting"
-            return
-        }
-        if (! centered(p)) { status = "stepping to the middle of the block"; return }
-        if (track != target) { track = target; trackSettle = 0 }
-        trackLoose = false
-        ownMoveTicks = 20
-        status = "whipping ${target.name.string}"
-        val err = trackError(p, target)
-        if (err < 3.5f) trackSettle++ else trackSettle = 0
-        if (hypeBeat > 0) { hypeBeat--; return }
-        if (p.inventory.selectedSlot != slot) { // take the whip out once we're more or less facing it
-            if (err < 25f) { hold(slot); hypeBeat = delay(2, 7) }
-            return
-        }
-        // swing only once the aim has stayed on it for a moment, then keep tracking between swings
-        if (hitCooldown > 0 || trackSettle < 3) return
-        use(p)
-        p.swing(InteractionHand.MAIN_HAND)
-        hitCooldown = delay(whipDelay.value, whipDelay.value * 2 + 2)
-    }
-
-    // ------------------------------------------------------------------ smooth tracking (every frame)
-
-    private var track: LivingEntity? = null
-    private var trackLoose = false
-    private var trackSettle = 0
-    private var trackVelYaw = 0f
-    private var trackVelPitch = 0f
-    private var trackLastNs = 0L
-    private var trackOff = Vec3.ZERO       // where on the body we aim; drifts slowly, not a new point every tick
-    private var trackOffGoal = Vec3.ZERO
-    private var trackOffNext = 0L
-    private var trackMaxSpeed = 300f
-
-    /** Walking: the same spring, a bit softer, after the steering point. */
-    private fun steerFrame(p: LocalPlayer, dt: Float) {
-        if (dt <= 0f) return
-        val errY = wrap(walkGoalYaw - p.yRot)
-        val errP = walkGoalPitch - p.xRot
-        val k = 28f
-        val c = 2f * kotlin.math.sqrt(k)
-        trackVelYaw += (k * errY - c * trackVelYaw) * dt
-        trackVelPitch += (k * errP - c * trackVelPitch) * dt
-        val max = 260f
-        val sp = kotlin.math.hypot(trackVelYaw.toDouble(), trackVelPitch.toDouble()).toFloat()
-        if (sp > max) { trackVelYaw *= max / sp; trackVelPitch *= max / sp }
-        p.yRot += trackVelYaw * dt
-        p.xRot = (p.xRot + trackVelPitch * dt).coerceIn(- 90f, 90f)
-        p.yHeadRot = p.yRot
-    }
-
-    private fun trackPoint(e: Entity, pt: Float): Vec3 {
-        val pos = e.getPosition(pt)
-        return Vec3(pos.x, pos.y + e.bbHeight * 0.55, pos.z).add(trackOff)
-    }
-
-    private fun trackError(p: LocalPlayer, e: Entity): Float {
-        val rot = MathUtils.calcYawPitch(trackPoint(e, 1f))
-        return kotlin.math.hypot(wrap(rot.yaw - p.yRot).toDouble(), (rot.pitch - p.xRot).toDouble()).toFloat()
-    }
-
-    /**
-     * Follows [track] smoothly every frame with a critically damped spring and a top speed, so the view glides
-     * after the creature and trails it slightly when it moves, instead of stepping 20 times a second.
-     */
-    private fun trackFrame() {
-        val now = System.nanoTime()
-        val dt = ((now - trackLastNs) / 1e9f).coerceIn(0f, 0.05f)
-        trackLastNs = now
-        val p = mc.player ?: return
-        val e = track
-        if (running && state == State.TRAVEL && walkSteer && hop == null) { steerFrame(p, dt); return }
-        walkSteer = walkSteer && state == State.TRAVEL
-        if (! running || e == null || ! e.isAlive || state != State.FIGHT) { trackVelYaw = 0f; trackVelPitch = 0f; return }
-        if (dt <= 0f) return
-        val ms = System.currentTimeMillis()
-        if (ms >= trackOffNext) { // pick a new spot on its body every 0.4-1.2 s
-            val w = e.bbWidth * 0.25
-            val h = e.bbHeight * 0.2
-            trackOffGoal = Vec3((RANDOM.nextDouble() * 2 - 1) * w, (RANDOM.nextDouble() * 2 - 1) * h, (RANDOM.nextDouble() * 2 - 1) * w)
-            trackOffNext = ms + 400 + RANDOM.nextInt(800)
-            trackMaxSpeed = 220f + RANDOM.nextFloat() * 200f
-        }
-        trackOff = trackOff.lerp(trackOffGoal, (dt * 3f).toDouble().coerceAtMost(1.0))
-        val rot = MathUtils.calcYawPitch(trackPoint(e, mc.deltaTracker.getGameTimeDeltaPartialTick(true)))
-        var errY = wrap(rot.yaw - p.yRot)
-        var errP = rot.pitch - p.xRot
-        if (trackLoose) { // only keep it roughly in view while waiting
-            errY = if (abs(errY) > 20f) errY - kotlin.math.sign(errY) * 20f else 0f
-            errP = if (abs(errP) > 15f) errP - kotlin.math.sign(errP) * 15f else 0f
-        }
-        val k = 55f
-        val c = 2f * kotlin.math.sqrt(k)
-        trackVelYaw += (k * errY - c * trackVelYaw) * dt
-        trackVelPitch += (k * errP - c * trackVelPitch) * dt
-        val sp = kotlin.math.hypot(trackVelYaw.toDouble(), trackVelPitch.toDouble()).toFloat()
-        if (sp > trackMaxSpeed) { trackVelYaw *= trackMaxSpeed / sp; trackVelPitch *= trackMaxSpeed / sp }
-        p.yRot += trackVelYaw * dt
-        p.xRot = (p.xRot + trackVelPitch * dt).coerceIn(- 90f, 90f)
-        p.yHeadRot = p.yRot
-    }
-
-    private fun fight(p: LocalPlayer, mobs: List<LivingEntity>) {
-        val whipSlot = WHIPS[weaponType.value]?.let { id -> PlayerUtils.findHotbarSlot { it.skyblockId == id } }
-        if (whipSlot != null) return whipFight(p, mobs, whipSlot)
-        val hypeSlot = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
-        // no mana: the Hyperion is still a sword, swing it instead of standing there
-        val hype = hypeSlot?.takeIf { ! blastBlocked && com.github.noamm9.utils.ManaGuard.canCast(manaCost.value) }
-        if (hypeSlot != null && hype == null) hold(hypeSlot)
-        val reach = if (hype != null) blastRange.value else 3.2
-        // a creature that's in reach but never loses health (out of the blast, immune, already dead): leave it
-        val inReachLimit = maxOf(giveUp.value * 20 * 2, 200)
-        for (m in mobs) if (p.distanceTo(m) <= reach) {
-            val (t, hp) = inReach[m.id] ?: (0 to m.health)
-            val n = if (m.health < hp - 0.01f) 0 else t + 1
-            inReach[m.id] = n to m.health
-            if (n > inReachLimit && p.hurtTime == 0) { ignored += m.id; inReach.remove(m.id) }
-        }
-        if (inReach.size > 200) inReach.keys.retainAll(mobs.map { it.id }.toSet())
-        for (m in mobs) {
-            if (p.distanceTo(m) <= reach) waiting.remove(m.id)
-            else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > giveUp.value * 20) {
-                ignored += m.id
-                waiting.remove(m.id)
-            }
-        }
-        val close = mobs.filter { p.distanceTo(it) <= reach }
-        if (close.isEmpty()) {
-            val far = mobs.minByOrNull { it.distanceToSqr(p) } ?: return
-            status = "waiting for ${far.name.string}"
-            // keep an eye on it loosely: only turn when it's well off to the side, and not onto its exact middle
-            val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(far.boundingBox.center, 0.6))
-            if (abs(wrap(rot.yaw - p.yRot)) > 22f || abs(rot.pitch - p.xRot) > 18f) turn(p, rot.yaw, rot.pitch, 9f)
-            return
-        }
-        if (! centered(p)) { status = "stepping to the middle of the block"; return }
-        if (hype != null) {
-            status = "Hyperion on ${close.size}"
-            if (hypeBeat > 0) { hypeBeat--; return }
-            when (hypeStage) {
-                0 -> { // glance at the creature first (still holding the rod)
-                    val m = close.minByOrNull { it.distanceToSqr(p) } ?: return
-                    val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(m.boundingBox.center, 0.5))
-                    if (abs(wrap(rot.yaw - p.yRot)) > 15f && ! turn(p, rot.yaw, rot.pitch, 10f)) return
-                    hypeStage = 1
-                    hypeBeat = delay(3, 9)
-                }
-                1 -> { // then look down so the blast covers everything around us
-                    if (castDownPitch == 0f) castDownPitch = 78f + RANDOM.nextFloat() * 11f
-                    if (! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
-                    if (! turn(p, p.yRot, castDownPitch, 3f)) return
-                    val swapped = p.inventory.selectedSlot != hype
-                    hold(hype) // the Hyperion comes out once we're looking down
-                    hypeStage = 2
-                    hypeBeat = if (swapped) delay(3, 8) else delay(2, 7) // a beat with it in hand before clicking
-                }
-                else -> { // cast; between casts keep looking down, each cast a little different
-                    if (hitCooldown > 0) return
-                    if (! blastSafe(p, p.yRot, p.xRot)) { // this look would teleport us off the edge: straight down instead
-                        castDownPitch = 90f
-                        if (abs(p.xRot - 90f) > 0.5f) { hypeStage = 1; return }
-                        if (! blastSafe(p, p.yRot, 90f)) { // no safe blast from here: fight it with the sword instead
-                            blastBlocked = true
-                            hypeStage = 0
-                            return
-                        }
-                    }
-                    hold(hype)
-                    ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
-                    use(p)
-                    hitCooldown = delay(hitDelay.value, hitDelay.value * 2 + 4)
-                    castDownPitch = (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
-                    if (abs(castDownPitch - p.xRot) > 1.5f) { hypeStage = 1; hypeBeat = delay(1, 4) }
-                }
-            }
-            return
-        }
-        if (weaponSlot.value in 1 .. 9) hold(weaponSlot.value - 1)
-        val target = close.minByOrNull { it.distanceToSqr(p) } ?: return
-        status = if (hypeSlot != null && hype == null) "no mana, hitting ${target.name.string}" else "fighting ${target.name.string}"
-        val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(target.boundingBox.center, 0.25))
-        if (! turn(p, rot.yaw, rot.pitch, 4f) || hitCooldown > 0) return
-        hitCooldown = hitDelay.value
-        mc.gameMode?.attack(p, target)
-        p.swing(InteractionHand.MAIN_HAND)
-    }
+    internal var track: LivingEntity? = null
+    internal var trackLoose = false
+    internal var trackSettle = 0
+    internal var trackVelYaw = 0f
+    internal var trackVelPitch = 0f
+    internal var trackLastNs = 0L
+    internal var trackOff = Vec3.ZERO       // where on the body we aim; drifts slowly, not a new point every tick
+    internal var trackOffGoal = Vec3.ZERO
+    internal var trackOffNext = 0L
+    internal var trackMaxSpeed = 300f
 }
 //#endif
