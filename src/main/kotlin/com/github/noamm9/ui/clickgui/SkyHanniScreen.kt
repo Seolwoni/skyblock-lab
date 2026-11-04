@@ -35,6 +35,44 @@ import net.minecraft.client.input.KeyEvent
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.Component
 import java.awt.Color
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.CARD_GAP
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.CARD_PAD
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.DESC_SCALE
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.LINE_H
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.MARGIN_X
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.MARGIN_Y
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.ROW_H
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.SIDEBAR_W
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.TITLE_H
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.bg
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.candidate
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.card
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.cardHover
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.cardOff
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.field
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.fit
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.glass
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.glassA
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.icons
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.inside
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.line
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.lines
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.logoFrom
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.logoTo
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.offDot
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.onDot
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.out
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.panel
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.panelTop
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.textDim
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.textFaint
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.textMain
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.textSoft
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.textWidth
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.titleOf
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.uiWidth
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.wrap
+import com.github.noamm9.ui.clickgui.SkyHanniTheme.wrapCache
 
 /**
  * SkyHanni / MoulConfig style settings: search on top, categories and features on the left,
@@ -43,53 +81,9 @@ import java.awt.Color
  */
 class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     companion object {
-        private const val MARGIN_X = 40f
-        private const val MARGIN_Y = 22f
-        private const val TITLE_H = 26f
-        private const val SIDEBAR_W = 150f
-        private const val ROW_H = 15f
-        private const val CARD_PAD = 5f
-        private const val CARD_GAP = 5f
-        private const val LINE_H = 10f
-        /** Descriptions a step smaller than names, so names lead. */
-        private const val DESC_SCALE = 0.9f
-
-        // Void Rift palette
-        /** 0 = solid, 1 = most see-through (Dev > ClickGui > Glass). */
-        private val glass get() = com.github.noamm9.features.impl.dev.ClickGui.glass.value / 100f
-        private fun glassA(solid: Int, drop: Int) = (solid - drop * glass).toInt().coerceIn(0, 255)
-        private val bg get() = Color(15, 11, 23, glassA(250, 120))
-        private val panel get() = Color(21, 15, 32, glassA(255, 150))
-        private val panelTop get() = Color(32, 22, 50, glassA(255, 130))
-        private val card get() = Color(26, 20, 38, glassA(255, 110))
-        private val cardOff get() = Color(20, 15, 30, glassA(255, 120))
-        private val cardHover get() = Color(37, 27, 55, glassA(255, 90))
-        private val field = Color(11, 8, 18, 255)
-        private val line = Color(42, 31, 61, 255)
-        private val textMain = Color(237, 231, 255)
-        private val textSoft = Color(196, 184, 224)
-        private val textDim = Color(138, 127, 163)
-        private val textFaint = Color(93, 84, 112)
-        private val onDot = Color(236, 72, 153)
-        private val offDot = Color(52, 41, 72)
-        private val logoFrom = Color(139, 92, 246)
-        private val logoTo = Color(236, 72, 153)
-
-        /** Icon texture per category (white, tinted when drawn). */
-        private val icons = CategoryType.entries.associateWith {
-            net.minecraft.resources.Identifier.fromNamespaceAndPath(com.github.noamm9.NoammAddons.MOD_ID, "textures/gui/icons/${it.name.lowercase()}.png")
-        }
-
         /** Draws a category icon [size] GUI pixels wide at x, y, tinted with [color]. */
-        fun drawCategoryIcon(ctx: GuiGraphicsExtractor, cat: CategoryType, x: Float, y: Float, size: Float, color: Color) {
-            ctx.pose().pushMatrix()
-            ctx.pose().translate(x, y)
-            ctx.pose().scale(size / 64f, size / 64f)
-            ctx.drawTexture(icons.getValue(cat), 0, 0, 64, 64, color)
-            ctx.pose().popMatrix()
-        }
-
-        private fun titleOf(cat: CategoryType) = if (cat == CategoryType.FLOOR7) "Floor 7" else cat.name.lowercase().replaceFirstChar { it.uppercase() }
+        fun drawCategoryIcon(ctx: GuiGraphicsExtractor, cat: CategoryType, x: Float, y: Float, size: Float, color: Color) =
+            SkyHanniTheme.drawCategoryIcon(ctx, cat, x, y, size, color)
 
         /** The logo intro has played this launch. */
         private var introPlayed = false
@@ -784,40 +778,4 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         return cx
     }
 
-    // ------------------------------------------------------------------ text helpers
-
-    private fun uiWidth(s: String) = if (UiFont.active) UiFont.width(s) else mc.font.width(s)
-
-    private fun inside(mx: Float, my: Float, r: FloatArray) = mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3]
-
-    private fun textWidth(s: String) = if (UiFont.active) UiFont.width(s) else mc.font.width(s.replace(Regex("[§&][0-9a-fk-or]"), ""))
-
-    private fun fit(s: String, max: Float): String {
-        if (textWidth(s) <= max) return s
-        var out = s
-        while (out.isNotEmpty() && textWidth("$out…") > max) out = out.dropLast(1)
-        return "$out…"
-    }
-
-    private val wrapCache = HashMap<Pair<String, Int>, List<String>>()
-
-    private fun wrap(text: String, max: Float): List<String> {
-        if (text.isBlank()) return emptyList()
-        return wrapCache.getOrPut(text to max.toInt()) {
-            val lines = ArrayList<String>()
-            for (paragraph in text.split('\n')) {
-                var line = ""
-                for (word in paragraph.split(' ')) {
-                    val candidate = if (line.isEmpty()) word else "$line $word"
-                    if (textWidth(candidate) > max && line.isNotEmpty()) {
-                        lines += line
-                        line = word
-                    }
-                    else line = candidate
-                }
-                if (line.isNotEmpty()) lines += line
-            }
-            lines
-        }
-    }
 }

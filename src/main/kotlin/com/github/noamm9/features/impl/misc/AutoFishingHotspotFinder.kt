@@ -52,7 +52,7 @@ internal fun AutoFishing.readSharedHotspot(text: String) {
 }
 
 internal fun AutoFishing.radarSlot(): Int? = PlayerUtils.findHotbarSlot {
-    it.skyblockId.contains("HOTSPOT_RADAR") || it.hoverName.string.contains("Hotspot Radar", ignoreCase = true)
+    it.skyblockId.contains(com.github.noamm9.utils.SkyblockText.HOTSPOT_RADAR) || it.hoverName.string.contains(com.github.noamm9.utils.SkyblockText.HOTSPOT_RADAR_NAME, ignoreCase = true)
 }
 
 /** A particle while the radar is reading: keep the ones around us (the trail starts at us and points the way). */

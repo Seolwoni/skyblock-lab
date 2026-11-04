@@ -151,8 +151,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal var hopThisStretch = true
     internal var stretchLeft = 0
     internal var justCaughtSomething = false
-    internal val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
-    internal val WHIPS = mapOf(1 to "SOUL_WHIP", 2 to "FLAMING_FLAY")
+    internal val WITHER_BLADES = com.github.noamm9.utils.SkyblockText.WITHER_BLADES
+    internal val WHIPS = mapOf(1 to com.github.noamm9.utils.SkyblockText.SOUL_WHIP, 2 to com.github.noamm9.utils.SkyblockText.FLAMING_FLAY)
     internal val NPC_CLASSES = setOf("Villager", "WanderingTrader")
 
     internal var running = false
@@ -287,16 +287,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 if (running) stop("stopped") else start()
             }
             if (running) mc.player?.let { com.github.noamm9.utils.Humanize.settle(it) }
-            if (running) runCatching(::tick).onFailure { stop("error: ${it.message}") }
+            if (running) runCatching(::tick).onFailure { com.github.noamm9.utils.Safely.report("AutoFishing tick", it); stop("error: ${it.message}") }
         }
-        register<com.github.noamm9.event.impl.ChatMessageEvent> { if (readShared.value) runCatching { readSharedHotspot(event.unformattedText) } }
+        register<com.github.noamm9.event.impl.ChatMessageEvent> { if (readShared.value) com.github.noamm9.utils.Safely("AutoFishing shared hotspot") { readSharedHotspot(event.unformattedText) } }
         register<com.github.noamm9.event.impl.ChatMessageEvent> {
             if (! running) return@register
             val t = event.unformattedText.replace(Regex("§."), "").trim()
             val lastReel = reels.lastOrNull()?.tick ?: return@register
             if (tickCount - lastReel > 30 || t.length > 160) return@register
             if (Regex("^(?:\\[[^]]+] )*[A-Za-z0-9_]{2,16}: ").containsMatchIn(t)) return@register // a player talking
-            if (t.contains("Double Hook", ignoreCase = true)) { claimsLeft++; return@register }
+            if (t.contains(com.github.noamm9.utils.SkyblockText.DOUBLE_HOOK, ignoreCase = true)) { claimsLeft++; return@register }
             catches += tickCount to t.lowercase()
             claimsLeft++
         }
@@ -322,7 +322,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             if (! running || ! showMarkers.value || ! creatureGlow.value || event.entity.id !in mineAlive) return@register
             event.color = if (event.entity.id in rareIds) java.awt.Color(255, 196, 64) else com.github.noamm9.ui.clickgui.components.settings.Style.accent2
         }
-        register<com.github.noamm9.event.impl.RenderWorldEvent> { runCatching { com.github.noamm9.utils.Humanize.frame(); trackFrame() } }
+        register<com.github.noamm9.event.impl.RenderWorldEvent> { com.github.noamm9.utils.Safely("AutoFishing frame") { com.github.noamm9.utils.Humanize.frame(); trackFrame() } }
         register<com.github.noamm9.event.impl.RenderWorldEvent> {
             if (! running || ! showMarkers.value) return@register
             val level = mc.level ?: return@register
@@ -349,7 +349,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     // label: name, then a health bar and the distance
                     val raw = (tagOf(e) ?: e.name.string).replace(Regex("§."), "")
                     val name = creatureName(e) ?: raw.substringBefore('❤').trim()
-                    val hp = Regex("([\\d,.]+[kKmMbB]?)/([\\d,.]+[kKmMbB]?)❤").find(raw)
+                    val hp = com.github.noamm9.utils.SkyblockText.MOB_HEALTH.find(raw)
                     val frac = hp?.let { (parseShort(it.groupValues[1]) / parseShort(it.groupValues[2]).coerceAtLeast(1.0)).coerceIn(0.0, 1.0) }
                         ?: (e as? LivingEntity)?.let { (it.health / it.maxHealth).toDouble().coerceIn(0.0, 1.0) } ?: 1.0
                     val dist = mc.player?.distanceTo(e)?.toInt() ?: 0

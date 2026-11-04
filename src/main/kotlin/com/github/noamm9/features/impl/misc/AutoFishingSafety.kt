@@ -56,7 +56,7 @@ internal fun AutoFishing.escapeLava(p: LocalPlayer) {
         mc.options.keyUp.isDown = true
         // swimming alone often can't climb out: teleport back with AOTV, else the Hyperion, every half second
         if (lavaTicks % 10 == 4) {
-            val tp = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" }
+            val tp = PlayerUtils.findHotbarSlot { it.skyblockId in com.github.noamm9.utils.SkyblockText.TELEPORT_SWORDS }
                 ?: PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
             if (tp != null) { hold(tp); use(p) }
         }

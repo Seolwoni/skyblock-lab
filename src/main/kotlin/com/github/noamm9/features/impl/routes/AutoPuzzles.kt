@@ -53,7 +53,7 @@ object AutoPuzzles: Feature("Solves puzzles by itself using the Puzzle Solvers' 
             busy = false
             val wasWalking = walkingNow
             walkingNow = false
-            runCatching { tickPuzzles() }
+            com.github.noamm9.utils.Safely("AutoPuzzles tick") { tickPuzzles() }
             if (wasWalking && ! walkingNow) AutoRoutes.releaseAll()
         }
     }

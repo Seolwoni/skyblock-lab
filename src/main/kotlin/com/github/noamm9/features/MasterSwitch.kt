@@ -19,7 +19,7 @@ object MasterSwitch {
     private fun turnOff() {
         val on = FeatureManager.features.filter { it.enabled && it !is ClickGui }
         if (on.isEmpty()) return NotificationManager.push("Riftwalk", "&7Nothing is on")
-        on.forEach { runCatching { it.toggle() } }
+        on.forEach { com.github.noamm9.utils.Safely("MasterSwitch ${it.name}") { it.toggle() } }
         // Some built-in parts (server link, door fix, class colours, mod hider) can't be switched off: skip those.
         val turnedOff = on.filter { ! it.enabled }
         ClickGui.masterSaved.value = turnedOff.joinToString("\n") { it.jsonName }
@@ -30,7 +30,7 @@ object MasterSwitch {
         val names = ClickGui.masterSaved.value.split("\n").filter { it.isNotBlank() }.toSet()
         var n = 0
         FeatureManager.features.filter { it.jsonName in names && ! it.enabled }.forEach {
-            runCatching { it.toggle() }
+            com.github.noamm9.utils.Safely("MasterSwitch ${it.name}") { it.toggle() }
             n++
         }
         ClickGui.masterSaved.value = ""

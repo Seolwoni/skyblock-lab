@@ -125,7 +125,7 @@ internal fun AutoFishing.claim(e: Entity, how: String = "") {
 /** "Sea Walker" from "[Lv45] Sea Walker 1,200/1,200❤" (colour codes and symbols stripped). */
 internal fun AutoFishing.creatureName(e: Entity): String? {
     val tag = tagOf(e)?.replace(Regex("§."), "") ?: return null
-    val m = Regex("^(?:\\[Lv\\d+] )?(.+?) [\\d,.]+[kKmMbB]?(?:/[\\d,.]+[kKmMbB]?)?❤").find(tag.trim()) ?: return null
+    val m = com.github.noamm9.utils.SkyblockText.MOB_TAG.find(tag.trim()) ?: return null
     return m.groupValues[1].replace(Regex("[^A-Za-z' -]"), "").trim().takeIf { it.length >= 3 }
 }
 
@@ -136,7 +136,7 @@ internal fun AutoFishing.tagOf(e: Entity): String? {
 }
 
 /** "0❤" on its name tag: SkyBlock keeps a dying creature around for a moment. */
-internal fun AutoFishing.deadTag(e: Entity) = tagOf(e)?.let { Regex("(?:^|\\s)0/[\\d,.]+[kKmMbB]?❤").containsMatchIn(it.replace(Regex("§."), "")) || it.replace(Regex("§."), "").contains(" 0❤") } == true
+internal fun AutoFishing.deadTag(e: Entity) = tagOf(e)?.let { com.github.noamm9.utils.SkyblockText.MOB_DEAD.containsMatchIn(it.replace(Regex("§."), "")) } == true
 
 internal fun AutoFishing.creatures(p: LocalPlayer): List<LivingEntity> {
     val r = killRange.value

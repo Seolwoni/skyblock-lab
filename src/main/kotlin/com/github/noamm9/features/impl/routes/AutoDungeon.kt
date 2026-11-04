@@ -71,7 +71,7 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
             if (toggleKey.isPressed() && mc.gui.screen() == null) {
                 if (state != State.IDLE) stop("stopped") else start()
             }
-            if (state != State.IDLE) runCatching(::tick).onFailure { stop("error: ${it.message}") }
+            if (state != State.IDLE) runCatching(::tick).onFailure { com.github.noamm9.utils.Safely.report("AutoDungeon tick", it); stop("error: ${it.message}") }
         }
         register<WorldChangeEvent> { if (state != State.IDLE) stop("world changed") }
 

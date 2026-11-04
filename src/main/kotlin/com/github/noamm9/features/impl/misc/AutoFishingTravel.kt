@@ -43,7 +43,7 @@ internal fun AutoFishing.nearestHotspot(p: LocalPlayer): Entity? {
     val r = hotspotRange.value.toDouble()
     // the "HOTSPOT" text: an armor stand's name or a text display, whichever the server uses
     val live = com.github.noamm9.utils.FloatingText.near(p.level(), p.boundingBox.inflate(r, 64.0, r))
-        .filter { (e, t) -> e.isAlive && t.contains("HOTSPOT", ignoreCase = true) }
+        .filter { (e, t) -> e.isAlive && t.contains(com.github.noamm9.utils.SkyblockText.HOTSPOT, ignoreCase = true) }
         .map { it.first }
     val now = System.currentTimeMillis()
     for (h in live) remembered[h.blockPosition().asLong()] = h.position() to now
@@ -352,7 +352,7 @@ internal fun AutoFishing.lineSafe(a: Vec3, b: Vec3): Boolean {
 /** AOTV to a path node 9-12 blocks ahead when the stretch is straight, level, in sight and away from lava. */
 internal fun AutoFishing.tryHop(p: LocalPlayer): Boolean {
     if (hopWait > 0 || ! p.onGround() || RANDOM.nextInt(100) < walkSome.value) return false
-    val slot = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" } ?: return false
+    val slot = PlayerUtils.findHotbarSlot { it.skyblockId in com.github.noamm9.utils.SkyblockText.TELEPORT_SWORDS } ?: return false
     val from = p.position()
     var pick = - 1
     for (i in pathIndex until path.size) {
@@ -433,7 +433,7 @@ internal fun AutoFishing.planHop(p: LocalPlayer, goal: Vec3): AutoFishing.Hop? {
         }
         if (best != null) return best
     }
-    val aotvSlot = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" } ?: return null
+    val aotvSlot = PlayerUtils.findHotbarSlot { it.skyblockId in com.github.noamm9.utils.SkyblockText.TELEPORT_SWORDS } ?: return null
     val baseYaw = Math.toDegrees(kotlin.math.atan2(goal.z - p.z, goal.x - p.x)).toFloat() - 90f
     var best: AutoFishing.Hop? = null
     var bestScore = here - 4.0

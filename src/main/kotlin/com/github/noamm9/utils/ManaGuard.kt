@@ -14,10 +14,10 @@ object ManaGuard: ISelfInit {
 
     override fun init() {
         EventBus.register<ActionBarMessageEvent> {
-            if (event.component.string.contains("NOT ENOUGH MANA", ignoreCase = true)) lastOut = System.currentTimeMillis()
+            if (event.component.string.contains(SkyblockText.NOT_ENOUGH_MANA_BAR, ignoreCase = true)) lastOut = System.currentTimeMillis()
         }
         EventBus.register<ChatMessageEvent> {
-            if (event.unformattedText.contains("do not have enough mana", ignoreCase = true)) lastOut = System.currentTimeMillis()
+            if (event.unformattedText.contains(SkyblockText.NOT_ENOUGH_MANA_CHAT, ignoreCase = true)) lastOut = System.currentTimeMillis()
         }
     }
 

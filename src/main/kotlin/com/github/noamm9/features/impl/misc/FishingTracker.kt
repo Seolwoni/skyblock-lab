@@ -33,7 +33,7 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private val lowBait by SliderSetting("Low Bait At", 20, 1, 200, 1).withDescription("Warns once the bait count drops to this")
     val resetButton by ButtonSetting("Reset Tracker") { reset() }
 
-    private val trophyMsg = Regex("TROPHY FISH! You caught an? (.+?) (BRONZE|SILVER|GOLD|DIAMOND)\\.?$")
+    private val trophyMsg = com.github.noamm9.utils.SkyblockText.TROPHY_CATCH
     private val tierColor = mapOf("BRONZE" to "§6", "SILVER" to "§7", "GOLD" to "§e", "DIAMOND" to "§b")
     private val trophies = LinkedHashMap<String, IntArray>() // fish -> bronze, silver, gold, diamond
     private var castAt = 0L
@@ -42,7 +42,7 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private var baitTick = 0
     private var biteAt = 0L
 
-    private val creatureTag = Regex("^(?:\\[Lv\\d+] )?(.+?) [\\d,.]+[kKmMbB]?(?:/[\\d,.]+[kKmMbB]?)?❤")
+    private val creatureTag = com.github.noamm9.utils.SkyblockText.MOB_TAG
 
     private var casts = 0
     private var reels = 0
@@ -62,10 +62,10 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private val seenStands = HashSet<Int>()
 
     override fun init() {
-        register<TickEvent.Start> { runCatching { tick() } }
+        register<TickEvent.Start> { com.github.noamm9.utils.Safely("FishingTracker tick") { tick() } }
         register<ChatMessageEvent> {
             val t = event.unformattedText.removeFormatting()
-            if (t.contains("Double Hook!", ignoreCase = true)) doubleHooks++
+            if (t.contains(com.github.noamm9.utils.SkyblockText.DOUBLE_HOOK, ignoreCase = true)) doubleHooks++
             trophyMsg.find(t.trim())?.let { m ->
                 val tier = listOf("BRONZE", "SILVER", "GOLD", "DIAMOND").indexOf(m.groupValues[2])
                 if (tier >= 0) trophies.getOrPut(m.groupValues[1]) { IntArray(4) }[tier]++
@@ -106,7 +106,7 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
         val stack = p.inventory.getItem(8)
         if (stack.isEmpty) return
         val lore = with(com.github.noamm9.utils.items.ItemUtils) { stack.lore }.map { it.removeFormatting() }
-        val count = lore.firstNotNullOfOrNull { Regex("Bait Remaining: ([\\d,]+)").find(it)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull() }
+        val count = lore.firstNotNullOfOrNull { com.github.noamm9.utils.SkyblockText.BAIT_REMAINING.find(it)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull() }
         val name = lore.firstNotNullOfOrNull { Regex("^(?:Selected|Current|Using)(?: Bait)?: (.+)$").find(it)?.groupValues?.get(1) } ?: stack.hoverName.string.removeFormatting()
         if (baitName != null && baitName != name) com.github.noamm9.ui.notification.NotificationManager.push("Bait changed", "&f$baitName &7-> &f$name")
         baitName = name
@@ -159,7 +159,7 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private fun biteSign(hook: net.minecraft.world.entity.projectile.FishingHook): Boolean {
         val level = mc.level ?: return false
         val box = hook.boundingBox.inflate(0.6, 2.0, 0.6)
-        return com.github.noamm9.utils.FloatingText.any(level, box, "!!!")
+        return com.github.noamm9.utils.FloatingText.any(level, box, com.github.noamm9.utils.SkyblockText.BITE)
     }
 
     private fun snapshot(): Map<String, Pair<Int, String>> {

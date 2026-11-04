@@ -63,7 +63,7 @@ object AutoBoss: Feature("F7/M7 boss: does the terminals and levers of each P3 s
             if (toggleKey.isPressed() && mc.gui.screen() == null) {
                 if (running) stop("stopped") else start()
             }
-            if (running) runCatching(::tick).onFailure { stop("error: ${it.message}") }
+            if (running) runCatching(::tick).onFailure { com.github.noamm9.utils.Safely.report("AutoBoss tick", it); stop("error: ${it.message}") }
         }
         register<WorldChangeEvent> { if (running) stop("world changed") }
 
