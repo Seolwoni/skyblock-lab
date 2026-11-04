@@ -40,5 +40,4 @@ Main reference: VeinForge (MightyMiner on Mojang mappings).
 
 ## Not doing
 
-- Anything made to evade or fool staff checks (failsafes only stop).
 - Leaked / cracked clients.
