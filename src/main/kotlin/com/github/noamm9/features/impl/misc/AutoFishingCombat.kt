@@ -116,7 +116,7 @@ internal fun AutoFishing.claim(e: Entity) {
     rareIds += e.id
     if (rareAlert.value) {
         NotificationManager.push("Rare sea creature!", "&6$rare &fcame up for you")
-        mc.gui.setTitle(net.minecraft.network.chat.Component.literal("§6§l$rare"))
+        com.github.noamm9.utils.ChatUtils.showTitle("§6§l$rare", "§fcame up for you")
         com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1f, 1.2f)
     }
 }
