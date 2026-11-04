@@ -248,6 +248,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal var lastLookYaw: Float? = null
     internal var lastLookPitch = 0f
     internal var lastTickPos: Vec3? = null
+    internal var lastTickLevel: Any? = null
+    internal var lastTickPlayer: Any? = null
 
     // safe walking (own path, avoids lava / water)
     internal var path: List<BlockPos> = emptyList()
@@ -661,7 +663,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         tickCount += 100 // anything seen from now on is "after" any stale reel
         timing = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
         lastLookYaw = null
-        lastTickPos = null
+        lastTickPos = null; lastTickLevel = null; lastTickPlayer = null
         wobYaw = 0f; wobPitch = 0f
         aimTarget = null
         noticeAt.clear()
@@ -795,7 +797,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             com.github.noamm9.utils.Humanize.setView(p, yaw, pitch)
             return true
         }
-        return com.github.noamm9.utils.Humanize.turnTo(p, yaw, pitch, tol)
+        // no overshoot while fighting: a creature on the move needs the aim to stay on it
+        return com.github.noamm9.utils.Humanize.turnTo(p, yaw, pitch, tol, overshoot = state != State.FIGHT)
     }
 
     /** The small eased head movements around the bobber while waiting. Also follows the player's own camera moves. */
@@ -885,8 +888,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         lastLookPitch = p.xRot
         // a long jump in one tick that isn't ours (no warp / AOTV / Wither Impact just now)
         val here = p.position()
-        val before = lastTickPos
+        // dying / respawning or a new world (lobby, other server) isn't a teleport: start counting again
+        val sameWorld = lastTickLevel === p.level() && lastTickPlayer === p && ! p.isDeadOrDying
+        val before = if (sameWorld) lastTickPos else null
         lastTickPos = here
+        lastTickLevel = p.level()
+        lastTickPlayer = p
         if (failsafe.value && stopOnTeleport.value && before != null && ownMoveTicks <= 0 && state != State.RESUME &&
             com.github.noamm9.utils.WatchSigns.teleported(before.x, before.y, before.z, here.x, here.y, here.z, teleportDistance.value.toDouble())
         ) return failStop("teleported ${before.distanceTo(here).toInt()} blocks without a warp")

@@ -14,6 +14,8 @@ class WatchSignsTest {
         assertEquals("Bob", WatchSigns.partyInvite("Bob has invited you to join Carl's party!"))
         assertNull(WatchSigns.partyInvite("[VIP] Steve: has invited you to join their party!"))
         assertNull(WatchSigns.partyInvite("You have 60 seconds to accept. Click here to join!"))
+        val wrapped = "§9§m-----------------------------§r\n§b[MVP§c+§b] Steve §r§ehas invited you to join their party!\n§r§eYou have §r§c60 §r§eseconds to accept. §r§6Click here to join!§r\n§9§m-----------------------------"
+        assertEquals("Steve", WatchSigns.partyInvite(wrapped))
     }
 
     @Test fun privateMessages() {

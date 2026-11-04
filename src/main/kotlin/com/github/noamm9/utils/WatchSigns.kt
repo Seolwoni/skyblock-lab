@@ -12,7 +12,8 @@ object WatchSigns {
     private val PRIVATE_MESSAGE = Regex("^From (?:\\[[^]]+] )?([A-Za-z0-9_]{1,16}): ")
 
     /** Who invited you to a party, or null. */
-    fun partyInvite(line: String): String? = PARTY_INVITE.find(clean(line))?.groupValues?.get(1)
+    fun partyInvite(message: String): String? =
+        message.split('\n').firstNotNullOfOrNull { PARTY_INVITE.find(clean(it))?.groupValues?.get(1) } // Hypixel wraps it in ----- lines
 
     /** Who sent you a private message ("From <name>: ..."), or null. */
     fun privateMessage(line: String): String? = PRIVATE_MESSAGE.find(clean(line))?.groupValues?.get(1)

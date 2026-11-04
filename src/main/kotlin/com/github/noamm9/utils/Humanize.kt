@@ -152,7 +152,7 @@ object Humanize {
      * Turns towards yaw / pitch like a hand on a mouse: speeds up, cruises, eases in, along a gentle arc.
      * Returns true once within [tolerance] degrees. With Human Behaviour off it snaps.
      */
-    fun turnTo(p: LocalPlayer, yaw: Float, pitch: Float, tolerance: Float = 1.5f): Boolean {
+    fun turnTo(p: LocalPlayer, yaw: Float, pitch: Float, tolerance: Float = 1.5f, overshoot: Boolean = true): Boolean {
         if (! on) {
             PlayerUtils.rotate(yaw, pitch)
             return true
@@ -174,7 +174,7 @@ object Humanize {
         val fresh = abs(wrap(yaw - lastYaw)) + abs(pitch - lastPitch) > 15f || realDist > curveFrom + 15f
         if (fresh) {
             // a new turn: maybe aim a bit past it (share of the turn from Human Behaviour, never on small turns)
-            val extra = if (HumanBehaviour.overshoot.value) HumanMotion.overshoot(realDist, HumanBehaviour.overshootMin.value.toFloat(), HumanBehaviour.overshootMax.value.toFloat(), rnd) else 0f
+            val extra = if (overshoot && HumanBehaviour.overshoot.value) HumanMotion.overshoot(realDist, HumanBehaviour.overshootMin.value.toFloat(), HumanBehaviour.overshootMax.value.toFloat(), rnd) else 0f
             osYaw = if (realDist > 0f) ry / realDist * extra else 0f
             osPitch = if (realDist > 0f) rp / realDist * extra else 0f
             if (pitch + osPitch !in - 90f .. 90f) osPitch = 0f
