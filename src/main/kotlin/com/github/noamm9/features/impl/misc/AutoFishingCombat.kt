@@ -154,9 +154,9 @@ internal fun AutoFishing.trackFrame() {
     trackLastNs = now
     val p = mc.player ?: return
     val e = track
-    if (running && state == State.TRAVEL && walkSteer && hop == null) { steerFrame(p, dt); return }
-    walkSteer = walkSteer && state == State.TRAVEL
-    if (! running || e == null || ! e.isAlive || state != State.FIGHT) { trackVelYaw = 0f; trackVelPitch = 0f; return }
+    if (running && state == AutoFishing.State.TRAVEL && walkSteer && hop == null) { steerFrame(p, dt); return }
+    walkSteer = walkSteer && state == AutoFishing.State.TRAVEL
+    if (! running || e == null || ! e.isAlive || state != AutoFishing.State.FIGHT) { trackVelYaw = 0f; trackVelPitch = 0f; return }
     if (dt <= 0f) return
     val ms = System.currentTimeMillis()
     if (ms >= trackOffNext) { // pick a new spot on its body every 0.4-1.2 s

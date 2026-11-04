@@ -66,7 +66,7 @@ internal fun AutoFishing.escapeLava(p: LocalPlayer) {
         failStop("fell into lava and couldn't get out")
         return
     }
-    state = State.TRAVEL
+    state = AutoFishing.State.TRAVEL
     repath = 0
 }
 

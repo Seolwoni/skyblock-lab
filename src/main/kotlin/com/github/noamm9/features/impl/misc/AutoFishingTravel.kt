@@ -68,7 +68,7 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
             scouting = true
             path = emptyList()
             travelStuck = 0
-            state = State.TRAVEL
+            state = AutoFishing.State.TRAVEL
             info("&7Heading for a hotspot seen earlier &8(${p.position().distanceTo(far).toInt()} blocks)")
             return
         }
@@ -76,7 +76,7 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
         hotspot = null
         if (stand == null) stand = p.position()
         status = "no hotspot nearby, fishing here"
-        state = State.CAST
+        state = AutoFishing.State.CAST
         return
     }
     scouting = false
@@ -91,7 +91,7 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
     aimTries = 0
     travelStuck = 0
     path = emptyList()
-    state = State.TRAVEL
+    state = AutoFishing.State.TRAVEL
     info("&7Hotspot found &8(${p.position().distanceTo(hs.position()).toInt()} blocks)&7, going there.")
 }
 
@@ -125,7 +125,7 @@ internal fun AutoFishing.shoreSpot(p: LocalPlayer, centre: Vec3): Vec3? {
 }
 
 internal fun AutoFishing.travel(p: LocalPlayer) {
-    val goal = stand ?: return run { state = State.FIND }
+    val goal = stand ?: return run { state = AutoFishing.State.FIND }
     ownMoveTicks = 20 // our own walking / AOTV: not the server's doing
     expectedSlot = - 1
     if (horizontalDist(p.position(), goal) < 0.6 && abs(p.y - goal.y) < 1.5) {
@@ -166,7 +166,7 @@ internal fun AutoFishing.travel(p: LocalPlayer) {
             hotspot?.let { badHotspots += it.id }
             hotspot = null
             scouting = false
-            state = State.FIND
+            state = AutoFishing.State.FIND
             status = "no safe way there"
         }
         else status = "planning a way there"
@@ -180,14 +180,14 @@ internal fun AutoFishing.arrive(p: LocalPlayer) {
     if (scouting) { // got near a remembered hotspot: look for it properly now
         scouting = false
         remembered.clear()
-        state = State.FIND
+        state = AutoFishing.State.FIND
         return
     }
     val hs = hotspot
     if (hs != null) aimAt(p, hs) else aimTarget = null
     offYaw = 0f; offPitch = 0f; moveLen = 0
     returning = true
-    state = State.CAST
+    state = AutoFishing.State.CAST
     wait = castWait()
     status = "at the spot"
 }
@@ -379,7 +379,7 @@ internal fun AutoFishing.hopScore(feet: Vec3, goal: Vec3) = horizontalDist(feet,
  * AOTV - a few aims towards the goal, each traced to where the teleport stops and where we'd fall to.
  * Only hops that get clearly closer count.
  */
-internal fun AutoFishing.planHop(p: LocalPlayer, goal: Vec3): Hop? {
+internal fun AutoFishing.planHop(p: LocalPlayer, goal: Vec3): AutoFishing.Hop? {
     val here = hopScore(p.position(), goal)
     val etherSlot = PlayerUtils.findHotbarSlot { com.github.noamm9.utils.items.EtherwarpHelper.getEtherwarpDistance(it) != null }
     if (etherSlot != null) {
@@ -395,7 +395,7 @@ internal fun AutoFishing.planHop(p: LocalPlayer, goal: Vec3): Hop? {
                 topBlock(BlockPos.containing(pt.x + ox, maxOf(pt.y, goal.y) + 6, pt.z + oz), 16)?.let { cands += it }
             }
         }
-        var best: Hop? = null
+        var best: AutoFishing.Hop? = null
         var bestScore = here - 6.0
         var checked = 0
         for (b in cands) {
@@ -412,13 +412,13 @@ internal fun AutoFishing.planHop(p: LocalPlayer, goal: Vec3): Hop? {
             val land = com.github.noamm9.utils.items.EtherwarpHelper.getEtherPos(sneakFeet, look, range)
             if (! land.succeeded || land.pos != b) continue
             bestScore = score
-            best = Hop(true, etherSlot, b, rot.yaw, rot.pitch, Vec3.atBottomCenterOf(feet))
+            best = AutoFishing.Hop(true, etherSlot, b, rot.yaw, rot.pitch, Vec3.atBottomCenterOf(feet))
         }
         if (best != null) return best
     }
     val aotvSlot = PlayerUtils.findHotbarSlot { it.skyblockId == "ASPECT_OF_THE_VOID" || it.skyblockId == "ASPECT_OF_THE_END" } ?: return null
     val baseYaw = Math.toDegrees(kotlin.math.atan2(goal.z - p.z, goal.x - p.x)).toFloat() - 90f
-    var best: Hop? = null
+    var best: AutoFishing.Hop? = null
     var bestScore = here - 4.0
     for (dyaw in floatArrayOf(0f, - 12f, 12f, - 25f, 25f)) for (pitch in floatArrayOf(- 5f, - 20f, - 35f, - 50f, 5f)) {
         val yaw = baseYaw + dyaw
@@ -426,7 +426,7 @@ internal fun AutoFishing.planHop(p: LocalPlayer, goal: Vec3): Hop? {
         val score = hopScore(land, goal)
         if (score < bestScore) {
             bestScore = score
-            best = Hop(false, aotvSlot, null, yaw, pitch, land)
+            best = AutoFishing.Hop(false, aotvSlot, null, yaw, pitch, land)
         }
     }
     return best
