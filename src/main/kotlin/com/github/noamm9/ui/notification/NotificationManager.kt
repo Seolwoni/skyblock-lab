@@ -21,6 +21,7 @@ import java.util.concurrent.*
 object NotificationManager: ISelfInit {
     private val notifications = CopyOnWriteArrayList<Notification>()
     private var lastFrameTime = System.currentTimeMillis()
+    private val peek = Animation(160L, 1f) // 1 = shown, ~0.15 = stepped aside so the menu under it can be used
 
     private const val WIDTH = 190f
     private const val PAD = 9f
@@ -78,6 +79,12 @@ object NotificationManager: ISelfInit {
         val mX = com.github.noamm9.ui.utils.Resolution.getMouseX().toFloat()
         val mY = com.github.noamm9.ui.utils.Resolution.getMouseY().toFloat()
 
+        // inside a menu, toasts become see-through while the mouse is over their corner
+        val stackTop = screenH - notifications.size.coerceAtMost(MAX_VISIBLE) * 62f - 20f
+        val near = mc.gui.screen() != null && mX >= screenW - WIDTH - 30f && mY >= stackTop
+        peek.update(if (near) 0.15f else 1f)
+        val pv = peek.value
+
         val prev = UiFont.active
         UiFont.active = smooth()
         try {
@@ -102,8 +109,9 @@ object NotificationManager: ISelfInit {
 
                 // slide in from the right (eased by Animation), glide to the stack position
                 n.stack.update(stackY)
-                val a = n.anim.value
-                val x = screenW - (WIDTH + 10f) * a + (1f - a) * 12f
+                val am = n.anim.value
+                val x = screenW - (WIDTH + 10f) * am + (1f - am) * 12f
+                val a = am * pv
                 val y = screenH - height - 10f - n.stack.value
 
                 val hovered = mX >= x && mX <= x + WIDTH && mY >= y && mY <= y + height
@@ -139,7 +147,7 @@ object NotificationManager: ISelfInit {
                 Style.roundRect(ctx, x + 6f, by, WIDTH - 12f, 2f, 1f, Color(255, 255, 255, (14 * a).toInt()))
                 if (bw > 2f) Style.gradientPill(ctx, x + 6f, by, bw, 2f, Style.accentColor.withAlpha((220 * a).toInt()), Style.accent2.withAlpha((220 * a).toInt()))
 
-                stackY += (height + 6f) * a
+                stackY += (height + 6f) * am
             }
         } finally {
             UiFont.active = prev

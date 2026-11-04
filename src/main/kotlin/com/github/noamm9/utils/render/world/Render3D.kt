@@ -304,7 +304,8 @@ object Render3D {
         for ((i, line) in text.addColor().lineSequence().withIndex()) collector.submitText(
             matrixStack, - line.width() / 2f, i * 9f, Component.literal(line).visualOrderText, true,
             if (phase) Font.DisplayMode.SEE_THROUGH else Font.DisplayMode.NORMAL,
-            LightCoordsUtil.FULL_BRIGHT, color.rgb, 0, 0
+            LightCoordsUtil.FULL_BRIGHT, color.rgb,
+            if (runCatching { com.github.noamm9.features.impl.dev.ClickGui.labelBackdrop.value }.getOrDefault(false)) 0x5A0C0814 else 0, 0
         )
 
         matrixStack.popPose()
@@ -363,6 +364,17 @@ object Render3D {
     fun RenderContext.renderLine(start: Vec3, finish: Vec3, color: Color, thickness: Number = 2, phase: Boolean = false) {
         matrixStack.pushPose()
         matrixStack.translate(camera.pos.reverse())
+
+        if (runCatching { com.github.noamm9.features.impl.dev.ClickGui.espStyle.value != 0 }.getOrDefault(false)) {
+            val glow = runCatching { com.github.noamm9.features.impl.dev.ClickGui.espGlow.value }.getOrDefault(35) / 100f
+            RenderBatcher.lineBatch(phase).line(
+                pose(),
+                start.x.toFloat(), start.y.toFloat(), start.z.toFloat(),
+                finish.x.toFloat(), finish.y.toFloat(), finish.z.toFloat(),
+                color.red / 255f, color.green / 255f, color.blue / 255f, color.alpha / 255f * 0.22f * glow / 0.35f,
+                thickness.toFloat() * 3f
+            )
+        }
 
         RenderBatcher.lineBatch(phase).line(
             pose(),

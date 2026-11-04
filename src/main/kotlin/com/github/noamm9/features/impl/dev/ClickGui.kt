@@ -34,6 +34,7 @@ object ClickGui: Feature("A feature used to change the ClickGui configuration.",
     val espStyle by DropdownSetting("ESP Style", 1, listOf("Classic", "Glow", "Corners")).section("World Look")
         .withDescription("How every ESP box is drawn. Classic: plain outline. Glow: a soft halo around a crisp outline and a lighter fill. Corners: the halo with clean corner brackets instead of full edges")
     val espGlow by com.github.noamm9.config.types.SliderSetting("ESP Glow", 35, 0, 100, 5, "%").withDescription("How strong the halo around ESP boxes is").showIf { espStyle.value != 0 }
+    val labelBackdrop by ToggleSetting("Label Backdrop", true).withDescription("A soft dark plate behind text floating in the world (names, distances, waypoints) so it reads on any background")
     val themeColorsButton by ButtonSetting("Apply Theme Colours") {
         var n = 0
         com.github.noamm9.features.FeatureManager.features.forEach { f ->

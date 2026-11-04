@@ -69,8 +69,19 @@ abstract class HudElement {
         val gui = com.github.noamm9.features.impl.dev.ClickGui
         if (! example && themedPanel && gui.hudPanels.value && width > 0f && height > 0f) {
             val left = if (centered()) - width / 2f else 0f
-            Style.roundRect(ctx, left - 4f, - 3f, width + 8f, height + 6f, 3.5f, Color(15, 11, 23, 165))
-            Style.roundRect(ctx, left - 4f, 0f, 1.5f, height, 0.75f, Style.accentColor.withAlpha(220))
+            val px = left - 5f
+            val py = - 3.5f
+            val pw = width + 10f
+            val ph = height + 7f
+            Style.drawShadow(ctx, px, py, pw, ph, 4.5f, 0.55f)
+            Style.roundRect(ctx, px - 0.5f, py - 0.5f, pw + 1f, ph + 1f, 5f, Color(255, 255, 255, 20)) // hairline edge
+            Style.roundRect(ctx, px, py, pw, ph, 4.5f, Color(16, 11, 26, 172))
+            // light on glass: a faint sheen across the top
+            with(com.github.noamm9.utils.render.Render2D) {
+                ctx.drawVerticalGradient(px + 3f, py + 0.5f, pw - 6f, minOf(9f, ph / 2f), Color(255, 255, 255, 13), Color(255, 255, 255, 0))
+                // accent strip, purple into pink
+                ctx.drawVerticalGradient(px + 1.5f, 0f, 1.5f, height, Style.accentColor.withAlpha(230), Style.accent2.withAlpha(230))
+            }
         }
 
         val prevFont = com.github.noamm9.utils.render.UiFont.active

@@ -49,6 +49,7 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
             "grid" to if (gridEnabled) "Grid  ${gridSize}px" else "Grid  Off",
             "minus" to "−",
             "plus" to "+",
+            "arrange" to "Arrange",
             "reset" to if (resetConfirmed) "Confirm reset?" else "Reset",
             "done" to "Done",
         )
@@ -196,6 +197,7 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
             "minus" -> { gridSize = (gridSize - 5).coerceAtLeast(5); gridEnabled = true }
             "plus" -> { gridSize = (gridSize + 5).coerceAtMost(50); gridEnabled = true }
             "done" -> onClose()
+            "arrange" -> arrange()
             "reset" -> {
                 if (! resetConfirmed) { resetConfirmed = true; return }
                 resetConfirmed = false
@@ -207,6 +209,26 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
                 }
             }
         }
+    }
+
+    /** Lays every enabled element out so none overlap: columns from the top-left, keeping their current order. */
+    private fun arrange() {
+        val gap = 8f
+        val maxY = Resolution.height - 50f
+        var x = 8f
+        var y = 8f
+        var colW = 0f
+        for (el in huds.sortedWith(compareBy({ it.x }, { it.y }))) {
+            val w = el.width * el.scale + 10f
+            val h = el.height * el.scale + 7f
+            if (w <= 10f || h <= 7f) continue
+            if (y + h > maxY && y > 8f) { x += colW + gap; y = 8f; colW = 0f }
+            el.x = x + (if (el.centered()) w / 2f - 5f else 5f)
+            el.y = y + 3.5f
+            y += h + gap
+            colW = maxOf(colW, w)
+        }
+        ConfigManager.save()
     }
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, horizontal: Double, vertical: Double): Boolean {
