@@ -117,10 +117,11 @@ object Style {
 
     /** Layered soft shadow around a rounded panel. */
     fun drawShadow(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, radius: Float, strength: Float = 1f) {
-        // 12 thin layers: with the smooth corners this reads as one soft, slightly lowered shadow
-        for (i in 12 downTo 1) {
-            val d = i * 0.75f
-            val a = (9 * strength * (13 - i) / 12f).toInt().coerceIn(0, 255)
+        // 12 thin layers: with the smooth corners this reads as one soft, slightly lowered shadow (3 on phones)
+        val layers = if (ClickGui.mobileMode.value) 3 else 12
+        for (i in layers downTo 1) {
+            val d = i * 0.75f * 12f / layers
+            val a = (9 * strength * (13 - i * 12f / layers) / 12f * 12f / layers).toInt().coerceIn(0, 255)
             roundRect(ctx, x - d, y - d + 2.5f, w + d * 2, h + d * 2, radius + d, Color(4, 0, 12, a))
         }
     }

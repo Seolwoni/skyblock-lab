@@ -44,6 +44,32 @@ object DiscordWebhook {
         }
     }
 
+    /** Uploads files (name to bytes) with a short message. Discord takes up to ~10 MB per message. */
+    fun sendFiles(url: String, message: String, files: List<Pair<String, ByteArray>>, onDone: (Boolean, String) -> Unit = { _, _ -> }) {
+        val u = url.trim()
+        if (! isValid(u)) return onDone(false, "not a Discord webhook URL")
+        val boundary = "----riftwalk" + System.nanoTime()
+        val out = java.io.ByteArrayOutputStream()
+        fun w(s: String) = out.write(s.toByteArray(Charsets.UTF_8))
+        w("--$boundary\r\nContent-Disposition: form-data; name=\"payload_json\"\r\nContent-Type: application/json\r\n\r\n")
+        w("{\"username\":\"Riftwalk\",\"content\":${q(message.take(1900))}}\r\n")
+        files.forEachIndexed { i, (name, bytes) ->
+            w("--$boundary\r\nContent-Disposition: form-data; name=\"files[$i]\"; filename=\"$name\"\r\nContent-Type: text/plain\r\n\r\n")
+            out.write(bytes)
+            w("\r\n")
+        }
+        w("--$boundary--\r\n")
+        val req = HttpRequest.newBuilder(URI.create(u)).timeout(Duration.ofSeconds(30))
+            .header("Content-Type", "multipart/form-data; boundary=$boundary")
+            .POST(HttpRequest.BodyPublishers.ofByteArray(out.toByteArray())).build()
+        client.sendAsync(req, HttpResponse.BodyHandlers.ofString()).whenComplete { res, err ->
+            val ok = err == null && res.statusCode() in 200 .. 299
+            val why = err?.message ?: "HTTP ${res?.statusCode()} ${res?.body()?.take(120) ?: ""}"
+            if (! ok) NoammAddons.logger.warn("Discord upload failed: $why")
+            NoammAddons.mc.execute { onDone(ok, if (ok) "sent" else why) }
+        }
+    }
+
     private fun q(s: String) = buildString {
         append('"')
         for (c in s) when (c) {

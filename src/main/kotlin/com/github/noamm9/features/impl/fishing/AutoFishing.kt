@@ -163,6 +163,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             info(if (ok) "&aDiscord test sent." else "&cDiscord test failed: $why")
         }
     }.showIf { discordOn.value }
+    internal val sendLogsButton by com.github.noamm9.config.types.ButtonSetting("Send Logs To Discord") { sendLogs() }
+        .withDescription("Uploads fishing.log and the latest session reports to your Discord webhook - handy on a phone, where the files are hard to reach").showIf { discordOn.value }
     internal val checkButton by com.github.noamm9.config.types.ButtonSetting("Fishing Check") { runCatching { fishingCheck() }.onFailure { info("&cCheck failed: ${it.message}") } }
         .section("Server Check").withDescription("Prints what the mod can see right now: hotbar item IDs, floating texts nearby (hotspot / bite / name tags), the hook, tab stats, mana and bait. Stand by the water with the rod out")
     internal val copyLogButton by com.github.noamm9.config.types.ButtonSetting("Copy Log Path") {

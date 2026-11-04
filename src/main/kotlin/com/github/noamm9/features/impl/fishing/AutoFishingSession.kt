@@ -274,4 +274,24 @@ internal fun AutoFishing.sendDiscord(reason: String, lines: List<String>, ms: Lo
         journal.log(if (ok) "discord: sent ($title)" else "discord: failed - $err")
     }
 }
+/** fishing.log (last ~1.5 MB) and the 3 newest session reports, to the Discord webhook. */
+internal fun AutoFishing.sendLogs() {
+    if (discordUrl.value.isBlank()) return info("&cPut your Discord webhook URL in first (Discord section).")
+    val dir = java.nio.file.Path.of(journal.path).parent
+    val files = ArrayList<Pair<String, ByteArray>>()
+    runCatching {
+        val log = java.nio.file.Files.readAllBytes(dir.resolve("fishing.log"))
+        files += "fishing.log" to (if (log.size > 1_500_000) log.copyOfRange(log.size - 1_500_000, log.size) else log)
+    }
+    runCatching {
+        java.nio.file.Files.list(dir.resolve("sessions")).use { st ->
+            st.sorted(Comparator.reverseOrder()).limit(3).forEach { files += it.fileName.toString() to java.nio.file.Files.readAllBytes(it) }
+        }
+    }
+    if (files.isEmpty()) return info("&cNo logs yet - fish for a bit first.")
+    info("&7Sending ${files.size} file(s) to Discord...")
+    com.github.noamm9.utils.DiscordWebhook.sendFiles(discordUrl.value, "🎣 Riftwalk 로그 (${java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm"))})", files) { ok, why ->
+        info(if (ok) "&aLogs sent to Discord." else "&cSending failed: $why")
+    }
+}
 //#endif

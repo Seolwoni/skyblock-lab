@@ -241,7 +241,8 @@ object Render3D {
             val b = outlineColor.blue / 255f
             val w = lineWidth.toFloat()
             val batch = RenderBatcher.lineBatch(phase)
-            if (style != 0) { // soft halo: two wide, faint passes under the crisp line
+            val mobile = runCatching { com.github.noamm9.features.impl.dev.ClickGui.mobileMode.value }.getOrDefault(false)
+            if (style != 0 && ! mobile) { // soft halo: two wide, faint passes under the crisp line
                 val glow = runCatching { com.github.noamm9.features.impl.dev.ClickGui.espGlow.value }.getOrDefault(35) / 100f
                 batch.addLineBoxVertices(pose, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, outlineAlpha * 0.16f * glow / 0.35f, w * 4.2f)
                 batch.addLineBoxVertices(pose, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, outlineAlpha * 0.28f * glow / 0.35f, w * 2.2f)
@@ -365,7 +366,7 @@ object Render3D {
         matrixStack.pushPose()
         matrixStack.translate(camera.pos.reverse())
 
-        if (runCatching { com.github.noamm9.features.impl.dev.ClickGui.espStyle.value != 0 }.getOrDefault(false)) {
+        if (runCatching { com.github.noamm9.features.impl.dev.ClickGui.espStyle.value != 0 && ! com.github.noamm9.features.impl.dev.ClickGui.mobileMode.value }.getOrDefault(false)) {
             val glow = runCatching { com.github.noamm9.features.impl.dev.ClickGui.espGlow.value }.getOrDefault(35) / 100f
             RenderBatcher.lineBatch(phase).line(
                 pose(),
