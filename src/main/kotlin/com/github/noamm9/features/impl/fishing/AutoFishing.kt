@@ -286,7 +286,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val rareIds = HashSet<Int>()
     internal var hotspotAt: Vec3? = null            // where the hotspot was when we picked it (it can move)
     internal val castHp = HashMap<Int, Float>()
-    internal var immuneWait = 0     // creature health at our last blast (immunity check)
+    internal var immuneWait = 0
+    internal val immuneWaited = HashSet<Int>()
+    internal val deaths = ArrayDeque<Pair<Int, Vec3>>()   // tick, where one of ours died (split check)
+    internal var arrivedAt = - 1000
+    internal var nearGoalTicks = 0     // creature health at our last blast (immunity check)
 
     // noticing sea creatures
     internal val noticeAt = HashMap<Int, Int>()
@@ -552,7 +556,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         anchorYaw = p.yRot
         anchorPitch = p.xRot
         seenAt.clear(); seenPos.clear(); reels.clear(); catches.clear(); chase.clear(); claimsLeft = 0
-        claimedAt.clear(); despawnWarned.clear(); rareIds.clear(); castHp.clear()
+        claimedAt.clear(); despawnWarned.clear(); rareIds.clear(); castHp.clear(); immuneWaited.clear(); deaths.clear()
         tickCount += 100 // anything seen from now on is "after" any stale reel
         timing = com.github.noamm9.utils.HumanTiming()
         lastLookYaw = null
@@ -577,7 +581,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         running = true
         returning = false
         state = if (hotspots.value) State.FIND else State.CAST
-        stand = if (hotspots.value) null else p.position()
+        stand = if (hotspots.value) null else Vec3.atBottomCenterOf(BlockPos.containing(p.position()))
         hotspot = null
         badHotspots.clear()
         aimTries = 0
@@ -759,7 +763,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
         // pushed away from the spot: walk back (not while fighting, sea creatures come to us)
         val home = stand
-        if (stayHome.value && home != null && state != State.FIGHT && p.position().distanceTo(home) > 3.0) {
+        if (stayHome.value && home != null && state != State.FIGHT && tickCount - arrivedAt > 60 &&
+            (horizontalDist(p.position(), home) > 3.0 || abs(p.y - home.y) > 2.5)) {
+            journal.log("pushed ${"%.1f".format(horizontalDist(p.position(), home))} blocks from the spot, going back")
             if (p.fishing != null) rod()?.let { hold(it); use(p) }
             state = State.TRAVEL
             path = emptyList()
@@ -770,7 +776,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         claimOwn(p)
         // sea creatures first, the moment one comes up
         val seen = if (killCreatures.value && mc.gui.screen() == null) creatures(p) else emptyList()
-        if (mineAlive.isNotEmpty()) mineAlive.removeIf { id -> val e = p.level().getEntity(id); (e == null || ! e.isAlive).also { if (it && e != null) kills++ } }
+        if (mineAlive.isNotEmpty()) mineAlive.removeIf { id ->
+            val e = p.level().getEntity(id)
+            (e == null || ! e.isAlive).also { if (it && e != null) { kills++; deaths += tickCount to e.position() } }
+        }
         val nowMs = System.currentTimeMillis()
         for (id in mineAlive) {
             val at = claimedAt[id] ?: continue

@@ -64,7 +64,7 @@ internal fun AutoFishing.claimOwn(p: LocalPlayer) {
     while (reels.isNotEmpty() && tickCount - reels.first().tick > 80) reels.removeFirst()
     while (catches.isNotEmpty() && tickCount - catches.first().first > 60) catches.removeFirst()
     if (catches.isEmpty() && (reels.isEmpty() || tickCount - reels.last().tick > 40)) claimsLeft = 0
-    if (reels.isEmpty()) return
+    if (reels.isEmpty()) return claimCompanions(p, around)
 
     for (e in around) {
         if (e.id in mine) continue
@@ -102,6 +102,46 @@ internal fun AutoFishing.claimOwn(p: LocalPlayer) {
         chase[e.id] = n to dist
         score += minOf(30.0, n * 1.5) // up to 30 after ~1 s of coming at us
         if (score >= 70.0) claim(e, "score ${score.toInt()}")
+    }
+    claimCompanions(p, around)
+}
+
+/** A creature's health as SkyBlock shows it on the name tag ("1,200/1,500❤"); the entity's own health is often a dummy. */
+internal fun AutoFishing.hpOf(e: LivingEntity): Double {
+    val tag = tagOf(e)?.replace(Regex("§."), "")
+    val m = tag?.let { com.github.noamm9.utils.SkyblockText.MOB_HEALTH.find(it) }
+    return m?.let { parseShort(it.groupValues[1]) } ?: e.health.toDouble()
+}
+
+internal fun AutoFishing.hpFraction(e: LivingEntity): Double {
+    val tag = tagOf(e)?.replace(Regex("§."), "")
+    val m = tag?.let { com.github.noamm9.utils.SkyblockText.MOB_HEALTH.find(it) }
+    if (m != null) return (parseShort(m.groupValues[1]) / parseShort(m.groupValues[2]).coerceAtLeast(1.0)).coerceIn(0.0, 1.0)
+    return (e.health / e.maxHealth.coerceAtLeast(1f)).toDouble()
+}
+
+/**
+ * Some catches are several creatures at once (a Magma Slug comes with company, Tadgang is a gang), and some
+ * split when killed. New mobs that appear right next to one of ours within half a second of it, or right
+ * where one of ours just died, are ours too.
+ */
+internal fun AutoFishing.claimCompanions(p: LocalPlayer, around: List<Mob>) {
+    while (deaths.isNotEmpty() && tickCount - deaths.first().first > 30) deaths.removeFirst()
+    for (e in around) {
+        if (e.id in mine) continue
+        val first = seenAt[e.id] ?: continue
+        if (tickCount - first > 40) continue
+        val at = seenPos[e.id] ?: continue
+        // spawned together with one of ours
+        val buddy = mine.firstOrNull { id ->
+            val f = seenAt[id] ?: return@firstOrNull false
+            val pos = seenPos[id] ?: return@firstOrNull false
+            kotlin.math.abs(f - first) <= 10 && pos.distanceTo(at) <= 4.0
+        }
+        if (buddy != null) { claim(e, "came with #$buddy"); continue }
+        // split from one of ours that just died
+        val parent = deaths.firstOrNull { (t, pos) -> first >= t - 2 && first - t <= 20 && pos.distanceTo(at) <= 4.0 }
+        if (parent != null) claim(e, "split from a kill")
     }
 }
 
@@ -169,7 +209,7 @@ internal fun AutoFishing.whipFight(p: LocalPlayer, mobs: List<LivingEntity>, slo
     // hitting us > rare > most hurt > nearest
     val target = inRange.firstOrNull { it == track } ?: inRange.minWithOrNull(
         compareBy<LivingEntity>({ if (p.hurtTime > 0 && it.distanceTo(p) < 4f) 0 else 1 }, { if (it.id in rareIds) 0 else 1 },
-            { it.health / it.maxHealth.coerceAtLeast(1f) }, { it.distanceToSqr(p) })
+            { hpFraction(it) }, { it.distanceToSqr(p) })
     )
     if (target == null) {
         val far = mobs.minByOrNull { it.distanceToSqr(p) }
@@ -184,14 +224,16 @@ internal fun AutoFishing.whipFight(p: LocalPlayer, mobs: List<LivingEntity>, slo
     ownMoveTicks = 20
     status = "whipping ${target.name.string}"
     val err = trackError(p, target)
-    if (err < 3.5f) trackSettle++ else trackSettle = 0
+    // "on target" = within the creature's own size as seen from here (at least 6 degrees)
+    val size = Math.toDegrees(kotlin.math.atan2(maxOf(target.bbWidth, target.bbHeight).toDouble(), p.distanceTo(target).toDouble().coerceAtLeast(1.0))).toFloat()
+    if (err < maxOf(6f, size * 0.8f)) trackSettle++ else trackSettle = maxOf(0, trackSettle - 1)
     if (hypeBeat > 0) { hypeBeat--; return }
     if (p.inventory.selectedSlot != slot) { // take the whip out once we're more or less facing it
         if (err < 25f) { hold(slot); hypeBeat = delay(2, 7) }
         return
     }
     // swing only once the aim has stayed on it for a moment, then keep tracking between swings
-    if (hitCooldown > 0 || trackSettle < 3) return
+    if (hitCooldown > 0 || trackSettle < 2) return
     use(p)
     p.swing(InteractionHand.MAIN_HAND)
     hitCooldown = delay(whipDelay.value, whipDelay.value * 2 + 2)
@@ -259,9 +301,10 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
     // a creature that's in reach but never loses health (out of the blast, immune, already dead): leave it
     val inReachLimit = maxOf(giveUp.value * 20 * 2, 200)
     for (m in mobs) if (p.distanceTo(m) <= reach) {
-        val (t, hp) = inReach[m.id] ?: (0 to m.health)
-        val n = if (m.health < hp - 0.01f) 0 else t + 1
-        inReach[m.id] = n to m.health
+        val now = hpOf(m).toFloat()
+        val (t, hp) = inReach[m.id] ?: (0 to now)
+        val n = if (now < hp - 0.01f) 0 else t + 1
+        inReach[m.id] = n to now
         if (n > inReachLimit && p.hurtTime == 0) { ignored += m.id; inReach.remove(m.id) }
     }
     if (inReach.size > 200) inReach.keys.retainAll(mobs.map { it.id }.toSet())
@@ -281,7 +324,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
         if (abs(wrap(rot.yaw - p.yRot)) > 22f || abs(rot.pitch - p.xRot) > 18f) turn(p, rot.yaw, rot.pitch, 9f)
         return
     }
-    if (! centered(p)) { status = "stepping to the middle of the block"; return }
+    if (hype != null && ! blastSafe(p, p.yRot, 90f) && ! centered(p)) { status = "stepping to the middle of the block"; return }
     if (hype != null) {
         status = "Hyperion on ${close.size}"
         if (hypeBeat > 0) { hypeBeat--; return }
@@ -318,19 +361,24 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 val m0 = close.minByOrNull { it.distanceToSqr(p) }
                 if (m0 != null) {
                     val before = castHp[m0.id]
-                    if (before != null && m0.health >= before - 0.01f && hitCooldown == 0 && hypeBeat == 0 && (immuneWait++ % 2 == 0)) {
+                    val nowHp = hpOf(m0).toFloat()
+                    // a fresh creature that took nothing from the first blast is still immune: wait once, then keep blasting
+                    if (before != null && nowHp >= before - 0.01f && hitCooldown == 0 && hypeBeat == 0 && immuneWaited.add(m0.id)) {
                         hypeBeat = delay(14, 24)
                         status = "${m0.name.string} took no damage, waiting a moment"
-                        castHp[m0.id] = m0.health
+                        castHp[m0.id] = nowHp
                         return
                     }
-                    castHp[m0.id] = m0.health
+                    castHp[m0.id] = nowHp
                 }
                 ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
                 use(p)
                 hitCooldown = delay(hitDelay.value, hitDelay.value * 2 + 4)
                 castDownPitch = (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
-                if (abs(castDownPitch - p.xRot) > 1.5f) { hypeStage = 1; hypeBeat = delay(1, 4) }
+                if (abs(castDownPitch - p.xRot) > 1.5f) {
+                    // keep casting: drift the view to the new pitch in place instead of restarting the sequence
+                    com.github.noamm9.utils.Humanize.glide(p, p.yRot, castDownPitch)
+                }
             }
         }
         return

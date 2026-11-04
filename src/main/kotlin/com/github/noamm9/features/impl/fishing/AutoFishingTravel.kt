@@ -145,9 +145,14 @@ internal fun AutoFishing.travel(p: LocalPlayer) {
     val goal = stand ?: return run { state = AutoFishing.State.FIND }
     ownMoveTicks = 20 // our own walking / AOTV: not the server's doing
     expectedSlot = - 1
-    if (horizontalDist(p.position(), goal) < 0.6 && abs(p.y - goal.y) < 1.5) {
+    val hd = horizontalDist(p.position(), goal)
+    // there; or right above / below it and not getting any closer for 2 s: take where we stand as the spot
+    if (hd < 0.8 && abs(p.y - goal.y) < 2.5) nearGoalTicks++ else nearGoalTicks = 0
+    if ((hd < 0.6 && abs(p.y - goal.y) < 1.5) || nearGoalTicks > 40) {
         stopWalking()
         path = emptyList()
+        if (nearGoalTicks > 40) journal.log("close enough to the spot (${"%.1f".format(hd)}), fishing from here")
+        nearGoalTicks = 0
         arrive(p)
         return
     }
@@ -203,6 +208,9 @@ internal fun AutoFishing.arrive(p: LocalPlayer) {
     val hs = hotspot
     if (hs != null) aimAt(p, hs) else aimTarget = null
     offYaw = 0f; offPitch = 0f; moveLen = 0
+    // the spot is where we really stand now (block centre), so "pushed away" and centring agree on it
+    stand = Vec3.atBottomCenterOf(BlockPos.containing(p.position()))
+    arrivedAt = tickCount
     returning = true
     state = AutoFishing.State.CAST
     wait = castWait()
