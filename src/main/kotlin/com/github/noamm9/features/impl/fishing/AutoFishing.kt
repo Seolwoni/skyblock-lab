@@ -152,6 +152,17 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val creatureTracer by ToggleSetting("Creature Tracer", true).withDescription("A line from the middle of your screen to each of your sea creatures")
 
     internal val standCentre by ToggleSetting("Stand In Block Centre", true).section("Safety").withDescription("Before casting and before fighting, steps (sneaking, so it can't walk off an edge) to the exact middle of a safe block: solid ground under it, no lava in or under it")
+    internal val discordOn by ToggleSetting("Discord Alerts", false).section("Discord").withDescription(
+        "When a session ends, posts one message to your Discord channel: \"goal reached\" or why it stopped, with the session report"
+    )
+    internal val discordUrl by com.github.noamm9.config.types.TextInputSetting("Webhook URL", "").withDescription(
+        "Channel settings > Integrations > Webhooks > New Webhook > Copy Webhook URL, then paste it here"
+    ).showIf { discordOn.value }
+    internal val discordTest by com.github.noamm9.config.types.ButtonSetting("Send Test Message") {
+        com.github.noamm9.utils.DiscordWebhook.send(discordUrl.value, "🎣 Riftwalk 연결 확인", "웹후크가 잘 연결됐어요. 낚시가 끝나면 여기로 알려드릴게요.", 0x8B5CF6) { ok, why ->
+            info(if (ok) "&aDiscord test sent." else "&cDiscord test failed: $why")
+        }
+    }.showIf { discordOn.value }
     internal val checkButton by com.github.noamm9.config.types.ButtonSetting("Fishing Check") { runCatching { fishingCheck() }.onFailure { info("&cCheck failed: ${it.message}") } }
         .section("Server Check").withDescription("Prints what the mod can see right now: hotbar item IDs, floating texts nearby (hotspot / bite / name tags), the hook, tab stats, mana and bait. Stand by the water with the rod out")
     internal val copyLogButton by com.github.noamm9.config.types.ButtonSetting("Copy Log Path") {

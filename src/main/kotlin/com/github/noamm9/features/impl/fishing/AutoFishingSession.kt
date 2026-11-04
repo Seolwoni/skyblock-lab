@@ -213,7 +213,7 @@ internal fun AutoFishing.resumeTick() {
 internal fun AutoFishing.writeReport(reason: String) {
     if (sessionStart <= 0L) return
     val ms = System.currentTimeMillis() - sessionStart
-    if (ms < 30_000) return // a quick start/stop isn't a session
+    if (ms < 30_000 && reason == "stopped") { sessionStart = 0L; return } // a quick start / stop by hand isn't a session
     val hours = ms / 3_600_000.0
     val t = FishingTracker.numbers()
     val t0 = trackerAtStart
@@ -239,5 +239,39 @@ internal fun AutoFishing.writeReport(reason: String) {
     journal.log("report saved: $name")
     lastReport = lines
     sessionStart = 0L
+    sendDiscord(reason, lines, ms, coins, hours)
+}
+/**
+ * The end-of-session Discord message: "goal reached" when it was, otherwise why it stopped - in both cases
+ * with the report. One message per session.
+ */
+internal fun AutoFishing.sendDiscord(reason: String, lines: List<String>, ms: Long, coins: Long, hours: Double) {
+    if (! discordOn.value || discordUrl.value.isBlank()) return
+    val goal = reason.startsWith("done - goal reached")
+    val manual = reason == "stopped"
+    val title = when {
+        goal -> "🎯 목표 달성"
+        manual -> "✋ 직접 멈춤"
+        else -> "⛔ 낚시 멈춤"
+    }
+    val why = when {
+        goal -> reason.substringAfter("(").substringBefore(")")
+        manual -> "키를 눌러 멈췄어요"
+        else -> reason.removePrefix("stopped: ")
+    }
+    val color = when { goal -> 0x22C55E; manual -> 0x8B5CF6; else -> 0xEF4444 }
+    fun perH(n: Long) = if (hours > 0.01) "%,d".format((n / hours).toLong()) else "-"
+    val fields = listOf(
+        "시간" to clock(ms),
+        "바다 생물" to "$creaturesCaught (${perH(creaturesCaught.toLong())}/h)",
+        "처치" to "$kills",
+        "코인" to "%,d (%s/h)".format(coins, perH(coins)),
+        "희귀" to (rareLog.joinToString(", ").ifBlank { "-" }),
+        "지역" to (currentArea() ?: "-"),
+    )
+    val desc = (if (goal) "**목표:** $why" else "**이유:** $why") + "\n```\n" + lines.drop(1).joinToString("\n") + "\n```"
+    com.github.noamm9.utils.DiscordWebhook.send(discordUrl.value, title, desc, color, fields) { ok, err ->
+        journal.log(if (ok) "discord: sent ($title)" else "discord: failed - $err")
+    }
 }
 //#endif
