@@ -27,6 +27,11 @@ object FloatingText {
         return runCatching { (textGetter?.invoke(e) as? Component)?.string }.getOrNull()
     }
 
+    /** Every floating text in [box], with the entity showing it. */
+    fun near(level: net.minecraft.world.level.Level, box: AABB): List<Pair<Entity, String>> =
+        level.getEntities(null as Entity?, box) { it is net.minecraft.world.entity.decoration.ArmorStand || it is Display.TextDisplay }
+            .mapNotNull { e -> of(e)?.let { e to it } }
+
     /** True when any floating text in [box] contains [needle]. */
     fun any(level: net.minecraft.world.level.Level, box: AABB, needle: String): Boolean =
         level.getEntities(null as Entity?, box) { it is net.minecraft.world.entity.decoration.ArmorStand || it is Display.TextDisplay }

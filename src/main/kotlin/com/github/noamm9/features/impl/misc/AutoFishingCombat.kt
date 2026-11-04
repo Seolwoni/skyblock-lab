@@ -122,9 +122,7 @@ internal fun AutoFishing.creatureName(e: Entity): String? {
 /** The SkyBlock name tag that floats over a mob ("[Lv45] Sea Walker 1,200/1,200❤"), if there is one. */
 internal fun AutoFishing.tagOf(e: Entity): String? {
     val box = e.boundingBox.inflate(0.4, 2.5, 0.4)
-    return e.level().getEntitiesOfClass(ArmorStand::class.java, box)
-        .mapNotNull { it.customName?.string }
-        .firstOrNull { "❤" in it }
+    return com.github.noamm9.utils.FloatingText.near(e.level(), box).map { it.second }.firstOrNull { "❤" in it }
 }
 
 /** "0❤" on its name tag: SkyBlock keeps a dying creature around for a moment. */

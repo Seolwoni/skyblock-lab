@@ -139,7 +139,7 @@ internal fun AutoFishing.solveAim(p: LocalPlayer, target: Vec3): Pair<Float, Flo
     return yaw to best.first
 }
 
-internal fun AutoFishing.aimAt(p: LocalPlayer, hs: ArmorStand) {
+internal fun AutoFishing.aimAt(p: LocalPlayer, hs: Entity) {
     aimTarget = Vec3(hs.x, hs.y, hs.z)
     aimTries = 0
     val sol = solveAim(p, aimTarget!!)
@@ -163,7 +163,7 @@ internal fun AutoFishing.nextCastAim(@Suppress("UNUSED_PARAMETER") p: LocalPlaye
 }
 
 /** Is the hook inside the hotspot? If not, move the aim point by the miss and solve the throw again (8 tries). */
-internal fun AutoFishing.landedIn(p: LocalPlayer, hook: FishingHook, hs: ArmorStand): Boolean {
+internal fun AutoFishing.landedIn(p: LocalPlayer, hook: FishingHook, hs: Entity): Boolean {
     val off = hook.position().subtract(hs.position())
     if (kotlin.math.sqrt(off.x * off.x + off.z * off.z) <= hotspotRadius.value || aimTries >= 8) return true
     aimTries++

@@ -164,9 +164,9 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private fun newCreatures(at: Vec3) {
         val level = mc.level ?: return
         val box = net.minecraft.world.phys.AABB(at, at).inflate(5.0, 4.0, 5.0)
-        for (stand in level.getEntitiesOfClass(ArmorStand::class.java, box)) {
+        for ((stand, text) in com.github.noamm9.utils.FloatingText.near(level, box)) {
             if (! seenStands.add(stand.id)) continue
-            val name = stand.customName?.string?.removeFormatting() ?: continue
+            val name = text.removeFormatting()
             val m = creatureTag.find(name) ?: continue
             val creature = m.groupValues[1].trim()
             if (creature.isBlank()) continue

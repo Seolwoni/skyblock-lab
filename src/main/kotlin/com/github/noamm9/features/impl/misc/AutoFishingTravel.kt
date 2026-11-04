@@ -39,11 +39,12 @@ import net.minecraft.world.phys.Vec3
 
 // Getting to the fish: finding Hotspots, a lava-safe A* walk with rounded corners, and etherwarp / AOTV hops.
 
-internal fun AutoFishing.nearestHotspot(p: LocalPlayer): ArmorStand? {
+internal fun AutoFishing.nearestHotspot(p: LocalPlayer): Entity? {
     val r = hotspotRange.value.toDouble()
-    val live = p.level().getEntitiesOfClass(ArmorStand::class.java, p.boundingBox.inflate(r, 64.0, r)) {
-        it.isAlive && it.customName?.string?.contains("HOTSPOT", ignoreCase = true) == true
-    }
+    // the "HOTSPOT" text: an armor stand's name or a text display, whichever the server uses
+    val live = com.github.noamm9.utils.FloatingText.near(p.level(), p.boundingBox.inflate(r, 64.0, r))
+        .filter { (e, t) -> e.isAlive && t.contains("HOTSPOT", ignoreCase = true) }
+        .map { it.first }
     val now = System.currentTimeMillis()
     for (h in live) remembered[h.blockPosition().asLong()] = h.position() to now
     return live.filter { it.id !in badHotspots }.minByOrNull { it.distanceToSqr(p) }

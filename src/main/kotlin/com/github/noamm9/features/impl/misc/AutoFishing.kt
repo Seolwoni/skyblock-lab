@@ -184,7 +184,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal var returning = false
 
     // hotspots / location
-    internal var hotspot: ArmorStand? = null
+    internal var hotspot: Entity? = null  // the floating "HOTSPOT" text (armor stand or text display)
     internal var stand: Vec3? = null
     internal val badHotspots = HashSet<Int>()
     internal var aimTries = 0
