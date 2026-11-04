@@ -138,6 +138,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val creatureTracer by ToggleSetting("Creature Tracer", true).withDescription("A line from the middle of your screen to each of your sea creatures")
 
     internal val standCentre by ToggleSetting("Stand In Block Centre", true).section("Safety").withDescription("Before casting and before fighting, steps (sneaking, so it can't walk off an edge) to the exact middle of a safe block: solid ground under it, no lava in or under it")
+    internal val stopAfterMin by SliderSetting("Stop After", 0, 0, 600, 10, " min").withDescription("Ends the session on its own after this long (0 = never)")
+    internal val stopAfterKills by SliderSetting("Stop After Kills", 0, 0, 5000, 50).withDescription("Ends the session after this many sea creature kills (0 = never)")
     internal val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
     internal val chatInfo by ToggleSetting("Chat Messages", true)
     internal val statusHud by ToggleSetting("Status HUD", true)
@@ -260,6 +262,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val chase = HashMap<Int, Pair<Int, Double>>() // id -> ticks coming at us, last distance
     internal var claimsLeft = 0
     internal var catchMsgsWork = false
+    internal val journal = com.github.noamm9.utils.Journal("fishing")
+    internal var lastLoggedState: State? = null
+    internal var biteAt: Vec3? = null               // where the hook was at the bite (it can vanish before we reel)
+    internal var tabStats = ""                      // "SCC 21% · DHC 8%" from the tab list
     internal val claimedAt = HashMap<Int, Long>()   // id -> when it became ours (despawn warning)
     internal val despawnWarned = HashSet<Int>()
     internal val rareIds = HashSet<Int>()
@@ -430,7 +436,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal fun drawCard(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, example: Boolean): Pair<Number, Number> {
         val st = com.github.noamm9.ui.clickgui.components.settings.Style
         val w = 150f
-        val h = 92f
+        val stats = if (example) "SCC 21%  DHC 8%  Speed 120" else tabStats
+        val h = if (stats.isNotEmpty()) 104f else 92f
         val now = System.currentTimeMillis()
         val session = if (example) 754_000L else now - sessionStart
         val hours = session / 3_600_000.0
@@ -474,6 +481,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         cell("SESSION TIME", clock(session), w - 8f, 55f, true)
         cell("KILLS", if (example) "36" else "$kills", 8f, 73f, false)
         cell("NEXT BREAK", breakText, w - 8f, 73f, true)
+        if (stats.isNotEmpty()) {
+            st.roundRect(ctx, 8f, 91f, w - 16f, 0.5f, 0.25f, java.awt.Color(255, 255, 255, 18))
+            ctx.drawString(stats, 8f, 94f, java.awt.Color(150, 140, 175), shadow = false, scale = 0.7f)
+        }
         return w to h
     }
 
@@ -481,6 +492,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         super.onDisable()
         if (running) stop(null)
     }
+
+    /** Sea Creature Chance / Double Hook Chance / Fishing Speed from the tab list's stat lines, if it shows them. */
+    internal fun readTabStats(): String = runCatching {
+        val lines = com.github.noamm9.utils.TabListUtils.getTabList().map { it.first.string.replace(Regex("§."), "").trim() }
+        fun stat(key: String) = lines.firstNotNullOfOrNull { Regex("$key:?\\s*([\\d.,]+%?)").find(it)?.groupValues?.get(1) }
+        listOfNotNull(stat("Sea Creature Chance")?.let { "SCC $it" }, stat("Double Hook Chance")?.let { "DHC $it" }, stat("Fishing Speed")?.let { "Speed $it" })
+            .joinToString("  ")
+    }.getOrDefault("")
 
     /** "1.2k" -> 1200.0, "3,400" -> 3400.0 */
     internal fun parseShort(v: String): Double {
@@ -490,12 +509,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     internal fun info(msg: String) {
+        journal.log("info  $msg")
         if (chatInfo.value) modMessage(msg)
     }
 
     internal fun start() {
         val p = mc.player ?: return
         if (rod() == null) return info("&cNo fishing rod in the hotbar.")
+        journal.log("==== start  at ${p.blockPosition().toShortString()}  hotspots=${hotspots.value} weapon=${listOf("Hyperion", "Soul Whip", "Flaming Flay")[weaponType.value]}")
         anchorYaw = p.yRot
         anchorPitch = p.xRot
         seenAt.clear(); seenPos.clear(); reels.clear(); catches.clear(); chase.clear(); claimsLeft = 0
@@ -537,12 +558,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     internal fun failStop(why: String) {
+        journal.log("FAILSAFE  $why  (state=$state, status=$status)")
         stop("stopped: $why")
         NotificationManager.push("Auto Fishing stopped", why)
         com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_PLING.value(), 1f, 0.6f)
     }
 
     internal fun stop(reason: String?) {
+        if (running) journal.log("stop  ${reason ?: "-"}  (state=$state, kills=$kills, creatures=$creaturesCaught)")
         if (running) releaseCentre()
         centreTarget = null
         track = null
@@ -657,6 +680,18 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }
 
     internal fun tick() {
+        if (state != lastLoggedState) { journal.log("state ${lastLoggedState ?: "-"} -> $state  ($status)"); lastLoggedState = state }
+        if (tickCount % 40 == 0) tabStats = readTabStats()
+        val goalHit = when {
+            stopAfterMin.value > 0 && System.currentTimeMillis() - sessionStart > stopAfterMin.value * 60_000L -> "${stopAfterMin.value} min of fishing"
+            stopAfterKills.value > 0 && kills >= stopAfterKills.value -> "${stopAfterKills.value} kills"
+            else -> null
+        }
+        if (goalHit != null && state != State.FIGHT) {
+            mc.player?.let { pl -> if (pl.fishing != null) rod()?.let { hold(it); use(pl) } }
+            NotificationManager.push("Auto Fishing", "&fGoal reached: &d$goalHit")
+            return stop("done - goal reached ($goalHit)")
+        }
         val p = mc.player ?: return stop("no player")
         if (stopHealth.value > 0 && p.health / p.maxHealth * 100f < stopHealth.value) return stop("health is low")
         if (hitCooldown > 0) hitCooldown--
@@ -858,6 +893,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     }
                 }
                 if (bitten(hook)) {
+                    biteAt = hook.position()
+                    journal.log("bite after ${timer / 20.0}s  (${fluidName()})")
                     state = State.REEL
                     wait = delay(reelMin.value, reelMax.value)
                     status = "bite!"
@@ -884,11 +921,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
 
             State.REEL -> {
                 hold(rod)
-                if (hook != null) {
-                    reels += Reel(tickCount, hook.position())
+                // where the creature will come up: the hook now, or where it was at the bite if it's gone already
+                val at = hook?.position() ?: biteAt
+                if (at != null) {
+                    reels += Reel(tickCount, at)
                     if (reels.size > 6) reels.removeFirst()
-                    use(p)
                 }
+                if (hook != null) use(p)
+                biteAt = null
                 state = State.CAST
                 wait = castWait()
                 status = "reeled in"
