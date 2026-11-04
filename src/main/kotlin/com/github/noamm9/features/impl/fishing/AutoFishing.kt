@@ -92,6 +92,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val useCatchMsgs by ToggleSetting("Use Catch Messages", true).withDescription("A creature named in your own catch message is yours for sure; once the server sends these, only they count (other people's creatures never message you)")
     internal val ownWindow by SliderSetting("My Creature Window", 1.0, 0.3, 3.0, 0.1, " s").withDescription("A creature counts as yours only if it appears within this long after YOU reel in. Lower it if other people's creatures get picked up")
     internal val ownDistance by SliderSetting("My Creature Distance", 4.0, 1.5, 8.0, 0.5, " blocks").withDescription("...and only this close to where your hook was")
+    internal val quickKill by ToggleSetting("Quick Kill", true).withDescription(
+        "Deals with your creature while it's still flying at you instead of after it lands behind you: a short 0.15-0.4 s reaction, " +
+        "no glance first - the Hyperion is out and the view down while it comes, and it fires the moment it's in reach; whips follow it through the air"
+    )
     internal val noticeMin by SliderSetting("Notice Delay Min", 8, 0, 40, 1, " ticks").withDescription("How long it takes to notice a sea creature that came up, before reacting")
     internal val noticeMax by SliderSetting("Notice Delay Max", 26, 0, 60, 1, " ticks")
     internal val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")
@@ -814,7 +818,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 NotificationManager.push("Sea creature", "&fOne of yours is about to despawn &7(5.5 min old)")
         }
         // a person needs a moment to notice something new: each creature gets its own notice time
-        for (m in seen) noticeAt.getOrPut(m.id) { tickCount + delay(noticeMin.value, noticeMax.value) }
+        // right after our own reel we know something may come up: a person who's ready reacts faster
+        val ready = quickKill.value && reels.isNotEmpty() && tickCount - reels.last().tick < 60
+        for (m in seen) noticeAt.getOrPut(m.id) { tickCount + if (ready && m.id in mine) delay(3, 8) else delay(noticeMin.value, noticeMax.value) }
         if (noticeAt.size > 200) noticeAt.keys.retainAll(seen.map { it.id }.toSet())
         val mobs = seen.filter { (noticeAt[it.id] ?: 0) <= tickCount }
         if (state == State.FIGHT || mobs.isNotEmpty()) {
@@ -832,7 +838,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             }
             if (state != State.FIGHT) {
                 if (p.fishing != null) rod()?.let { hold(it); use(p) } // pull the line in first
-                fightWait = delay(3, 10) // then a beat before turning round
+                fightWait = if (quickKill.value) delay(1, 4) else delay(3, 10) // then a beat before turning round
             }
             justCaughtSomething = true
             if (state != State.FIGHT) fightTicks = 0

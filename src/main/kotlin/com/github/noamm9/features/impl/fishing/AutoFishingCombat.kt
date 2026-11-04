@@ -214,7 +214,9 @@ internal fun AutoFishing.whipFight(p: LocalPlayer, mobs: List<LivingEntity>, slo
     if (target == null) {
         val far = mobs.minByOrNull { it.distanceToSqr(p) }
         track = far // keep a loose eye on it while it comes closer
-        trackLoose = true
+        // quick kill: follow it properly through the air, whip already out, so it's hit as soon as it's in range
+        trackLoose = ! quickKill.value
+        if (quickKill.value && far != null && p.distanceTo(far) < 16f && p.inventory.selectedSlot != slot) hold(slot)
         status = if (far != null) "waiting for ${far.name.string}" else "fighting"
         return
     }
@@ -319,6 +321,17 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
     if (close.isEmpty()) {
         val far = mobs.minByOrNull { it.distanceToSqr(p) } ?: return
         status = "waiting for ${far.name.string}"
+        // quick kill: it's on its way - Hyperion out and looking down already, so it goes off the moment it's in reach
+        if (quickKill.value && hype != null && p.distanceTo(far) < 14f && (blastSafe(p, p.yRot, 90f) || centered(p))) {
+            if (castDownPitch == 0f) castDownPitch = 80f + RANDOM.nextFloat() * 9f
+            if (! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
+            if (turn(p, p.yRot, castDownPitch, 3f)) {
+                if (p.inventory.selectedSlot != hype) { hold(hype); hypeBeat = delay(1, 4) }
+                hypeStage = 2
+            }
+            status = "ready for ${far.name.string}"
+            return
+        }
         // keep an eye on it loosely: only turn when it's well off to the side, and not onto its exact middle
         val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(far.boundingBox.center, 0.6))
         if (abs(wrap(rot.yaw - p.yRot)) > 22f || abs(rot.pitch - p.xRot) > 18f) turn(p, rot.yaw, rot.pitch, 9f)
@@ -330,6 +343,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
         if (hypeBeat > 0) { hypeBeat--; return }
         when (hypeStage) {
             0 -> { // glance at the creature first (still holding the rod)
+                if (quickKill.value) { hypeStage = 1; return } // no glance: straight down
                 val m = close.minByOrNull { it.distanceToSqr(p) } ?: return
                 val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(m.boundingBox.center, 0.5))
                 if (abs(wrap(rot.yaw - p.yRot)) > 15f && ! turn(p, rot.yaw, rot.pitch, 10f)) return
