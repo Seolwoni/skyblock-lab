@@ -37,6 +37,7 @@ object Humanize {
     private var gToYaw = 0f
     private var gToPitch = 0f
     private var gStart = 0L
+    private var gTick = 0L
 
     /** Turn to [yaw]/[pitch] over the next 50 ms, a little every frame (not in one jump on the tick). */
     fun glide(p: LocalPlayer, yaw: Float, pitch: Float) {
@@ -46,6 +47,7 @@ object Humanize {
         gToYaw = gFromYaw + wrap(yaw - gFromYaw)
         gToPitch = pitch.coerceIn(- 90f, 90f)
         gStart = System.nanoTime()
+        gTick = net.minecraft.client.Minecraft.getInstance().level?.gameTime ?: 0L
         gliding = true
     }
 
@@ -60,7 +62,11 @@ object Humanize {
     fun frame() {
         if (! gliding) return
         val p = net.minecraft.client.Minecraft.getInstance().player ?: run { gliding = false; return }
-        val t = ((System.nanoTime() - gStart) / 50_000_000f).coerceIn(0f, 1f)
+        // follow the game's own tick clock (partial tick 0 -> 1 until the next tick), so the glide ends exactly when
+        // the next tick's step starts: no stop-and-go at tick edges whatever the frame rate or tick timing
+        val mc = net.minecraft.client.Minecraft.getInstance()
+        val now = mc.level?.gameTime ?: 0L
+        val t = if (gTick == now) mc.deltaTracker.getGameTimeDeltaPartialTick(true).coerceIn(0f, 1f) else 1f
         PlayerUtils.rotate(gFromYaw + (gToYaw - gFromYaw) * t, gFromPitch + (gToPitch - gFromPitch) * t)
         p.yHeadRot = p.yRot
         if (t >= 1f) gliding = false
