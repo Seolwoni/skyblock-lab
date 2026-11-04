@@ -2,7 +2,10 @@ package com.github.noamm9.utils
 
 import java.util.Random
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.min
+import kotlin.math.round
+import kotlin.math.sqrt
 
 /**
  * Pure maths for small human imperfections (no Minecraft types, so it can be unit tested).
@@ -50,4 +53,54 @@ object HumanMotion {
 
     /** True with probability [percent] / 100. */
     fun chance(percent: Double, rnd: Random) = percent > 0 && rnd.nextDouble() * 100 < percent
+
+    // ---- input quantization: a mouse moves the view in whole counts of a step set by the sensitivity
+
+    /**
+     * Degrees of view per mouse count at [sensitivity] (0..1, the game's slider), the game's own formula:
+     * f = s * 0.6 + 0.2, step = f³ * 8 * 0.15.
+     */
+    fun gcd(sensitivity: Double): Double {
+        val f = sensitivity.coerceIn(0.0, 1.0) * 0.6 + 0.2
+        return f * f * f * 8.0 * 0.15
+    }
+
+    /** [delta] degrees rounded to a whole number of mouse counts at [sensitivity]. */
+    fun gcdSnap(delta: Double, sensitivity: Double): Double {
+        val g = gcd(sensitivity)
+        return round(delta / g) * g
+    }
+
+    // ---- turn trace: per-tick steps spread log-normally, with ticks where the hand doesn't move
+
+    /**
+     * One tick of a turn: [base] scaled by a log-normal factor (median 1, sigma [spread]),
+     * or 0 with probability [pauseRatio] (a tick with no mouse movement).
+     */
+    fun turnStep(base: Float, spread: Double, pauseRatio: Double, rnd: Random): Float {
+        if (pauseRatio > 0 && rnd.nextDouble() < pauseRatio) return 0f
+        if (spread <= 0) return base
+        return (base * exp(rnd.nextGaussian() * spread)).toFloat()
+    }
+
+    // ---- cast-to-cast variance: each cast's offset leans on the last one (AR(1))
+
+    /** Next value of a series with standard deviation [sigma] and lag-1 correlation [carry] (0..1). */
+    fun carried(prev: Double, sigma: Double, carry: Double, rnd: Random): Double {
+        val c = carry.coerceIn(0.0, 0.99)
+        return prev * c + rnd.nextGaussian() * sigma * sqrt(1 - c * c)
+    }
+
+    // ---- clicks
+
+    /**
+     * Ticks until the next click: log-normal around [medianTicks] (sigma [spread]), at least [minTicks],
+     * never the same as [last] (two equal gaps in a row get moved by one).
+     */
+    fun clickInterval(medianTicks: Double, spread: Double, rnd: Random, last: Int = - 1, minTicks: Int = 1): Int {
+        val v = if (spread <= 0) medianTicks else medianTicks * exp(rnd.nextGaussian() * spread)
+        var t = maxOf(minTicks, Math.round(v).toInt())
+        if (t == last) t = if (t <= minTicks || rnd.nextBoolean()) t + 1 else t - 1
+        return t
+    }
 }

@@ -83,4 +83,12 @@ class HumanTimingTest {
         assertFailsWith<IllegalArgumentException> { HumanProfile(failRate = 1.5) }
         assertFailsWith<IllegalArgumentException> { HumanProfile(delaySpread = 0.0) }
     }
+
+    @Test
+    fun `reel tail - a bigger reel spread gives a heavier tail on the reel range`() {
+        val normal = sample(min = 1, max = 30) { spread = 0.55 }
+        val heavy = sample(min = 1, max = 30) { spread = 0.9 }
+        assertTrue(heavy.pct(0.99) > 2 * heavy.pct(0.5), "median ${heavy.pct(0.5)}, P99 ${heavy.pct(0.99)}")
+        assertTrue(heavy.pct(0.95) > normal.pct(0.95), "P95 ${heavy.pct(0.95)} vs ${normal.pct(0.95)}")
+    }
 }

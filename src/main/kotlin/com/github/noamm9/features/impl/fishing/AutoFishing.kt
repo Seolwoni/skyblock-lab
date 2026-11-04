@@ -55,7 +55,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val castMin by SliderSetting("Cast Delay Min", 6, 1, 60, 1, " ticks").withDescription("Shortest wait before casting again")
     internal val castMax by SliderSetting("Cast Delay Max", 34, 1, 80, 1, " ticks")
     internal val hesitate by SliderSetting("Hesitation", 12, 0, 40, 1, "%").withDescription("Chance that a cast comes a little later than usual (0.3-1 s more)")
-    internal val aimWobble by SliderSetting("Cast Aim Wobble", 0.5, 0.0, 2.0, 0.1, "°").withDescription("Each cast is aimed a tiny bit differently, like a hand that never lands on the exact same spot")
+    internal val aimWobble by SliderSetting("Cast Aim Wobble", 0.5, 0.0, 2.0, 0.1, "°").withDescription("Spread (sigma) of the left/right aim offset from cast to cast")
     internal val timingModel by DropdownSetting("Timing Model", 2, listOf("Even", "Reel Assist", "Human")).withDescription(
         "Even: any tick in the range equally. Reel Assist: mostly the lower third with the odd slow reaction. Human: skewed reaction times, a rhythm that drifts over minutes, each delay leaning on the last one, slight fatigue over time, no tick count twice in a row"
     )
@@ -71,7 +71,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val slugPet by ToggleSetting("Slug Pet", false).withDescription("With the Slug pet the wait is halved (11 s)").showIf { slugfish.value }
     internal val groundRecast by ToggleSetting("Recast If Hook Lands On Ground", true).withDescription("Casts again when the hook settles somewhere that isn't water / lava; stops after 3 misses in a row")
     internal val hookDive by ToggleSetting("Detect By Hook Dive", true).withDescription("Also reels in when the hook suddenly dives (vanilla bite), not only on the \"!!!\" sign")
-    internal val castFail by SliderSetting("Cast Fail", 1.5, 0.0, 10.0, 0.5, "%").section("Mistakes").withDescription("How often a cast comes out clearly off (the hand slips); a cast that misses gets recast")
+    internal val reelSpread by SliderSetting("Reel Spread", 0.9, 0.3, 1.5, 0.05).section("Mistakes").withDescription("Log-normal sigma of the reel delay (Human timing model): higher = more clearly slow reels within the reel range")
+    internal val castPitchSpread by SliderSetting("Cast Pitch Spread", 0.6, 0.0, 3.0, 0.1, "°").withDescription("How much the up/down aim of a cast differs from cast to cast")
+    internal val castCarry by SliderSetting("Cast Carry-Over", 0.3, 0.0, 0.9, 0.05).withDescription("How much each cast's aim offset leans on the last one")
+    internal val castFail by SliderSetting("Cast Fail", 1.5, 0.0, 10.0, 0.5, "%").withDescription("How often a cast comes out clearly off (the hand slips); a cast that misses gets recast")
     internal val lateReel by SliderSetting("Late Reel", 2.0, 0.0, 10.0, 0.5, "%").withDescription("How often the reel comes late after a bite (sometimes late enough to lose the fish)")
     internal val lateReelTicks by SliderSetting("Late Reel By", 14, 2, 30, 1, " ticks").showIf { lateReel.value > 0 }.withDescription("How much later, at most (half to all of this)")
     internal val zoneOut by SliderSetting("Zone Out", 3.0, 0.0, 15.0, 0.5, "%").withDescription("Chance per cast of staring for a moment before casting again")
@@ -209,6 +212,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal var timer = 0
     internal var inFluidTicks = 0
     internal var hitCooldown = 0
+    internal var lastClickGap = - 1
+    internal var castYawSeries = 0.0
+    internal var castPitchSeries = 0.0
+    internal var reelTiming = com.github.noamm9.utils.HumanTiming()
     internal var status = "idle"
     internal var lastMobIds = emptySet<Int>()
     internal val waiting = HashMap<Int, Int>()
@@ -664,6 +671,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         timing = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
         lastLookYaw = null
         lastTickPos = null; lastTickLevel = null; lastTickPlayer = null
+        reelTiming = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
+        castYawSeries = 0.0; castPitchSeries = 0.0; lastClickGap = - 1
         wobYaw = 0f; wobPitch = 0f
         aimTarget = null
         noticeAt.clear()
@@ -760,6 +769,31 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val v = if (RANDOM.nextDouble() < 0.08) lo + span * (0.6 + 0.4 * RANDOM.nextDouble())
         else lo + span * 0.3 + RANDOM.nextGaussian() * span * 0.15
         return Math.round(v).toInt().coerceIn(lo, hi)
+    }
+
+    /** Reel delay: the Human model gets its own timing with the heavier Reel Spread tail. */
+    internal fun reelDelay(): Int {
+        if (timingModel.value != 2) return delay(reelMin.value, reelMax.value)
+        reelTiming.spread = reelSpread.value
+        reelTiming.slipChance = slipChance.value / 100.0
+        reelTiming.drift = drift.value / 100.0
+        reelTiming.fatiguePerHour = fatigue.value / 100.0
+        reelTiming.tick()
+        return reelTiming.next(reelMin.value, reelMax.value)
+    }
+
+    /** Ticks to the next attack click: log-normal around [median] (Click Spread), never the same gap twice in a row. */
+    internal fun clickGap(median: Int): Int {
+        lastClickGap = com.github.noamm9.utils.HumanMotion.clickInterval(median.toDouble(), com.github.noamm9.features.impl.general.HumanBehaviour.clickSpread.value, RANDOM, lastClickGap)
+        return lastClickGap
+    }
+
+    /** True when this attack click doesn't go through (Click Miss); tried again after a short gap. */
+    internal fun clickMissed(): Boolean {
+        if (! com.github.noamm9.utils.HumanMotion.chance(com.github.noamm9.features.impl.general.HumanBehaviour.clickMiss.value, RANDOM)) return false
+        hitCooldown = com.github.noamm9.utils.HumanMotion.between(1, 3, RANDOM)
+        journal.log("click miss")
+        return true
     }
 
     /** Wait before the next cast: the timing model, plus reading the catch and the odd short break. */
@@ -1159,7 +1193,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     biteAt = hook.position()
                     journal.log("bite after ${timer / 20.0}s  (${fluidName()})")
                     state = State.REEL
-                    wait = delay(reelMin.value, reelMax.value)
+                    wait = reelDelay()
                     if (com.github.noamm9.utils.HumanMotion.chance(lateReel.value, RANDOM)) {
                         val late = com.github.noamm9.utils.HumanMotion.between(lateReelTicks.value / 2, lateReelTicks.value, RANDOM)
                         wait += late

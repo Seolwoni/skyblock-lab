@@ -237,9 +237,10 @@ internal fun AutoFishing.whipFight(p: LocalPlayer, mobs: List<LivingEntity>, slo
     }
     // swing only once the aim has stayed on it for a moment, then keep tracking between swings
     if (hitCooldown > 0 || trackSettle < 2) return
+    if (clickMissed()) return
     use(p)
     p.swing(InteractionHand.MAIN_HAND)
-    hitCooldown = delay(whipDelay.value, whipDelay.value * 2 + 2)
+    hitCooldown = clickGap(whipDelay.value)
 }
 
 internal fun AutoFishing.trackPoint(e: Entity, pt: Float): Vec3 {
@@ -384,9 +385,10 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                     }
                     castHp[m0.id] = nowHp
                 }
+                if (clickMissed()) return
                 ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
                 use(p)
-                hitCooldown = delay(hitDelay.value, hitDelay.value * 2 + 4)
+                hitCooldown = clickGap(hitDelay.value)
                 castDownPitch = (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
                 if (abs(castDownPitch - p.xRot) > 1.5f) {
                     // keep casting: drift the view to the new pitch in place instead of restarting the sequence
@@ -401,7 +403,8 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
     status = if (hypeSlot != null && hype == null) "no mana, hitting ${target.name.string}" else "fighting ${target.name.string}"
     val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(target.boundingBox.center, 0.25))
     if (! turn(p, rot.yaw, rot.pitch, 4f) || hitCooldown > 0) return
-    hitCooldown = hitDelay.value
+    if (clickMissed()) return
+    hitCooldown = clickGap(hitDelay.value)
     mc.gameMode?.attack(p, target)
     p.swing(InteractionHand.MAIN_HAND)
 }

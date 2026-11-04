@@ -203,8 +203,11 @@ internal fun AutoFishing.nextCastAim(@Suppress("UNUSED_PARAMETER") p: LocalPlaye
         journal.log("cast slip ${"%.1f".format(off)}°")
         return
     }
-    wobYaw = (RANDOM.nextFloat() * 2 - 1) * w
-    wobPitch = (RANDOM.nextFloat() * 2 - 1) * w * 0.6f
+    // cast-to-cast variance: each offset leans on the last (Cast Carry-Over), pitch with its own spread
+    castYawSeries = com.github.noamm9.utils.HumanMotion.carried(castYawSeries, w.toDouble(), castCarry.value, RANDOM)
+    castPitchSeries = com.github.noamm9.utils.HumanMotion.carried(castPitchSeries, castPitchSpread.value, castCarry.value, RANDOM)
+    wobYaw = castYawSeries.toFloat()
+    wobPitch = castPitchSeries.toFloat()
 }
 
 /** Is the hook inside the hotspot? If not, move the aim point by the miss and solve the throw again (8 tries). */

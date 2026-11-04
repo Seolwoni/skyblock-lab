@@ -58,7 +58,7 @@ object Humanize {
     fun settle(p: LocalPlayer) {
         if (! gliding) return
         gliding = false
-        PlayerUtils.rotate(gToYaw, gToPitch)
+        write(p, gToYaw, gToPitch)
     }
 
     /** Call every frame. */
@@ -70,16 +70,25 @@ object Humanize {
         val mc = net.minecraft.client.Minecraft.getInstance()
         val now = mc.level?.gameTime ?: 0L
         val t = if (gTick == now) mc.deltaTracker.getGameTimeDeltaPartialTick(true).coerceIn(0f, 1f) else 1f
-        PlayerUtils.rotate(gFromYaw + (gToYaw - gFromYaw) * t, gFromPitch + (gToPitch - gFromPitch) * t)
-        p.yHeadRot = p.yRot
+        write(p, gFromYaw + (gToYaw - gFromYaw) * t, gFromPitch + (gToPitch - gFromPitch) * t)
         if (t >= 1f) gliding = false
     }
 
     // ---- the only way automatic code changes where the player looks
 
     /** Set the view (mouse-sensitivity steps applied). Every automatic turn ends up here. */
-    fun setView(p: LocalPlayer, yaw: Float, pitch: Float) {
-        PlayerUtils.rotate(yaw, pitch.coerceIn(- 90f, 90f))
+    fun setView(p: LocalPlayer, yaw: Float, pitch: Float) = write(p, yaw, pitch)
+
+    /** The single writer: the change from the current view, in whole mouse counts (Mouse Grid), then applied. */
+    private fun write(p: LocalPlayer, yaw: Float, pitch: Float) {
+        var dy = wrap(yaw - p.yRot).toDouble()
+        var dp = (pitch.coerceIn(- 90f, 90f) - p.xRot).toDouble()
+        if (on && HumanBehaviour.mouseGrid.value) {
+            val sens = net.minecraft.client.Minecraft.getInstance().options.sensitivity().get()
+            dy = HumanMotion.gcdSnap(dy, sens)
+            dp = HumanMotion.gcdSnap(dp, sens)
+        }
+        PlayerUtils.rotate((p.yRot + dy).toFloat(), (p.xRot + dp).toFloat().coerceIn(- 90f, 90f))
         p.yHeadRot = p.yRot
     }
 
@@ -204,7 +213,9 @@ object Humanize {
         var want = minOf(turnSpeed, sqrt(2f * accel * dist))
         want = maxOf(want, 0.6f)
         vel = if (vel < want) minOf(want, vel + accel) else maxOf(want, vel - accel * 1.5f)
-        val step = minOf(vel, dist)
+        // this tick's share: log-normal around the eased speed, or nothing at all (Step Spread / Pause Ticks)
+        val step = HumanMotion.turnStep(minOf(vel, dist), HumanBehaviour.stepSpread.value, HumanBehaviour.pauseTicks.value / 100.0, rnd).coerceAtMost(dist)
+        if (step <= 0f) return false
         val ux = dy / dist
         val uy = dp / dist
         val bend = if (dist > 4f) curve * minOf(1f, dist / 25f) else 0f
