@@ -44,28 +44,79 @@ import net.minecraft.world.phys.Vec3
  * below or above still counts) and gives a new mob 30 ticks to settle, because the server can spawn it a
  * little off and move it into place.
  */
+/**
+ * Works out which new mobs are ours, three ways together:
+ *  1. Catch message: the server tells only the catcher what they caught ("...Sea Walker..."). A new mob near our
+ *     hook whose name is in a message we just got is ours for sure (two on a Double Hook). Once this server has
+ *     sent such a message, this is the only way a creature is claimed (other people's never message us).
+ *  2. When and where: appeared right after our reel, right where our hook was.
+ *  3. Who it goes for: over the next seconds it closes in on us and faces us.
+ * Without catch messages, 2 and 3 are scored together.
+ */
 internal fun AutoFishing.claimOwn(p: LocalPlayer) {
     val lvl = p.level()
-    // remember when every mob around us first showed up, all the time - so a creature someone else
-    // fished up earlier is never mistaken for a new one just because we reeled in next to it
+    // when every mob around first showed up (so an older creature is never taken for a new one)
     val around = lvl.getEntitiesOfClass(Mob::class.java, p.boundingBox.inflate(40.0, 24.0, 40.0)) { it.isAlive && it.javaClass.simpleName !in NPC_CLASSES }
     for (e in around) if (e.id !in seenAt) { seenAt[e.id] = tickCount; seenPos[e.id] = e.position() }
-    if (seenAt.size > 3000) { val live = around.map { it.id }.toSet(); seenAt.keys.retainAll(live); seenPos.keys.retainAll(live) }
+    if (seenAt.size > 3000) { val live = around.map { it.id }.toSet(); seenAt.keys.retainAll(live); seenPos.keys.retainAll(live); chase.keys.retainAll(live) }
 
     val window = (ownWindow.value * 20).toInt()
-    while (reels.isNotEmpty() && tickCount - reels.first().tick > window + 5) reels.removeFirst()
+    while (reels.isNotEmpty() && tickCount - reels.first().tick > 80) reels.removeFirst()
+    while (catches.isNotEmpty() && tickCount - catches.first().first > 60) catches.removeFirst()
+    if (catches.isEmpty() && (reels.isEmpty() || tickCount - reels.last().tick > 40)) claimsLeft = 0
+    if (reels.isEmpty()) return
+
     for (e in around) {
         if (e.id in mine) continue
         val first = seenAt[e.id] ?: continue
+        if (tickCount - first > 70) continue // only new mobs are looked at, for ~3.5 s
         val at = seenPos[e.id] ?: continue
-        // ours only if it appeared AFTER one of our reels, within the window, right where our hook was
-        if (reels.any { first >= it.tick && first - it.tick <= window && at.distanceTo(it.at) <= ownDistance.value }) {
-            mine += e.id
-            mineAlive += e.id
-            firstSeen += e.id
-            creaturesCaught++
+        val reel = reels.lastOrNull { first >= it.tick && first - it.tick <= 40 } ?: continue // came after one of our reels
+
+        // 1. catch message naming it
+        val name = creatureName(e)
+        if (useCatchMsgs.value && name != null) {
+            val msg = catches.firstOrNull { (t, m) -> t >= reel.tick - 2 && name.lowercase() in m }
+            if (msg != null && claimsLeft > 0 && at.distanceTo(reel.at) <= 10.0) {
+                catchMsgsWork = true
+                claimsLeft--
+                claim(e)
+                continue
+            }
         }
+        if (useCatchMsgs.value && catchMsgsWork) continue // this server sends them: nothing else counts
+
+        // 2. + 3. scored
+        var score = 0.0
+        val dt = first - reel.tick
+        if (dt <= window) score += 40.0 * (1.0 - dt / (window + 1.0) * 0.5)
+        val d = at.distanceTo(reel.at)
+        if (d <= ownDistance.value) score += 35.0 * (1.0 - d / (ownDistance.value * 2))
+        val toMe = p.position().subtract(e.position())
+        val dist = toMe.length()
+        val c = chase.getOrPut(e.id) { 0 to dist }
+        val yawToMe = Math.toDegrees(kotlin.math.atan2(toMe.z, toMe.x)).toFloat() - 90f
+        val facing = abs(wrap(yawToMe - e.yHeadRot)) < 45f
+        val closer = dist < c.second - 0.02
+        val n = c.first + (if (closer || (facing && dist < 4.0)) 1 else 0)
+        chase[e.id] = n to dist
+        score += minOf(30.0, n * 1.5) // up to 30 after ~1 s of coming at us
+        if (score >= 70.0) claim(e)
     }
+}
+
+internal fun AutoFishing.claim(e: Entity) {
+    mine += e.id
+    mineAlive += e.id
+    firstSeen += e.id
+    creaturesCaught++
+}
+
+/** "Sea Walker" from "[Lv45] Sea Walker 1,200/1,200❤" (colour codes and symbols stripped). */
+internal fun AutoFishing.creatureName(e: Entity): String? {
+    val tag = tagOf(e)?.replace(Regex("§."), "") ?: return null
+    val m = Regex("^(?:\\[Lv\\d+] )?(.+?) [\\d,.]+[kKmMbB]?(?:/[\\d,.]+[kKmMbB]?)?❤").find(tag.trim()) ?: return null
+    return m.groupValues[1].replace(Regex("[^A-Za-z' -]"), "").trim().takeIf { it.length >= 3 }
 }
 
 /** The SkyBlock name tag that floats over a mob ("[Lv45] Sea Walker 1,200/1,200❤"), if there is one. */

@@ -79,6 +79,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val onlyMine by ToggleSetting("Only My Sea Creatures", true).withDescription(
         "Only fights creatures that came up at your hook right after you reeled in (and anything that hits you). Other people's creatures are left alone"
     )
+    internal val useCatchMsgs by ToggleSetting("Use Catch Messages", true).withDescription("A creature named in your own catch message is yours for sure; once the server sends these, only they count (other people's creatures never message you)")
     internal val ownWindow by SliderSetting("My Creature Window", 1.0, 0.3, 3.0, 0.1, " s").withDescription("A creature counts as yours only if it appears within this long after YOU reel in. Lower it if other people's creatures get picked up")
     internal val ownDistance by SliderSetting("My Creature Distance", 4.0, 1.5, 8.0, 0.5, " blocks").withDescription("...and only this close to where your hook was")
     internal val noticeMin by SliderSetting("Notice Delay Min", 8, 0, 40, 1, " ticks").withDescription("How long it takes to notice a sea creature that came up, before reacting")
@@ -242,6 +243,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val mine = HashSet<Int>()
     internal val seenAt = HashMap<Int, Int>()
     internal val seenPos = HashMap<Int, Vec3>()
+    internal val catches = ArrayDeque<Pair<Int, String>>() // tick, lower-case catch message
+    internal val chase = HashMap<Int, Pair<Int, Double>>() // id -> ticks coming at us, last distance
+    internal var claimsLeft = 0
+    internal var catchMsgsWork = false
 
     // noticing sea creatures
     internal val noticeAt = HashMap<Int, Int>()
@@ -258,6 +263,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             }
             if (running) mc.player?.let { com.github.noamm9.utils.Humanize.settle(it) }
             if (running) runCatching(::tick).onFailure { stop("error: ${it.message}") }
+        }
+        register<com.github.noamm9.event.impl.ChatMessageEvent> {
+            if (! running) return@register
+            val t = event.unformattedText.replace(Regex("§."), "").trim()
+            val lastReel = reels.lastOrNull()?.tick ?: return@register
+            if (tickCount - lastReel > 30 || t.length > 160) return@register
+            if (Regex("^(?:\\[[^]]+] )*[A-Za-z0-9_]{2,16}: ").containsMatchIn(t)) return@register // a player talking
+            if (t.contains("Double Hook", ignoreCase = true)) { claimsLeft++; return@register }
+            catches += tickCount to t.lowercase()
+            claimsLeft++
         }
         register<WorldChangeEvent> {
             remembered.clear()
@@ -433,7 +448,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (rod() == null) return info("&cNo fishing rod in the hotbar.")
         anchorYaw = p.yRot
         anchorPitch = p.xRot
-        seenAt.clear(); seenPos.clear(); reels.clear()
+        seenAt.clear(); seenPos.clear(); reels.clear(); catches.clear(); chase.clear(); claimsLeft = 0
         tickCount += 100 // anything seen from now on is "after" any stale reel
         timing = com.github.noamm9.utils.HumanTiming()
         lastLookYaw = null
