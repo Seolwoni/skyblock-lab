@@ -249,7 +249,9 @@ internal fun AutoFishing.sendDiscord(reason: String, lines: List<String>, ms: Lo
     if (! discordOn.value || discordUrl.value.isBlank()) return
     val goal = reason.startsWith("done - goal reached")
     val manual = reason == "stopped"
+    val watched = Regex("^stopped: (party invite from|private message from|staff nearby|teleported) ").containsMatchIn(reason)
     val title = when {
+        watched -> "🚨 감지되어 멈춤"
         goal -> "🎯 목표 달성"
         manual -> "✋ 직접 멈춤"
         else -> "⛔ 낚시 멈춤"
@@ -259,7 +261,7 @@ internal fun AutoFishing.sendDiscord(reason: String, lines: List<String>, ms: Lo
         manual -> "키를 눌러 멈췄어요"
         else -> reason.removePrefix("stopped: ")
     }
-    val color = when { goal -> 0x22C55E; manual -> 0x8B5CF6; else -> 0xEF4444 }
+    val color = when { watched -> 0xF59E0B; goal -> 0x22C55E; manual -> 0x8B5CF6; else -> 0xEF4444 }
     fun perH(n: Long) = if (hours > 0.01) "%,d".format((n / hours).toLong()) else "-"
     val fields = listOf(
         "시간" to clock(ms),
@@ -268,6 +270,8 @@ internal fun AutoFishing.sendDiscord(reason: String, lines: List<String>, ms: Lo
         "코인" to "%,d (%s/h)".format(coins, perH(coins)),
         "희귀" to (rareLog.joinToString(", ").ifBlank { "-" }),
         "지역" to (currentArea() ?: "-"),
+        "위치" to (mc.player?.blockPosition()?.toShortString() ?: "-"),
+        "시각" to java.time.LocalTime.now().withNano(0).toString(),
     )
     val desc = (if (goal) "**목표:** $why" else "**이유:** $why") + "\n```\n" + lines.drop(1).joinToString("\n") + "\n```"
     com.github.noamm9.utils.DiscordWebhook.send(discordUrl.value, title, desc, color, fields) { ok, err ->

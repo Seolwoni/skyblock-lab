@@ -12,8 +12,7 @@
 |---|---|---|
 | 감지: 파티 초대, `From <name>:`, 스태프 태그 네임태그, warp 없는 30블록 텔레포트 | 구현 | `utils/WatchSigns.kt`, `AutoFishing` Failsafe 섹션 |
 | 정지: 감지 시 즉시 정지 + 알림 + journal 기록 | 구현 | `AutoFishing.failStop` |
-| 응답 | 미구현 (Claude가 작성하지 않음) | - |
-| 재개 지연 | 미구현 (Claude가 작성하지 않음) | - |
+| 알림: 감지 사유·상대·위치·시각을 디스코드 웹훅으로 | 구현 | `AutoFishing.sendDiscord` |
 
 ## 수치 (전부 설정값)
 
