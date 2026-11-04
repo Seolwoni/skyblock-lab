@@ -80,7 +80,7 @@ internal fun AutoFishing.claimOwn(p: LocalPlayer) {
             if (msg != null && claimsLeft > 0 && at.distanceTo(reel.at) <= 10.0) {
                 catchMsgsWork = true
                 claimsLeft--
-                claim(e)
+                claim(e, "catch message")
                 continue
             }
         }
@@ -101,11 +101,12 @@ internal fun AutoFishing.claimOwn(p: LocalPlayer) {
         val n = c.first + (if (closer || (facing && dist < 4.0)) 1 else 0)
         chase[e.id] = n to dist
         score += minOf(30.0, n * 1.5) // up to 30 after ~1 s of coming at us
-        if (score >= 70.0) claim(e)
+        if (score >= 70.0) claim(e, "score ${score.toInt()}")
     }
 }
 
-internal fun AutoFishing.claim(e: Entity) {
+internal fun AutoFishing.claim(e: Entity, how: String = "") {
+    journal.log("mine  ${creatureName(e) ?: e.name.string}  #${e.id}  $how")
     mine += e.id
     mineAlive += e.id
     firstSeen += e.id
@@ -165,7 +166,11 @@ internal fun AutoFishing.whipFight(p: LocalPlayer, mobs: List<LivingEntity>, slo
     }
     // stick with the creature we're already on while it's still in range; switch only when it's gone
     val inRange = mobs.filter { p.distanceTo(it) <= whipRange.value && p.hasLineOfSight(it) }
-    val target = inRange.firstOrNull { it == track } ?: inRange.minByOrNull { it.distanceToSqr(p) }
+    // hitting us > rare > most hurt > nearest
+    val target = inRange.firstOrNull { it == track } ?: inRange.minWithOrNull(
+        compareBy<LivingEntity>({ if (p.hurtTime > 0 && it.distanceTo(p) < 4f) 0 else 1 }, { if (it.id in rareIds) 0 else 1 },
+            { it.health / it.maxHealth.coerceAtLeast(1f) }, { it.distanceToSqr(p) })
+    )
     if (target == null) {
         val far = mobs.minByOrNull { it.distanceToSqr(p) }
         track = far // keep a loose eye on it while it comes closer

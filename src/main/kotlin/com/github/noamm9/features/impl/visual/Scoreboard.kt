@@ -50,9 +50,19 @@ object Scoreboard: Feature("Draws a custom scoreboard instead of the vanilla one
             val padding = 8
             val backgroundAlpha = (backgroundOpacity.value / 100f * 255).toInt()
 
-            ctx.drawRect(xOffset, yOffset, boxWidth, boxHeight, Color(15, 15, 15, backgroundAlpha))
-            ctx.drawRect(xOffset, yOffset, boxWidth, 2.0, Style.accentColor)
-            ctx.drawRect(xOffset - 1, yOffset - 1, boxWidth + 2.0, boxHeight + 2.0, Color.WHITE.withAlpha(backgroundAlpha * 20 / 190))
+            // violet glass card: soft shadow, hairline edge, sheen, and an accent line under the title
+            val fx = xOffset.toFloat()
+            val fy = yOffset.toFloat()
+            val fw = boxWidth.toFloat()
+            val fh = boxHeight.toFloat()
+            Style.drawShadow(ctx, fx, fy, fw, fh, 6f, 0.6f * backgroundAlpha / 191f)
+            Style.roundRect(ctx, fx - 0.5f, fy - 0.5f, fw + 1f, fh + 1f, 6.5f, Color(255, 255, 255, 20 * backgroundAlpha / 191))
+            Style.roundRect(ctx, fx, fy, fw, fh, 6f, Color(16, 11, 26, backgroundAlpha))
+            with(com.github.noamm9.utils.render.Render2D) {
+                ctx.drawVerticalGradient(fx + 4f, fy + 0.5f, fw - 8f, 10f, Color(255, 255, 255, 14), Color(255, 255, 255, 0))
+            }
+            val ruleY = fy + padding + mc.font.lineHeight + 1.5f
+            Style.gradientPill(ctx, fx + padding, ruleY, fw - padding * 2, 1f, Style.accentColor.withAlpha(200), Style.accent2.withAlpha(200))
 
             ctx.drawCenteredString(cachedTitle, (xOffset + boxWidth / 2).toFloat(), (yOffset + padding).toFloat(), shadow = false)
 

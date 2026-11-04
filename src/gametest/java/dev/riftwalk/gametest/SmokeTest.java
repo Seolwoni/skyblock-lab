@@ -104,6 +104,19 @@ public class SmokeTest implements FabricClientGameTest {
 				com.github.noamm9.utils.ChatUtils.INSTANCE.modMessage("&7Etherwarp landed, &e3 &7secrets left.");
 				com.github.noamm9.utils.ChatUtils.INSTANCE.modMessage("&cCould not reach the next point, stopping.");
 			});
+			// a sidebar so the custom scoreboard shows in the shot
+			try {
+				sp.getServer().runOnServer(server -> {
+					var src = server.createCommandSourceStack().withSuppressedOutput();
+					for (String c : new String[] {
+						"scoreboard objectives add rw dummy {\"text\":\"SKYBLOCK\",\"color\":\"yellow\",\"bold\":true}",
+						"scoreboard objectives setdisplay sidebar rw",
+						"scoreboard players set §7Nov_4th rw 6", "scoreboard players set §f_ rw 5",
+						"scoreboard players set §bCrimson_Isle rw 4", "scoreboard players set §6Purse:_12,450,921 rw 3",
+						"scoreboard players set §e_ rw 2", "scoreboard players set §eriftwalk.dev rw 1"
+					}) server.getCommands().performPrefixedCommand(src, c);
+				});
+			} catch (Throwable t) { log.add("scoreboard setup: " + t); }
 			context.waitTicks(100);
 			context.takeScreenshot("rw-03-everything-on");
 			try {

@@ -3,6 +3,7 @@ package com.github.noamm9.mixin;
 import com.github.noamm9.features.impl.dev.cosmetics.badges.BadgeText;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.PlayerTabOverlay;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.network.chat.Component;
@@ -17,5 +18,13 @@ public class MixinPlayerTabOverlay {
     )
     private Component decoratePlayerName(PlayerTabOverlay overlay, PlayerInfo info, Operation<Component> original) {
         return BadgeText.decorate(original.call(overlay, info), info.getProfile().id());
+    }
+
+    @WrapOperation(
+        method = "extractRenderState",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;fill(IIIII)V")
+    )
+    private void riftwalkTabFill(GuiGraphicsExtractor graphics, int x1, int y1, int x2, int y2, int color, Operation<Void> original) {
+        if (!com.github.noamm9.features.impl.visual.TabStyle.fill(graphics, x1, y1, x2, y2, color)) original.call(graphics, x1, y1, x2, y2, color);
     }
 }
