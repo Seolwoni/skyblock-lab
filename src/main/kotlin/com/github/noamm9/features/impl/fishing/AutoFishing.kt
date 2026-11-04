@@ -637,7 +637,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         seenAt.clear(); seenPos.clear(); reels.clear(); catches.clear(); chase.clear(); claimsLeft = 0
         claimedAt.clear(); despawnWarned.clear(); rareIds.clear(); castHp.clear(); immuneWaited.clear(); deaths.clear()
         tickCount += 100 // anything seen from now on is "after" any stale reel
-        timing = com.github.noamm9.utils.HumanTiming()
+        timing = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
         lastLookYaw = null
         wobYaw = 0f; wobPitch = 0f
         aimTarget = null
@@ -745,7 +745,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val dp = pitch - p.xRot
         if (abs(dy) <= tol && abs(dp) <= tol) return true
         if (! smoothTurns.value) {
-            PlayerUtils.rotate(yaw, pitch)
+            com.github.noamm9.utils.Humanize.setView(p, yaw, pitch)
             return true
         }
         return com.github.noamm9.utils.Humanize.turnTo(p, yaw, pitch, tol)
@@ -937,8 +937,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         if (returning) {
             status = "looking back at the ${fluidName()}"
             if (! turn(p, anchorYaw + offYaw + wobYaw, anchorPitch + offPitch + wobPitch, 0.8f)) return
-            p.yRot = anchorYaw + offYaw + wobYaw // land exactly, so it isn't taken for a camera move
-            p.xRot = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
+            com.github.noamm9.utils.Humanize.setView(p, anchorYaw + offYaw + wobYaw, anchorPitch + offPitch + wobPitch) // land exactly
             returning = false
         }
         if (state == State.WAIT_BITE) lookMovement(p)
@@ -990,8 +989,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 val ty = anchorYaw + offYaw + wobYaw
                 val tp = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
                 if (! turn(p, ty, tp, 0.35f)) return
-                p.yRot = ty
-                p.xRot = tp
+                com.github.noamm9.utils.Humanize.setView(p, ty, tp)
                 // would this throw come down in the water / lava? if it hits the floor or a wall, aim again first
                 if (hook == null && ! throwLandsInFluid(p, ty, tp)) {
                     if (++aimFixes > 3) {

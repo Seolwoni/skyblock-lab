@@ -64,7 +64,7 @@ internal fun AutoRoutes.turn(yaw: Float, pitch: Float, tolerance: Float = 2f, se
     val p = mc.player ?: return false
     val arrived = if (smoothTurning.value) com.github.noamm9.utils.Humanize.turnTo(p, yaw, pitch, tolerance)
     else {
-        PlayerUtils.rotate(yaw, pitch)
+        com.github.noamm9.utils.Humanize.setView(p, yaw, pitch)
         true
     }
     if (! arrived) return false // keep the settle state: chasing a moving aim must not restart the pause

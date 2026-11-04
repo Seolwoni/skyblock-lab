@@ -18,12 +18,12 @@ import kotlin.math.roundToInt
  *
  * Every result stays inside the [min, max] the caller asks for.
  */
-class HumanTiming(seed: Long = System.nanoTime()) {
+class HumanTiming(seed: Long = System.nanoTime(), private val clock: () -> Long = System::currentTimeMillis) {
     private val rnd = Random(seed)
     private var tempo = 1.0
     private var last = - 1.0
     private var lastTicks = - 1
-    private val started = System.currentTimeMillis()
+    private val started = clock()
 
     /** Slips: chance of a clearly slow reaction (0..1). */
     var slipChance = 0.06
@@ -33,6 +33,17 @@ class HumanTiming(seed: Long = System.nanoTime()) {
     var fatiguePerHour = 0.08
     /** How much the rhythm can drift (0.2 = between 80% and 120% speed). */
     var drift = 0.2
+    /** Where the typical reaction sits in the range (0.28 = 28% of the way from min to max). */
+    var median = 0.28
+    /** Delay spread: the log-normal sigma. Higher = a longer tail of slow reactions. */
+    var spread = 0.55
+
+    /** Takes the spread and slip rate from a [HumanProfile]. */
+    fun apply(profile: HumanProfile): HumanTiming {
+        spread = profile.delaySpread
+        slipChance = profile.slipChance
+        return this
+    }
 
     /** Call once per tick so the rhythm drifts smoothly. */
     fun tick() {
@@ -49,12 +60,10 @@ class HumanTiming(seed: Long = System.nanoTime()) {
         val span = (hi - lo).toDouble()
 
         // log-normal: median ~28% into the range, long tail to the right
-        val median = 0.28
-        val sigma = 0.55
-        var x = exp(ln(median) + rnd.nextGaussian() * sigma) // 0..~1+, mostly 0.15-0.5
+        var x = exp(ln(median) + rnd.nextGaussian() * spread) // 0..~1+, mostly 0.15-0.5
         if (rnd.nextDouble() < slipChance) x = 0.6 + rnd.nextDouble() * 0.4
 
-        val hours = ((System.currentTimeMillis() - started) / 3_600_000.0).coerceAtMost(2.0)
+        val hours = ((clock() - started) / 3_600_000.0).coerceAtMost(2.0)
         x *= tempo * (1.0 + fatiguePerHour * hours)
         if (last >= 0) x = x * (1 - carryOver) + last * carryOver
         x = x.coerceIn(0.0, 1.0)
@@ -71,6 +80,9 @@ class HumanTiming(seed: Long = System.nanoTime()) {
         if (chancePercent <= 0 || rnd.nextDouble() * 100 >= chancePercent) return 0
         return minTicks + rnd.nextInt((maxTicks - minTicks).coerceAtLeast(0) + 1)
     }
+
+    /** True with the profile's failure rate: the odd fumble (an aim a bit off, a click a beat late). */
+    fun fails(failRate: Double) = failRate > 0 && rnd.nextDouble() < failRate
 
     /** Plain uniform pick, for things that shouldn't follow the rhythm. */
     fun uniform(min: Int, max: Int) = if (max <= min) min else min + rnd.nextInt(max - min + 1)

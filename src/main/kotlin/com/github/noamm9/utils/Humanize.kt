@@ -72,12 +72,33 @@ object Humanize {
         if (t >= 1f) gliding = false
     }
 
+    // ---- the only way automatic code changes where the player looks
+
+    /** Set the view (mouse-sensitivity steps applied). Every automatic turn ends up here. */
+    fun setView(p: LocalPlayer, yaw: Float, pitch: Float) {
+        PlayerUtils.rotate(yaw, pitch.coerceIn(- 90f, 90f))
+        p.yHeadRot = p.yRot
+    }
+
+    /** Move the view by a small amount (per-frame followers: tracking, steering). */
+    fun nudgeView(p: LocalPlayer, dYaw: Float, dPitch: Float) = setView(p, p.yRot + dYaw, p.xRot + dPitch)
+
+    /** The human-behaviour profile from the Human Behaviour settings. */
+    fun profile(): HumanProfile = runCatching {
+        HumanProfile(
+            failRate = HumanBehaviour.mistakeRate.value / 100.0,
+            delaySpread = HumanBehaviour.delaySpread.value / 100.0,
+            slipChance = HumanBehaviour.slips.value / 100.0,
+        )
+    }.getOrDefault(HumanProfile())
+
     /** Call once per tick (HumanBehaviour does it). */
     fun tick() {
         net.minecraft.client.Minecraft.getInstance().player?.let { settle(it) }
         timing.slipChance = HumanBehaviour.slips.value / 100.0
         timing.drift = HumanBehaviour.drift.value / 100.0
         timing.fatiguePerHour = HumanBehaviour.fatigue.value / 100.0
+        timing.apply(profile())
         timing.tick()
     }
 
@@ -133,7 +154,16 @@ object Humanize {
             PlayerUtils.rotate(yaw, pitch)
             return true
         }
-        if (HumanBehaviour.useAssistCore.value && AssistBridge.coreLoaded) return AssistBridge.turn(p, yaw, pitch, tolerance)
+        if (HumanBehaviour.useAssistCore.value && AssistBridge.coreLoaded) {
+            // Assist Core works out the step; it's drawn with our frame glide like every other turn
+            settle(p)
+            val y0 = p.yRot; val p0 = p.xRot
+            val done = AssistBridge.turn(p, yaw, pitch, tolerance)
+            val y1 = p.yRot; val p1 = p.xRot
+            p.yRot = y0; p.xRot = p0
+            glide(p, y1, p1)
+            return done && kotlin.math.abs(wrap(yaw - y0)) <= tolerance * 4
+        }
         settle(p)
         val dy = wrap(yaw - p.yRot)
         val dp = pitch - p.xRot

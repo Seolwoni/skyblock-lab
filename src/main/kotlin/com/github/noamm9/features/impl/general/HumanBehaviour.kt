@@ -25,6 +25,8 @@ object HumanBehaviour: Feature(
     val reactMin by SliderSetting("Reaction Min", 3, 0, 20, 1, " ticks").section("Reactions").withDescription("Shortest wait before acting on something that just appeared (a mob, a bite, a button lighting up)")
     val reactMax by SliderSetting("Reaction Max", 9, 0, 30, 1, " ticks")
     val slips by SliderSetting("Slow Reactions", 6, 0, 30, 1, "%").withDescription("How often a reaction is clearly slow")
+    val mistakeRate by SliderSetting("Mistake Rate", 2.0, 0.0, 10.0, 0.5, "%").withDescription("How often an action comes out a little wrong: a cast a bit off, a click a beat late")
+    val delaySpread by SliderSetting("Delay Spread", 55, 30, 90, 1, "%").withDescription("How spread out reaction times are: higher = more of them clearly slower than usual")
     val drift by SliderSetting("Rhythm Drift", 18, 0, 50, 1, "%").withDescription("How far the overall speed wanders over minutes")
     val fatigue by SliderSetting("Fatigue", 6, 0, 40, 1, "%/h").withDescription("How much slower reactions get per hour of running (up to 2 hours)")
     val breaks by SliderSetting("Short Breaks", 1.5, 0.0, 10.0, 0.5, "%").withDescription("Chance per action of a 1.5-5 s pause")

@@ -288,9 +288,7 @@ internal fun AutoFishing.trackFrame() {
     trackVelPitch += (k * errP - c * trackVelPitch) * dt
     val sp = kotlin.math.hypot(trackVelYaw.toDouble(), trackVelPitch.toDouble()).toFloat()
     if (sp > trackMaxSpeed) { trackVelYaw *= trackMaxSpeed / sp; trackVelPitch *= trackMaxSpeed / sp }
-    p.yRot += trackVelYaw * dt
-    p.xRot = (p.xRot + trackVelPitch * dt).coerceIn(- 90f, 90f)
-    p.yHeadRot = p.yRot
+    com.github.noamm9.utils.Humanize.nudgeView(p, trackVelYaw * dt, trackVelPitch * dt)
 }
 
 internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {

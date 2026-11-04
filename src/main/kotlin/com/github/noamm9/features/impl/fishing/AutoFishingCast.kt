@@ -193,8 +193,10 @@ internal fun AutoFishing.aimAt(p: LocalPlayer, hs: Entity) {
 /** This cast's aim: the solved aim plus a small hand wobble. */
 internal fun AutoFishing.nextCastAim(@Suppress("UNUSED_PARAMETER") p: LocalPlayer) {
     val w = aimWobble.value.toFloat()
-    wobYaw = (RANDOM.nextFloat() * 2 - 1) * w
-    wobPitch = (RANDOM.nextFloat() * 2 - 1) * w * 0.6f
+    // now and then (the profile's failure rate) the hand slips a bit more
+    val slip = if (timing.fails(com.github.noamm9.utils.Humanize.profile().failRate)) 3f else 1f
+    wobYaw = (RANDOM.nextFloat() * 2 - 1) * w * slip
+    wobPitch = (RANDOM.nextFloat() * 2 - 1) * w * 0.6f * slip
 }
 
 /** Is the hook inside the hotspot? If not, move the aim point by the miss and solve the throw again (8 tries). */
