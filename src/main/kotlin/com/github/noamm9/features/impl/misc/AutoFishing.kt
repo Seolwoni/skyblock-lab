@@ -82,6 +82,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")
     private val manaCost by SliderSetting("Mana Per Cast", 300, 0, 1000, 10).withDescription("Wither Impact's mana cost for you. Below it, the Hyperion swings as a sword instead of casting (no more standing there with no mana)")
     private val pauseMana by SliderSetting("Pause Below Mana", 35, 0, 90, 5, "%").withDescription("Stops casting the rod while mana is under this, so no new sea creatures come up until it has refilled (0 = never pause)")
+    private val weaponType by DropdownSetting("Weapon", 0, listOf("Hyperion", "Soul Whip", "Flaming Flay")).withDescription(
+        "Hyperion: Wither Impact looking down. Soul Whip / Flaming Flay: aims at the creature and right-clicks (Flay), no teleport. Falls back to the Hyperion if the whip isn't in the hotbar"
+    )
+    private val whipRange by SliderSetting("Whip Range", 11.0, 4.0, 14.0, 0.5, " blocks").withDescription("How close a creature has to be before the whip is used (Flay reaches about 13 forward)").showIf { weaponType.value != 0 }
+    private val whipDelay by SliderSetting("Whip Delay", 6, 2, 30, 1, " ticks").withDescription("Time between whip swings (a little random on top)").showIf { weaponType.value != 0 }
     private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) of the weapon. 0 = Hyperion / Astraea / Scylla / Valkyrie if found")
     private val hitDelay by SliderSetting("Hit Delay", 4, 1, 20, 1, " ticks")
 
@@ -134,6 +139,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     private var stretchLeft = 0
     private var justCaughtSomething = false
     private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
+    private val WHIPS = mapOf(1 to "SOUL_WHIP", 2 to "FLAMING_FLAY")
     private val NPC_CLASSES = setOf("Villager", "WanderingTrader")
 
     private var running = false
@@ -1660,9 +1666,45 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
     }
 
-    private fun hasHype() = weaponSlot.value !in 1 .. 9 && PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } != null
+    private fun hasHype() = weaponSlot.value !in 1 .. 9 && PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } != null &&
+        WHIPS[weaponType.value]?.let { id -> PlayerUtils.findHotbarSlot { it.skyblockId == id } } == null // a whip needs no mana
+
+    /**
+     * Soul Whip / Flaming Flay: no teleport, so nothing can drop us in the lava. Takes the whip out, aims
+     * (eased, not dead centre) at the nearest creature in range and right-clicks Flay, a varied beat apart.
+     */
+    private fun whipFight(p: LocalPlayer, mobs: List<LivingEntity>, slot: Int) {
+        for (m in mobs) {
+            if (p.distanceTo(m) <= whipRange.value) waiting.remove(m.id)
+            else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > giveUp.value * 20) { ignored += m.id; waiting.remove(m.id) }
+        }
+        val target = mobs.filter { p.distanceTo(it) <= whipRange.value && p.hasLineOfSight(it) }.minByOrNull { it.distanceToSqr(p) }
+        if (target == null) {
+            val far = mobs.minByOrNull { it.distanceToSqr(p) } ?: return
+            status = "waiting for ${far.name.string}"
+            val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(far.boundingBox.center, 0.6))
+            if (abs(wrap(rot.yaw - p.yRot)) > 22f || abs(rot.pitch - p.xRot) > 18f) turn(p, rot.yaw, rot.pitch, 9f)
+            return
+        }
+        if (! centered(p)) { status = "stepping to the middle of the block"; return }
+        status = "whipping ${target.name.string}"
+        if (hypeBeat > 0) { hypeBeat--; return }
+        val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(target.boundingBox.center, 0.35))
+        if (! turn(p, rot.yaw, rot.pitch, 5f)) return
+        if (p.inventory.selectedSlot != slot) { // take it out once we're looking at it, then a beat
+            hold(slot)
+            hypeBeat = delay(2, 7)
+            return
+        }
+        if (hitCooldown > 0) return
+        use(p)
+        p.swing(InteractionHand.MAIN_HAND)
+        hitCooldown = delay(whipDelay.value, whipDelay.value * 2 + 2)
+    }
 
     private fun fight(p: LocalPlayer, mobs: List<LivingEntity>) {
+        val whipSlot = WHIPS[weaponType.value]?.let { id -> PlayerUtils.findHotbarSlot { it.skyblockId == id } }
+        if (whipSlot != null) return whipFight(p, mobs, whipSlot)
         val hypeSlot = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
         // no mana: the Hyperion is still a sword, swing it instead of standing there
         val hype = hypeSlot?.takeIf { ! blastBlocked && com.github.noamm9.utils.ManaGuard.canCast(manaCost.value) }
