@@ -76,8 +76,8 @@ public class SmokeTest implements FabricClientGameTest {
 			checkScreen(context, "rw-02-classic", false);
 			context.runOnClient(mc -> {
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) {
-					if (f.getClass().getSimpleName().equals("AutoRoutes")) {
-						SkyHanniScreen.lastCategory = CategoryType.ROUTES;
+					if (f.getClass().getSimpleName().equals("AutoFishing")) {
+						SkyHanniScreen.lastCategory = CategoryType.FISHING;
 						SkyHanniScreen.lastFeature = f;
 					}
 				}

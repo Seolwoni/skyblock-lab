@@ -128,6 +128,35 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         class Header(val text: String): Entry()
         class FeatureCard(val feature: Feature): Entry()
         class Option(val feature: Feature, val widget: Widget<*>, val prefix: String?): Entry()
+        /** The section tabs of a feature with many settings. */
+        class Tabs(val feature: Feature, val tabs: List<String>, val current: String): Entry()
+    }
+
+    private val tabOf = HashMap<Feature, String>()
+    private val drawnTabs = ArrayList<Pair<String, FloatArray>>()
+
+    /** Settings grouped by section, in order ("General" for the ones before the first section). */
+    private fun sectionsOf(feature: Feature): List<Pair<String, List<Widget<*>>>> {
+        val out = LinkedHashMap<String, MutableList<Widget<*>>>()
+        var cur = "General"
+        for (w in widgetsOf(feature)) {
+            w.config.section?.let { cur = it }
+            out.getOrPut(cur) { ArrayList() } += w
+        }
+        return out.entries.map { it.key to it.value }.filter { (_, ws) -> ws.any { it.config.visibility() } }
+    }
+
+    private fun tabLayout(tabs: List<String>, w: Float): List<FloatArray> {
+        val out = ArrayList<FloatArray>()
+        var tx = 0f
+        var ty = 0f
+        for (t in tabs) {
+            val tw = uiWidth(t) + 18f
+            if (tx > 0f && tx + tw > w) { tx = 0f; ty += 20f }
+            out += floatArrayOf(tx, ty, tw, 16f)
+            tx += tw + 4f
+        }
+        return out
     }
 
     private var entries = emptyList<Entry>()
@@ -406,6 +435,15 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         }
 
         add(Entry.FeatureCard(feature))
+        // many sections: show them as tabs, one at a time
+        val groups = sectionsOf(feature)
+        if (groups.size >= 3) {
+            val names = groups.map { it.first }
+            val cur = tabOf[feature]?.takeIf { it in names } ?: names.first()
+            add(Entry.Tabs(feature, names, cur))
+            for (w in groups.first { it.first == cur }.second) if (w.config.visibility()) add(Entry.Option(feature, w, null))
+            return@buildList
+        }
         var lastSection: String? = null
         for (w in widgetsOf(feature)) {
             if (!w.config.visibility()) continue
@@ -443,8 +481,10 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                 is Entry.Header -> 16f
                 is Entry.FeatureCard -> featureCardHeight(it.feature, w)
                 is Entry.Option -> optionHeight(it, w)
+                is Entry.Tabs -> (tabLayout(it.tabs, w).maxOf { r -> r[1] } + 22f)
             }
         }
+        drawnTabs.clear()
         scroll.update(heights.sum() + entries.size * CARD_GAP, h)
 
         drawnFeatureCards.clear()
@@ -502,6 +542,20 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                             ctx.drawString(label, x + w - 8f - uiWidth(label), y + eh - 12f, if (f.enabled) accentLight() else textFaint, shadow = false)
                         }
                         ctx.pose().popMatrix()
+                    }
+                }
+
+                is Entry.Tabs -> if (visible) {
+                    val layout = tabLayout(entry.tabs, w)
+                    entry.tabs.forEachIndexed { ti, name ->
+                        val r = layout[ti]
+                        val rect = floatArrayOf(x + r[0], y + 2f + r[1], r[2], r[3])
+                        drawnTabs += name to rect
+                        val sel = name == entry.current
+                        val hov = anim("tab:${entry.feature.name}:$name", 120).also { it.update(if (insideContent && inside(mx, my, rect)) 1f else 0f) }.value
+                        if (sel) Style.gradientPill(ctx, rect[0], rect[1], rect[2], rect[3], Style.accentColor.withAlpha(220), Style.accent2.withAlpha(220))
+                        else Style.roundRect(ctx, rect[0], rect[1], rect[2], rect[3], 8f, Style.mix(card, cardHover, hov))
+                        ctx.drawString(name, rect[0] + 9f, rect[1] + 4f, if (sel) textMain else Style.mix(textDim, textSoft, hov), shadow = false)
                     }
                 }
 
@@ -595,6 +649,14 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
             return true
         }
 
+        if (left) drawnTabs.firstOrNull { inside(mx, my, it.second) }?.let { (name, rect) ->
+            val f = selected ?: return@let
+            ripple(rect, mx, my, "tab:$name")
+            Style.playClickSound(1.1f)
+            tabOf[f] = name
+            scroll.reset()
+            return true
+        }
         if (left && sideScroll.mouseClicked(mx, my)) return true
         if (left && scroll.mouseClicked(mx, my)) return true
 
