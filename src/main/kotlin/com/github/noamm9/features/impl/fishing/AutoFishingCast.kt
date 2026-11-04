@@ -193,10 +193,18 @@ internal fun AutoFishing.aimAt(p: LocalPlayer, hs: Entity) {
 /** This cast's aim: the solved aim plus a small hand wobble. */
 internal fun AutoFishing.nextCastAim(@Suppress("UNUSED_PARAMETER") p: LocalPlayer) {
     val w = aimWobble.value.toFloat()
-    // now and then (the profile's failure rate) the hand slips a bit more
-    val slip = if (timing.fails(com.github.noamm9.utils.Humanize.profile().failRate)) 3f else 1f
-    wobYaw = (RANDOM.nextFloat() * 2 - 1) * w * slip
-    wobPitch = (RANDOM.nextFloat() * 2 - 1) * w * 0.6f * slip
+    // Cast Fail (passed in as the profile's failure rate): the hand clearly slips, 2-4° off; a miss gets recast
+    val profile = com.github.noamm9.utils.Humanize.profile().copy(failRate = castFail.value / 100.0)
+    if (timing.fails(profile.failRate)) {
+        val off = 2f + RANDOM.nextFloat() * 2f
+        val a = RANDOM.nextFloat() * (2 * Math.PI).toFloat()
+        wobYaw = kotlin.math.cos(a) * off
+        wobPitch = kotlin.math.sin(a) * off * 0.6f
+        journal.log("cast slip ${"%.1f".format(off)}°")
+        return
+    }
+    wobYaw = (RANDOM.nextFloat() * 2 - 1) * w
+    wobPitch = (RANDOM.nextFloat() * 2 - 1) * w * 0.6f
 }
 
 /** Is the hook inside the hotspot? If not, move the aim point by the miss and solve the throw again (8 tries). */

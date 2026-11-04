@@ -4,6 +4,7 @@ package com.github.noamm9.features.impl.fishing
 import com.github.noamm9.config.types.DropdownSetting
 import com.github.noamm9.config.types.KeybindSetting
 import com.github.noamm9.config.types.SliderSetting
+import com.github.noamm9.config.types.TextInputSetting
 import com.github.noamm9.config.types.ToggleSetting
 import com.github.noamm9.event.impl.MainThreadPacketReceivedEvent
 import com.github.noamm9.event.impl.TickEvent
@@ -70,9 +71,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val slugPet by ToggleSetting("Slug Pet", false).withDescription("With the Slug pet the wait is halved (11 s)").showIf { slugfish.value }
     internal val groundRecast by ToggleSetting("Recast If Hook Lands On Ground", true).withDescription("Casts again when the hook settles somewhere that isn't water / lava; stops after 3 misses in a row")
     internal val hookDive by ToggleSetting("Detect By Hook Dive", true).withDescription("Also reels in when the hook suddenly dives (vanilla bite), not only on the \"!!!\" sign")
+    internal val castFail by SliderSetting("Cast Fail", 1.5, 0.0, 10.0, 0.5, "%").section("Mistakes").withDescription("How often a cast comes out clearly off (the hand slips); a cast that misses gets recast")
+    internal val lateReel by SliderSetting("Late Reel", 2.0, 0.0, 10.0, 0.5, "%").withDescription("How often the reel comes late after a bite (sometimes late enough to lose the fish)")
+    internal val lateReelTicks by SliderSetting("Late Reel By", 14, 2, 30, 1, " ticks").showIf { lateReel.value > 0 }.withDescription("How much later, at most (half to all of this)")
+    internal val zoneOut by SliderSetting("Zone Out", 3.0, 0.0, 15.0, 0.5, "%").withDescription("Chance per cast of staring for a moment before casting again")
+    internal val zoneOutMin by SliderSetting("Zone Out Min", 3.0, 1.0, 20.0, 0.5, " s").showIf { zoneOut.value > 0 }
+    internal val zoneOutMax by SliderSetting("Zone Out Max", 8.0, 1.0, 30.0, 0.5, " s").showIf { zoneOut.value > 0 }
 
     internal val lookJitter by ToggleSetting("Look Movement", true).section("Look").withDescription("Small eased head movements around the bobber now and then, like a person holding the rod")
-    internal val jitterDegrees by SliderSetting("Movement Size", 1.0, 0.2, 4.0, 0.1, "°")
+    internal val jitterDegrees by SliderSetting("Movement Size", 1.0, 0.2, 4.0, 0.1, "°").withDescription("Size of each small movement (a step of the random walk)")
+    internal val driftRange by SliderSetting("Drift Range", 3.0, 0.5, 8.0, 0.5, "°").withDescription("The aim wanders in a random walk but never further than this from where you fish")
     internal val jitterEvery by SliderSetting("Movement Every", 15, 3, 60, 1, " s").withDescription("On average; each wait is 80-120% of this")
     internal val smoothTurns by ToggleSetting("Smooth Turning", true).withDescription("Eases every turn (to sea creatures and back). Uses Assist Core's turning when it's installed")
 
@@ -142,6 +150,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe").withDescription(
         "Stops (doesn't try to hide anything): when the server teleports or turns you, your view jumps 70 degrees or more in an instant, your held item is changed, or a menu opens by itself"
     )
+    internal val stopOnParty by ToggleSetting("Stop On Party Invite", true).showIf { failsafe.value }.withDescription("Someone invites you to a party: stop and tell you")
+    internal val stopOnMessage by ToggleSetting("Stop On Private Message", true).showIf { failsafe.value }.withDescription("A \"From <name>:\" message: stop and tell you")
+    internal val stopOnStaff by ToggleSetting("Stop On Staff Nearby", true).showIf { failsafe.value }.withDescription("A player with a staff tag in their name is near you: stop and tell you")
+    internal val staffTags by TextInputSetting("Staff Tags", "ADMIN, OWNER, MOD, HELPER, GM, YOUTUBE").showIf { failsafe.value && stopOnStaff.value }.withDescription("Tags to look for, comma separated (written without brackets)")
+    internal val staffRange by SliderSetting("Staff Range", 48, 8, 128, 4, " blocks").showIf { failsafe.value && stopOnStaff.value }
+    internal val stopOnTeleport by ToggleSetting("Stop On Teleport", true).showIf { failsafe.value }.withDescription("You jump a long way in one tick without a warp / AOTV of ours: stop and tell you")
+    internal val teleportDistance by SliderSetting("Teleport Distance", 30, 10, 100, 5, " blocks").showIf { failsafe.value && stopOnTeleport.value }
     internal val longBreaks by ToggleSetting("Long Breaks", true).section("Breaks").withDescription("Every so often reels in and takes a proper break, looking around now and then, like a person getting a drink")
     internal val breakEveryMin by SliderSetting("Break Every Min", 25, 5, 120, 1, " min").showIf { longBreaks.value }
     internal val breakEveryMax by SliderSetting("Break Every Max", 45, 5, 180, 1, " min").showIf { longBreaks.value }
@@ -232,6 +247,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal var expectedSlot = - 1
     internal var lastLookYaw: Float? = null
     internal var lastLookPitch = 0f
+    internal var lastTickPos: Vec3? = null
 
     // safe walking (own path, avoids lava / water)
     internal var path: List<BlockPos> = emptyList()
@@ -356,6 +372,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             }
             if (running) mc.player?.let { com.github.noamm9.utils.Humanize.settle(it) }
             if (running) runCatching(::tick).onFailure { com.github.noamm9.utils.Safely.report("AutoFishing tick", it); stop("error: ${it.message}") }
+        }
+        register<com.github.noamm9.event.impl.ChatMessageEvent> {
+            if (! running || ! failsafe.value) return@register
+            val t = event.unformattedText
+            if (stopOnParty.value) com.github.noamm9.utils.WatchSigns.partyInvite(t)?.let { return@register failStop("party invite from $it") }
+            if (stopOnMessage.value) com.github.noamm9.utils.WatchSigns.privateMessage(t)?.let { return@register failStop("private message from $it") }
         }
         register<com.github.noamm9.event.impl.ChatMessageEvent> { if (readShared.value) com.github.noamm9.utils.Safely("AutoFishing shared hotspot") { readSharedHotspot(event.unformattedText) } }
         register<com.github.noamm9.event.impl.ChatMessageEvent> {
@@ -639,6 +661,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         tickCount += 100 // anything seen from now on is "after" any stale reel
         timing = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
         lastLookYaw = null
+        lastTickPos = null
         wobYaw = 0f; wobPitch = 0f
         aimTarget = null
         noticeAt.clear()
@@ -683,6 +706,25 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_PLING.value(), 1f, 0.6f)
     }
 
+    /** "[TAG] name" of a player near us whose name carries a staff tag, or null. */
+    internal fun staffNearby(p: LocalPlayer): String? {
+        val tags = com.github.noamm9.utils.WatchSigns.parseTags(staffTags.value)
+        val r = staffRange.value.toDouble()
+        for (o in p.level().players()) {
+            if (o === p || o.distanceToSqr(p) > r * r) continue
+            val shown = o.displayName?.string ?: o.name.string
+            val tag = com.github.noamm9.utils.WatchSigns.staffTag(shown, tags)
+                ?: mc.connection?.getPlayerInfo(o.uuid)?.tabListDisplayName?.string?.let { com.github.noamm9.utils.WatchSigns.staffTag(it, tags) }
+            if (tag != null) return "[$tag] ${o.name.string}"
+        }
+        // name tags floating over players (servers often draw ranks as a separate text)
+        for ((_, text) in com.github.noamm9.utils.FloatingText.near(p.level(), p.boundingBox.inflate(r))) {
+            val tag = com.github.noamm9.utils.WatchSigns.staffTag(text, tags) ?: continue
+            if (Regex("\\[$tag\\+*] ?[A-Za-z0-9_]{1,16}", RegexOption.IGNORE_CASE).containsMatchIn(text.replace(Regex("§."), ""))) return text.replace(Regex("§."), "").take(40)
+        }
+        return null
+    }
+
     internal fun stop(reason: String?) {
         if (running) runCatching { writeReport(reason ?: "stopped") }
         if (running) journal.log("stop  ${reason ?: "-"}  (state=$state, kills=$kills, creatures=$creaturesCaught)")
@@ -725,6 +767,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         justCaughtSomething = false
         t += timing.maybeBreak(breakChance.value, 40, 120)
         if (RANDOM.nextInt(100) < hesitate.value) t += timing.uniform(6, 20)
+        if (com.github.noamm9.utils.HumanMotion.chance(zoneOut.value, RANDOM)) {
+            val z = com.github.noamm9.utils.HumanMotion.between((zoneOutMin.value * 20).toInt(), (zoneOutMax.value * 20).toInt(), RANDOM)
+            t += z
+            journal.log("zone out ${z / 20.0}s")
+        }
         return t
     }
 
@@ -772,10 +819,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             return
         }
         if (--nextMoveIn > 0) return
-        val d = jitterDegrees.value.toFloat()
+        // a bounded random walk around the spot: each move is a small step from the last, never past Drift Range
+        val step = jitterDegrees.value.toFloat()
+        val bound = driftRange.value.toFloat()
         fromYaw = offYaw; fromPitch = offPitch
-        toYaw = (RANDOM.nextFloat() * 2 - 1) * d
-        toPitch = (RANDOM.nextFloat() * 2 - 1) * d * 0.6f
+        toYaw = com.github.noamm9.utils.HumanMotion.walk(offYaw, step, bound, RANDOM)
+        toPitch = com.github.noamm9.utils.HumanMotion.walk(offPitch, step * 0.6f, bound * 0.6f, RANDOM)
         moveTick = 0
         moveLen = rand(6, 14)
         nextMoveIn = nextMoveDelay()
@@ -834,6 +883,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
         lastLookYaw = p.yRot
         lastLookPitch = p.xRot
+        // a long jump in one tick that isn't ours (no warp / AOTV / Wither Impact just now)
+        val here = p.position()
+        val before = lastTickPos
+        lastTickPos = here
+        if (failsafe.value && stopOnTeleport.value && before != null && ownMoveTicks <= 0 && state != State.RESUME &&
+            com.github.noamm9.utils.WatchSigns.teleported(before.x, before.y, before.z, here.x, here.y, here.z, teleportDistance.value.toDouble())
+        ) return failStop("teleported ${before.distanceTo(here).toInt()} blocks without a warp")
+        if (failsafe.value && stopOnStaff.value && tickCount % 20 == 0) staffNearby(p)?.let { return failStop("staff nearby: $it") }
         timing.tick()
         if (failsafe.value) {
             if (expectedSlot >= 0 && p.inventory.selectedSlot != expectedSlot) return failStop("your held item was changed")
@@ -1096,6 +1153,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                     journal.log("bite after ${timer / 20.0}s  (${fluidName()})")
                     state = State.REEL
                     wait = delay(reelMin.value, reelMax.value)
+                    if (com.github.noamm9.utils.HumanMotion.chance(lateReel.value, RANDOM)) {
+                        val late = com.github.noamm9.utils.HumanMotion.between(lateReelTicks.value / 2, lateReelTicks.value, RANDOM)
+                        wait += late
+                        journal.log("late reel +$late ticks")
+                    }
                     status = "bite!"
                     groundFails = 0
                     return

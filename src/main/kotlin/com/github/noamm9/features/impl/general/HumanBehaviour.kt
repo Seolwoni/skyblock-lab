@@ -20,7 +20,10 @@ object HumanBehaviour: Feature(
 
     val turnSpeed by SliderSetting("Turn Speed", 1.0, 0.5, 2.0, 0.05, "x").section("Turning").withDescription("Top speed of head turns (each turn picks its own speed around this)")
     val curvedTurns by ToggleSetting("Curved Turns", true).withDescription("Turns follow a slight arc instead of a ruler-straight line")
-    val aimSpread by SliderSetting("Aim Spread", 0.18, 0.0, 0.45, 0.01, " blocks").withDescription("Aims at a point near the middle of a block / mob, not the exact centre (same spot each time for the same target)")
+    val aimSpread by SliderSetting("Aim Spread", 0.12, 0.0, 0.45, 0.01, " blocks").withDescription("Aims at a point near the middle of a block / mob, not the exact centre (same spot each time for the same target)")
+    val overshoot by ToggleSetting("Overshoot", true).withDescription("Big turns (over 20°) go a little past the target, then come back")
+    val overshootMin by SliderSetting("Overshoot Min", 0.1, 0.0, 0.5, 0.01, "x").showIf { overshoot.value }.withDescription("Least overshoot, as a share of the turn (the turn counted up to 10°)")
+    val overshootMax by SliderSetting("Overshoot Max", 0.3, 0.0, 0.5, 0.01, "x").showIf { overshoot.value }
 
     val reactMin by SliderSetting("Reaction Min", 3, 0, 20, 1, " ticks").section("Reactions").withDescription("Shortest wait before acting on something that just appeared (a mob, a bite, a button lighting up)")
     val reactMax by SliderSetting("Reaction Max", 9, 0, 30, 1, " ticks")

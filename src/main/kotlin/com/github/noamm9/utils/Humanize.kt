@@ -26,6 +26,9 @@ object Humanize {
     private var curveFrom = 0f
     private var lastYaw = 0f
     private var lastPitch = 0f
+    // overshoot: a big turn aims a little past the target, then comes back (settings: Overshoot Min / Max)
+    private var osYaw = 0f
+    private var osPitch = 0f
 
     private val pace get() = HumanBehaviour.pace.value.coerceIn(0, 2)
     private val on get() = HumanBehaviour.enabled
@@ -134,7 +137,7 @@ object Humanize {
         val key = (Math.floor(point.x * 2).toLong() * 73856093L) xor (Math.floor(point.y * 2).toLong() * 19349663L) xor (Math.floor(point.z * 2).toLong() * 83492791L)
         if (aimOffsets.size > 512) aimOffsets.clear()
         val off = aimOffsets.getOrPut(key) {
-            Vec3((rnd.nextDouble() * 2 - 1) * maxOffset, (rnd.nextDouble() * 2 - 1) * maxOffset * 0.7, (rnd.nextDouble() * 2 - 1) * maxOffset)
+            HumanMotion.faceOffset(maxOffset, rnd).let { Vec3(it[0], it[1] * 0.7, it[2]) }
         }
         return point.add(off)
     }
@@ -165,18 +168,35 @@ object Humanize {
             return done && kotlin.math.abs(wrap(yaw - y0)) <= tolerance * 4
         }
         settle(p)
-        val dy = wrap(yaw - p.yRot)
-        val dp = pitch - p.xRot
+        val ry = wrap(yaw - p.yRot)
+        val rp = pitch - p.xRot
+        val realDist = sqrt(ry * ry + rp * rp)
+        val fresh = abs(wrap(yaw - lastYaw)) + abs(pitch - lastPitch) > 15f || realDist > curveFrom + 15f
+        if (fresh) {
+            // a new turn: maybe aim a bit past it (share of the turn from Human Behaviour, never on small turns)
+            val extra = if (HumanBehaviour.overshoot.value) HumanMotion.overshoot(realDist, HumanBehaviour.overshootMin.value.toFloat(), HumanBehaviour.overshootMax.value.toFloat(), rnd) else 0f
+            osYaw = if (realDist > 0f) ry / realDist * extra else 0f
+            osPitch = if (realDist > 0f) rp / realDist * extra else 0f
+            if (pitch + osPitch !in - 90f .. 90f) osPitch = 0f
+        }
+        val dy = wrap(yaw + osYaw - p.yRot)
+        val dp = pitch + osPitch - p.xRot
         val dist = sqrt(dy * dy + dp * dp)
         if (dist <= tolerance) {
+            if (osYaw != 0f || osPitch != 0f) { // reached the overshoot point: now correct back
+                osYaw = 0f; osPitch = 0f
+                curveFrom = realDist
+                lastYaw = yaw; lastPitch = pitch
+                return false
+            }
             vel *= 0.5f
             return true
         }
-        if (abs(wrap(yaw - lastYaw)) + abs(pitch - lastPitch) > 15f || dist > curveFrom + 15f) {
+        if (fresh) {
             newTurn()
             val lively = doubleArrayOf(1.0, 0.7, 0.4)[pace]
             curve = ((0.15 + rnd.nextDouble() * 0.3) * (if (rnd.nextBoolean()) 1 else - 1) * lively * (if (HumanBehaviour.curvedTurns.value) 1 else 0)).toFloat()
-            curveFrom = dist
+            curveFrom = realDist
         }
         lastYaw = yaw
         lastPitch = pitch
