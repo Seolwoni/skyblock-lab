@@ -102,6 +102,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val hopMax by SliderSetting("AOTV Gap Max", 18, 2, 60, 1, " ticks")
     internal val walkSome by SliderSetting("Walk Instead", 15, 0, 80, 5, "%").withDescription("Chance to walk a stretch instead of hopping, when walking is possible")
     internal val aotvRange by SliderSetting("AOTV Distance", 12, 8, 16, 1, " blocks").withDescription("How far your AOTV teleports (8 + Transmission Tuners)")
+    internal val useRadar by ToggleSetting("Use Hotspot Radar", true).withDescription("No hotspot in sight or remembered: reads a Hotspot Radar in the hotbar, twice from two places, and goes where the two lines cross")
+    internal val readShared by ToggleSetting("Hotspots From Chat", true).withDescription("Remembers hotspot positions people share in chat (any message with \"hotspot\" and x y z)")
     internal val hotspotRange by SliderSetting("Search Range", 200, 16, 400, 8, " blocks").withDescription("How far it looks for a Hotspot. Hotspots seen earlier are remembered for 3 minutes, even after they're out of sight")
     internal val useEther by ToggleSetting("Etherwarp On The Way", true).withDescription("Plans etherwarps (and AOTV hops) to get to far or high spots, checking where each one lands, like Secret Routes does")
     internal val showRoute by ToggleSetting("Show Route", true).withDescription("Draws the planned walk and the next etherwarp / AOTV landing in the world")
@@ -217,6 +219,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal var hopTimer = 0
     internal var hopFrom: Vec3 = Vec3.ZERO
     internal var planIn = 0
+    internal var radarStage = 0
+    internal var radarTicks = 0
+    internal var radarCooldown = 0
+    internal var radarOrigin: Vec3? = null
+    internal val radarPts = ArrayList<Vec3>()
+    internal val radarLines = ArrayList<Pair<Vec3, Vec3>>() // where we read it, flat direction
+    internal var radarGuess: Vec3? = null
     internal val remembered = HashMap<Long, Pair<Vec3, Long>>() // block key -> position, last seen
     internal var scouting = false
 
@@ -264,6 +273,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             if (running) mc.player?.let { com.github.noamm9.utils.Humanize.settle(it) }
             if (running) runCatching(::tick).onFailure { stop("error: ${it.message}") }
         }
+        register<com.github.noamm9.event.impl.ChatMessageEvent> { if (readShared.value) runCatching { readSharedHotspot(event.unformattedText) } }
         register<com.github.noamm9.event.impl.ChatMessageEvent> {
             if (! running) return@register
             val t = event.unformattedText.replace(Regex("§."), "").trim()
@@ -275,7 +285,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             claimsLeft++
         }
         register<WorldChangeEvent> {
-            remembered.clear()
+            remembered.clear(); radarLines.clear(); radarStage = 0
             if (running) stop("world changed")
         }
         register<com.github.noamm9.event.impl.KeyboardEvent.KeyPressed> {
@@ -353,6 +363,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 }
             }
             stand?.let { with(com.github.noamm9.utils.render.world.Render3D) { event.ctx.renderBlock(BlockPos.containing(it.x, it.y - 0.5, it.z), java.awt.Color(80, 255, 140), fill = false, phase = true, lineWidth = 2) } }
+        }
+        register<MainThreadPacketReceivedEvent.Pre> {
+            val pk = event.packet
+            if (running && radarStage == 1 && pk is net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket) radarParticle(pk.x, pk.y, pk.z)
         }
         register<MainThreadPacketReceivedEvent.Pre> {
             if (! running || ! failsafe.value || ownMoveTicks > 0) return@register

@@ -53,7 +53,7 @@ internal fun AutoFishing.nearestHotspot(p: LocalPlayer): ArmorStand? {
 internal fun AutoFishing.rememberedHotspot(p: LocalPlayer): Vec3? {
     val now = System.currentTimeMillis()
     remembered.entries.removeIf { now - it.value.second > 180_000 }
-    return remembered.values.map { it.first }.filter { it.distanceTo(p.position()) > 40 }.minByOrNull { it.distanceTo(p.position()) }
+    return remembered.values.map { it.first }.filter { it.distanceTo(p.position()) > 10 }.minByOrNull { it.distanceTo(p.position()) }
 }
 
 internal fun AutoFishing.findHotspot(p: LocalPlayer) {
@@ -72,7 +72,22 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
             info("&7Heading for a hotspot seen earlier &8(${p.position().distanceTo(far).toInt()} blocks)")
             return
         }
-        if (far != null) remembered.remove(BlockPos.containing(far).asLong())
+        if (far != null) {
+            // a guess or a shared spot with no shore by it: walk to ground near it and look from there
+            val ground = groundNear(far)
+            remembered.remove(BlockPos.containing(far).asLong())
+            if (ground != null) {
+                hotspot = null
+                stand = ground
+                scouting = true
+                path = emptyList()
+                travelStuck = 0
+                state = AutoFishing.State.TRAVEL
+                return
+            }
+        }
+        // nothing known: ask the radar (busy for a moment while it reads)
+        if (radarStep(p)) return
         hotspot = null
         if (stand == null) stand = p.position()
         status = "no hotspot nearby, fishing here"
