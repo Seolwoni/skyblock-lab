@@ -252,6 +252,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             if (toggleKey.isPressed() && mc.gui.screen() == null) {
                 if (running) stop("stopped") else start()
             }
+            if (running) mc.player?.let { com.github.noamm9.utils.Humanize.settle(it) }
             if (running) runCatching(::tick).onFailure { stop("error: ${it.message}") }
         }
         register<WorldChangeEvent> {
@@ -272,7 +273,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             NotificationManager.push("Sell List", if (added) "&fAdded &d$name" else "&fRemoved &d$name")
             event.isCanceled = true
         }
-        register<com.github.noamm9.event.impl.RenderWorldEvent> { runCatching { trackFrame() } }
+        register<com.github.noamm9.event.impl.RenderWorldEvent> { runCatching { com.github.noamm9.utils.Humanize.frame(); trackFrame() } }
         register<com.github.noamm9.event.impl.RenderWorldEvent> {
             if (! running || ! showMarkers.value) return@register
             val level = mc.level ?: return@register
@@ -553,8 +554,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             val ease = t * t * (3 - 2 * t)
             offYaw = fromYaw + (toYaw - fromYaw) * ease
             offPitch = fromPitch + (toPitch - fromPitch) * ease
-            p.yRot = anchorYaw + offYaw + wobYaw
-            p.xRot = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
+            com.github.noamm9.utils.Humanize.glide(p, anchorYaw + offYaw + wobYaw, (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f))
             if (t >= 1f) moveLen = 0
             return
         }
@@ -1361,8 +1361,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             val ease = t * t * (3 - 2 * t)
             offYaw = fromYaw + (toYaw - fromYaw) * ease
             offPitch = fromPitch + (toPitch - fromPitch) * ease
-            p.yRot = anchorYaw + offYaw + wobYaw
-            p.xRot = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
+            com.github.noamm9.utils.Humanize.glide(p, anchorYaw + offYaw + wobYaw, (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f))
             if (t >= 1f) moveLen = 0
         }
     }

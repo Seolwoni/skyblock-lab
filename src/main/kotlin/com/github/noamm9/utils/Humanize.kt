@@ -30,8 +30,45 @@ object Humanize {
     private val pace get() = HumanBehaviour.pace.value.coerceIn(0, 2)
     private val on get() = HumanBehaviour.enabled
 
+    // ---- frame glide: a tick's turn is spread over the frames until the next tick, so turns look smooth at any FPS
+    private var gliding = false
+    private var gFromYaw = 0f
+    private var gFromPitch = 0f
+    private var gToYaw = 0f
+    private var gToPitch = 0f
+    private var gStart = 0L
+
+    /** Turn to [yaw]/[pitch] over the next 50 ms, a little every frame (not in one jump on the tick). */
+    fun glide(p: LocalPlayer, yaw: Float, pitch: Float) {
+        settle(p)
+        gFromYaw = p.yRot
+        gFromPitch = p.xRot
+        gToYaw = gFromYaw + wrap(yaw - gFromYaw)
+        gToPitch = pitch.coerceIn(- 90f, 90f)
+        gStart = System.nanoTime()
+        gliding = true
+    }
+
+    /** Finishes a glide that's still under way (called at the start of every tick, so logic sees where we ended up). */
+    fun settle(p: LocalPlayer) {
+        if (! gliding) return
+        gliding = false
+        PlayerUtils.rotate(gToYaw, gToPitch)
+    }
+
+    /** Call every frame. */
+    fun frame() {
+        if (! gliding) return
+        val p = net.minecraft.client.Minecraft.getInstance().player ?: run { gliding = false; return }
+        val t = ((System.nanoTime() - gStart) / 50_000_000f).coerceIn(0f, 1f)
+        PlayerUtils.rotate(gFromYaw + (gToYaw - gFromYaw) * t, gFromPitch + (gToPitch - gFromPitch) * t)
+        p.yHeadRot = p.yRot
+        if (t >= 1f) gliding = false
+    }
+
     /** Call once per tick (HumanBehaviour does it). */
     fun tick() {
+        net.minecraft.client.Minecraft.getInstance().player?.let { settle(it) }
         timing.slipChance = HumanBehaviour.slips.value / 100.0
         timing.drift = HumanBehaviour.drift.value / 100.0
         timing.fatiguePerHour = HumanBehaviour.fatigue.value / 100.0
@@ -91,6 +128,7 @@ object Humanize {
             return true
         }
         if (HumanBehaviour.useAssistCore.value && AssistBridge.coreLoaded) return AssistBridge.turn(p, yaw, pitch, tolerance)
+        settle(p)
         val dy = wrap(yaw - p.yRot)
         val dp = pitch - p.xRot
         val dist = sqrt(dy * dy + dp * dp)
@@ -117,8 +155,10 @@ object Humanize {
         val mx = ux - uy * bend
         val my = uy + ux * bend
         val ml = sqrt(mx * mx + my * my)
-        PlayerUtils.rotate(p.yRot + step * mx / ml, (p.xRot + step * my / ml).coerceIn(- 90f, 90f))
-        return dist - step <= tolerance
+        // spread this tick's step over the coming frames; we count as "there" from the next tick on, once the
+        // view really is there (so nothing is used while the aim is still on its way)
+        glide(p, p.yRot + step * mx / ml, (p.xRot + step * my / ml).coerceIn(- 90f, 90f))
+        return false
     }
 
     fun lookAt(p: LocalPlayer, target: Vec3, tolerance: Float = 1.5f): Boolean {

@@ -31,5 +31,6 @@ object HumanBehaviour: Feature(
 
     override fun init() {
         register<TickEvent.Start> { Humanize.tick() }
+        register<com.github.noamm9.event.impl.RenderWorldEvent> { Humanize.frame() }
     }
 }
