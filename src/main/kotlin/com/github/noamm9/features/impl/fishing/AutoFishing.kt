@@ -313,7 +313,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal var arrivedAt = - 1000
     internal var nearGoalTicks = 0
     internal var goldenSeenAt = - 100000
-    internal var fishTarget: Vec3? = null           // the water / lava point we walked to (no hotspot)
+    internal var fishTarget: Vec3? = null
+    internal var walkBest = Double.MAX_VALUE
+    internal var walkNoProgress = 0
+    internal var walkReplans = 0
+    internal var fightLeftAt = - 1000
+    internal var noReachTicks = 0
+    internal var aimFixes = 0           // the water / lava point we walked to (no hotspot)
     internal var rebootAt = 0L
     internal var rebootSpot: Vec3? = null
     internal var rebootHotspot = false
@@ -598,6 +604,16 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
     }
 
+    /** How far our weapon reaches: the Hyperion blast, the whip, or a sword swing. */
+    internal fun fightReach(): Double {
+        val whip = WHIPS[weaponType.value]?.let { id -> PlayerUtils.findHotbarSlot { it.skyblockId == id } }
+        return when {
+            whip != null -> whipRange.value
+            hasHype() || PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } != null -> blastRange.value
+            else -> 3.2
+        }
+    }
+
     /** "1.2k" -> 1200.0, "3,400" -> 3400.0 */
     internal fun parseShort(v: String): Double {
         val t = v.replace(",", "")
@@ -863,9 +879,26 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         val ready = quickKill.value && reels.isNotEmpty() && tickCount - reels.last().tick < 60
         for (m in seen) noticeAt.getOrPut(m.id) { tickCount + if (ready && m.id in mine) delay(3, 8) else delay(noticeMin.value, noticeMax.value) }
         if (noticeAt.size > 200) noticeAt.keys.retainAll(seen.map { it.id }.toSet())
-        val mobs = seen.filter { (noticeAt[it.id] ?: 0) <= tickCount }
+        val noticed = seen.filter { (noticeAt[it.id] ?: 0) <= tickCount }
+        // only stop fishing for what we can actually hit from here; one bobbing up and down below us
+        // (in and out of reach) mustn't make us reel in, take the Hyperion out and put it away over and over
+        val reach = fightReach()
+        val inReach = noticed.filter { p.distanceTo(it) <= reach }
+        val coming = noticed.filter { p.distanceTo(it) <= reach * 1.6 && it.y >= p.y - 2.0 }
+        val hurt = p.hurtTime > 0
+        val mobs = when {
+            state == State.FIGHT -> if (inReach.isNotEmpty() || coming.isNotEmpty() || hurt) noticed.filter { p.distanceTo(it) <= reach * 1.6 } else emptyList()
+            tickCount - fightLeftAt < 60 && ! hurt -> inReach // just left a fight: only something really in reach brings us back
+            quickKill.value -> coming.ifEmpty { inReach }
+            else -> inReach
+        }
+        // leave a fight only after 1.5 s with nothing to hit, so it doesn't flap
+        if (state == State.FIGHT && mobs.isEmpty() && ++noReachTicks < 30) { status = "watching ${noticed.firstOrNull()?.name?.string ?: "around"}"; return }
+        if (mobs.isNotEmpty()) noReachTicks = 0
         if (state == State.FIGHT || mobs.isNotEmpty()) {
             if (mobs.isEmpty()) {
+                fightLeftAt = tickCount
+                noReachTicks = 0
                 track = null
                 blastBlocked = false
                 hypeStage = 0
@@ -957,6 +990,23 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 if (! turn(p, ty, tp, 0.35f)) return
                 p.yRot = ty
                 p.xRot = tp
+                // would this throw come down in the water / lava? if it hits the floor or a wall, aim again first
+                if (hook == null && ! throwLandsInFluid(p, ty, tp)) {
+                    if (++aimFixes > 3) {
+                        aimFixes = 0
+                        journal.log("the aim keeps hitting the ground - looking for water again")
+                        fishTarget = null
+                        return goToFluid(p)
+                    }
+                    val target = hotspot?.position() ?: fishTarget ?: lookingAtFluid(p) ?: nearestFluid(p, 12)
+                    if (target == null) { journal.log("cast would land on the ground, no water near - finding some"); return goToFluid(p) }
+                    journal.log("cast would land on the ground - re-aiming at ${BlockPos.containing(target).toShortString()}")
+                    fishTarget = fishTarget ?: target
+                    aimAtPoint(p, target)
+                    status = "re-aiming at the ${fluidName()}"
+                    return
+                }
+                aimFixes = 0
                 hold(rod)
                 if (hook != null) { // a line is still out: pull it in first
                     use(p)

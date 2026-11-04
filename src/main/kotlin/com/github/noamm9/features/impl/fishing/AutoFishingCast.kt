@@ -60,6 +60,27 @@ internal fun AutoFishing.nearFluid(hook: FishingHook, tag: net.minecraft.tags.Ta
     return false
 }
 
+/** Simulates this throw: true when it comes down on water / lava (not a block on the way, not dry ground). */
+internal fun AutoFishing.throwLandsInFluid(p: LocalPlayer, yaw: Float, pitch: Float): Boolean {
+    // follow the throw tick by tick: water / lava first -> good; a block first -> it lands on the ground
+    val lvl = p.level()
+    val t = FishingMath.throwStart(yaw, pitch)
+    var pos = Vec3(p.x + t.offX, p.eyeY, p.z + t.offZ)
+    var v = Vec3(t.vx, t.vy, t.vz)
+    repeat(160) {
+        val next = pos.add(v)
+        val hit = lvl.clip(net.minecraft.world.level.ClipContext(pos, next, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.ANY, p))
+        if (hit.type == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+            val bp = (hit as net.minecraft.world.phys.BlockHitResult).blockPos
+            return wantedFluid(bp) || wantedFluid(BlockPos.containing(hit.location))
+        }
+        if (next.y < p.y - 30) return false
+        pos = next
+        v = Vec3(v.x * FishingMath.DRAG, v.y * FishingMath.DRAG - FishingMath.GRAVITY, v.z * FishingMath.DRAG)
+    }
+    return false
+}
+
 /** The "?" / countdown Hypixel floats over a bobber that's waiting in the water. */
 internal fun AutoFishing.waitingMarker(hook: FishingHook): Boolean =
     com.github.noamm9.utils.FloatingText.near(hook.level(), hook.boundingBox.inflate(1.0, 2.5, 1.0))

@@ -163,6 +163,7 @@ internal fun AutoFishing.travel(p: LocalPlayer) {
 
     val flat = horizontalDist(p.position(), goal)
     val rise = goal.y - p.y
+    if (pathGoal != goal) { walkBest = Double.MAX_VALUE; walkNoProgress = 0; walkReplans = 0 }
     if (pathGoal != goal || --repath <= 0) {
         pathGoal = goal
         path = if (flat < 70) findPath(p, BlockPos.containing(goal.x, goal.y + 0.1, goal.z)) ?: emptyList() else emptyList()
@@ -294,7 +295,25 @@ internal fun AutoFishing.findPath(p: LocalPlayer, goal: BlockPos): List<BlockPos
 internal fun AutoFishing.walkPath(p: LocalPlayer) {
     if (pathIndex >= path.size) return
     // skip nodes we've already passed
-    while (pathIndex < path.size - 1 && horizontalDist(p.position(), Vec3.atBottomCenterOf(path[pathIndex])) < 0.7) pathIndex++
+    // skip nodes we're at or have already gone past (the next one is closer than this one) - no circling a node
+    while (pathIndex < path.size - 1) {
+        val here = horizontalDist(p.position(), Vec3.atBottomCenterOf(path[pathIndex]))
+        val next = horizontalDist(p.position(), Vec3.atBottomCenterOf(path[pathIndex + 1]))
+        if (here < 1.0 || (next < here && path[pathIndex + 1].y == path[pathIndex].y && here < 2.5)) pathIndex++ else break
+    }
+    // not getting any closer to the goal for 3 s while walking: plan again from here (orbiting / stuck)
+    val goalNow = stand
+    if (goalNow != null) {
+        val d = horizontalDist(p.position(), goalNow)
+        if (d < walkBest - 0.5) { walkBest = d; walkNoProgress = 0 }
+        else if (++walkNoProgress > 60) {
+            journal.log("no progress for 3 s (${"%.1f".format(d)} left), planning again")
+            walkNoProgress = 0; walkBest = Double.MAX_VALUE
+            stopWalking(); repath = 0; path = emptyList()
+            if (++walkReplans >= 4) { walkReplans = 0; hopWait = 0; planIn = 0 } // let a hop take over
+            return
+        }
+    }
     val node = path[pathIndex]
     val target = Vec3.atBottomCenterOf(node)
 
@@ -320,9 +339,11 @@ internal fun AutoFishing.walkPath(p: LocalPlayer) {
     walkSteer = true
     ownMoveTicks = 20
     val dy = node.y - p.blockPosition().y
-    mc.options.keyUp.isDown = abs(wrap(yaw - p.yRot)) < 60f
+    // face it first, then walk: walking while still turning hard is what draws circles
+    val off = abs(wrap(yaw - p.yRot))
+    mc.options.keyUp.isDown = off < 35f
     mc.options.keyJump.isDown = p.onGround() && (dy > 0 || p.horizontalCollision)
-    mc.options.keySprint.isDown = path.size - pathIndex > 4 && ! nearLava(p.blockPosition(), 2)
+    mc.options.keySprint.isDown = off < 12f && path.size - pathIndex > 4 && ! nearLava(p.blockPosition(), 2)
 }
 
 /** The point ~2.5 blocks ahead along the path, if the straight line there is safe ground all the way. */
@@ -526,11 +547,11 @@ internal fun AutoFishing.steerFrame(p: LocalPlayer, dt: Float) {
     if (dt <= 0f) return
     val errY = wrap(walkGoalYaw - p.yRot)
     val errP = walkGoalPitch - p.xRot
-    val k = 28f
+    val k = 60f
     val c = 2f * kotlin.math.sqrt(k)
     trackVelYaw += (k * errY - c * trackVelYaw) * dt
     trackVelPitch += (k * errP - c * trackVelPitch) * dt
-    val max = 260f
+    val max = 380f
     val sp = kotlin.math.hypot(trackVelYaw.toDouble(), trackVelPitch.toDouble()).toFloat()
     if (sp > max) { trackVelYaw *= max / sp; trackVelPitch *= max / sp }
     p.yRot += trackVelYaw * dt
