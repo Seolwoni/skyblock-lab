@@ -157,14 +157,14 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     )
     internal val discordUrl by com.github.noamm9.config.types.TextInputSetting("Webhook URL", "").withDescription(
         "Channel settings > Integrations > Webhooks > New Webhook > Copy Webhook URL, then paste it here"
-    ).showIf { discordOn.value }
+    )
     internal val discordTest by com.github.noamm9.config.types.ButtonSetting("Send Test Message") {
         com.github.noamm9.utils.DiscordWebhook.send(discordUrl.value, "🎣 Riftwalk 연결 확인", "웹후크가 잘 연결됐어요. 낚시가 끝나면 여기로 알려드릴게요.", 0x8B5CF6) { ok, why ->
             info(if (ok) "&aDiscord test sent." else "&cDiscord test failed: $why")
         }
-    }.showIf { discordOn.value }
+    }
     internal val sendLogsButton by com.github.noamm9.config.types.ButtonSetting("Send Logs To Discord") { sendLogs() }
-        .withDescription("Uploads fishing.log and the latest session reports to your Discord webhook - handy on a phone, where the files are hard to reach").showIf { discordOn.value }
+        .withDescription("Uploads fishing.log and the latest session reports to your Discord webhook - handy on a phone, where the files are hard to reach (needs the Webhook URL above)")
     internal val checkButton by com.github.noamm9.config.types.ButtonSetting("Fishing Check") { runCatching { fishingCheck() }.onFailure { info("&cCheck failed: ${it.message}") } }
         .section("Server Check").withDescription("Prints what the mod can see right now: hotbar item IDs, floating texts nearby (hotspot / bite / name tags), the hook, tab stats, mana and bait. Stand by the water with the rod out")
     internal val copyLogButton by com.github.noamm9.config.types.ButtonSetting("Copy Log Path") {
