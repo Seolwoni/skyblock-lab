@@ -1073,7 +1073,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
                 status = "reeled in"
             }
 
-            State.FIGHT, State.FIND, State.TRAVEL, State.SELL, State.BREAK -> {}
+            State.FIGHT, State.FIND, State.TRAVEL, State.SELL, State.BREAK, State.RESUME -> {}
         }
     }
 

@@ -12,7 +12,6 @@ import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.features.impl.routes.AssistBridge
 import com.github.noamm9.features.impl.routes.AutoRoutes
-import com.github.noamm9.ui.notification.NotificationManager
 import com.github.noamm9.utils.ChatUtils.modMessage
 import com.github.noamm9.utils.ColorUtils.withAlpha
 import com.github.noamm9.utils.GuiUtils
