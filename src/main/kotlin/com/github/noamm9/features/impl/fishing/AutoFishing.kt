@@ -86,6 +86,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val creatureCap by SliderSetting("Sea Creature Cap", 10, 0, 30, 1).withDescription("Stops casting while this many of your sea creatures are alive (no new ones come up past the cap anyway). 0 = off")
     internal val rareAlert by ToggleSetting("Rare Creature Alert", true).withDescription("Title, sound and a gold highlight when one of the creatures in the list below comes up for you")
     internal val rareList by com.github.noamm9.config.types.TextInputSetting("Rare Creatures", "Thunder|Lord Jawbus|Water Hydra|Sea Emperor|Loch Emperor|Great White Shark|Phantom Fisher|Grim Reaper|Yeti|Reindrake|Titanoboa|Plhlegblast|Fiery Scuttler|Ragnarok|Abyssal Miner|Wiki Tiki|Carrot King|Nessie").withDescription("Names, separated by |")
+    internal val goldenFish by DropdownSetting("On Golden Fish", 1, listOf("Ignore", "Alert", "Alert and pause")).withDescription(
+        "When a Golden Fish shows up (chat line or its name nearby): a loud alert, and optionally reel in and pause so you can catch it yourself. It stays a few minutes as long as you keep fishing near it"
+    )
     internal val useCatchMsgs by ToggleSetting("Use Catch Messages", true).withDescription("A creature named in your own catch message is yours for sure; once the server sends these, only they count (other people's creatures never message you)")
     internal val ownWindow by SliderSetting("My Creature Window", 1.0, 0.3, 3.0, 0.1, " s").withDescription("A creature counts as yours only if it appears within this long after YOU reel in. Lower it if other people's creatures get picked up")
     internal val ownDistance by SliderSetting("My Creature Distance", 4.0, 1.5, 8.0, 0.5, " blocks").withDescription("...and only this close to where your hook was")
@@ -290,7 +293,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val immuneWaited = HashSet<Int>()
     internal val deaths = ArrayDeque<Pair<Int, Vec3>>()   // tick, where one of ours died (split check)
     internal var arrivedAt = - 1000
-    internal var nearGoalTicks = 0     // creature health at our last blast (immunity check)
+    internal var nearGoalTicks = 0
+    internal var goldenSeenAt = - 100000     // creature health at our last blast (immunity check)
 
     // noticing sea creatures
     internal val noticeAt = HashMap<Int, Int>()
@@ -309,6 +313,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             if (running) runCatching(::tick).onFailure { com.github.noamm9.utils.Safely.report("AutoFishing tick", it); stop("error: ${it.message}") }
         }
         register<com.github.noamm9.event.impl.ChatMessageEvent> { if (readShared.value) com.github.noamm9.utils.Safely("AutoFishing shared hotspot") { readSharedHotspot(event.unformattedText) } }
+        register<com.github.noamm9.event.impl.ChatMessageEvent> {
+            val t = event.unformattedText.replace(Regex("§."), "")
+            if (running && t.contains(com.github.noamm9.utils.SkyblockText.GOLDEN_FISH, ignoreCase = true) && ! t.contains("TROPHY FISH", true) && ! Regex("^(?:\\[[^]]+] )*[A-Za-z0-9_]{2,16}: ").containsMatchIn(t)) onGoldenFish("chat: ${t.take(60)}")
+        }
         register<com.github.noamm9.event.impl.ChatMessageEvent> {
             if (running && event.unformattedText.contains(com.github.noamm9.utils.SkyblockText.REBOOT, ignoreCase = true)) {
                 NotificationManager.push("Server restarting", "&fThe server will restart soon - Auto Fishing keeps going until you're moved")
@@ -537,6 +545,20 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             .joinToString("  ")
     }.getOrDefault("")
 
+    /** A Golden Fish is out: tell the player loudly (once a minute at most), and pause if they want to catch it themselves. */
+    internal fun onGoldenFish(how: String) {
+        if (goldenFish.value == 0 || tickCount - goldenSeenAt < 1200) return
+        goldenSeenAt = tickCount
+        journal.log("GOLDEN FISH  $how")
+        NotificationManager.push("Golden Fish!", "&6A Golden Fish is out &7($how)", 8000L)
+        com.github.noamm9.utils.ChatUtils.showTitle("§6§lGOLDEN FISH", "§fit's out - go get it")
+        repeat(3) { com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1f, 1.5f) }
+        if (goldenFish.value == 2) {
+            mc.player?.let { pl -> if (pl.fishing != null) rod()?.let { hold(it); use(pl) } }
+            stop("paused for the Golden Fish - start again when you've caught it")
+        }
+    }
+
     /** "1.2k" -> 1200.0, "3,400" -> 3400.0 */
     internal fun parseShort(v: String): Double {
         val t = v.replace(",", "")
@@ -722,6 +744,11 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         guiWasOpen = guiOpen
         if (state != lastLoggedState) { journal.log("state ${lastLoggedState ?: "-"} -> $state  ($status)"); lastLoggedState = state }
         if (tickCount % 40 == 0) tabStats = readTabStats()
+        if (tickCount % 20 == 0 && goldenFish.value > 0) mc.player?.let { pl ->
+            com.github.noamm9.utils.FloatingText.near(pl.level(), pl.boundingBox.inflate(30.0, 15.0, 30.0))
+                .firstOrNull { (_, txt) -> txt.contains(com.github.noamm9.utils.SkyblockText.GOLDEN_FISH, ignoreCase = true) }
+                ?.let { onGoldenFish("seen ${pl.distanceTo(it.first).toInt()}m away") }
+        }
         val goalHit = when {
             stopAfterMin.value > 0 && System.currentTimeMillis() - sessionStart > stopAfterMin.value * 60_000L -> "${stopAfterMin.value} min of fishing"
             stopAfterKills.value > 0 && kills >= stopAfterKills.value -> "${stopAfterKills.value} kills"

@@ -92,6 +92,8 @@ object SkyblockText {
     /** The marker Hypixel floats over a waiting bobber ("?" or a countdown like "1.2"): the hook is in the water. */
     val WAITING_MARKER = Regex("^(?:\\?|\\d+(?:\\.\\d+)?s?)$")
     const val REBOOT = "This server will restart soon"
+    /** The Golden Fish (lava trophy fish that shows up after ~15 min of fishing): its chat line / floating name. */
+    const val GOLDEN_FISH = "Golden Fish"
 
     // ---- mana
     const val NOT_ENOUGH_MANA_BAR = "NOT ENOUGH MANA"
