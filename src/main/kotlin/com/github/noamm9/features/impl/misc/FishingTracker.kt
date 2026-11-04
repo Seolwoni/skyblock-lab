@@ -133,7 +133,7 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private fun biteSign(hook: net.minecraft.world.entity.projectile.FishingHook): Boolean {
         val level = mc.level ?: return false
         val box = hook.boundingBox.inflate(0.6, 2.0, 0.6)
-        return level.getEntitiesOfClass(ArmorStand::class.java, box).any { it.customName?.string?.contains("!!!") == true }
+        return com.github.noamm9.utils.FloatingText.any(level, box, "!!!")
     }
 
     private fun snapshot(): Map<String, Pair<Int, String>> {

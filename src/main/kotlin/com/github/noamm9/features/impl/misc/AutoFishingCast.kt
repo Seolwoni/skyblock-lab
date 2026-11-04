@@ -84,10 +84,8 @@ internal fun AutoFishing.grounded(hook: FishingHook): Boolean {
 
 /** SkyBlock puts a "!!!" stand over the hook on a bite (water and lava); vanilla pulls the hook down. */
 internal fun AutoFishing.bitten(hook: FishingHook): Boolean {
-    val sign = hook.level().getEntitiesOfClass(ArmorStand::class.java, hook.boundingBox.inflate(1.5, 3.0, 1.5)) {
-        it.customName?.string?.contains("!!!") == true
-    }
-    if (sign.isNotEmpty()) return true
+    // the server's "!!!" over the bobber: an armor stand name (older) or a text display (newer Hypixel)
+    if (com.github.noamm9.utils.FloatingText.any(hook.level(), hook.boundingBox.inflate(1.5, 3.0, 1.5), "!!!")) return true
     return hookDive.value && inFluidTicks > 10 && hook.deltaMovement.y < - 0.05
 }
 
