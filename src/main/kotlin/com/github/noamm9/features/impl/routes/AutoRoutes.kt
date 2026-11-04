@@ -46,70 +46,70 @@ import kotlin.math.sqrt
  * Secret Routes moves on to the next step when the secret is collected, and this picks up the new step.
  */
 object AutoRoutes: Feature("Follows the current room's secret route automatically (walk, etherwarp, pearl, stonk, superboom, levers, secret).") {
-    private val toggleKey by KeybindSetting("Start / Stop Key").withDescription("Press to start following the route in your room, press again to stop")
-    private val speed by DropdownSetting("Speed", 0, listOf("0-Tick", "Fastest", "Fast", "Careful")).withDescription(
+    internal val toggleKey by KeybindSetting("Start / Stop Key").withDescription("Press to start following the route in your room, press again to stop")
+    internal val speed by DropdownSetting("Speed", 0, listOf("0-Tick", "Fastest", "Fast", "Careful")).withDescription(
         "0-Tick: sends the new rotation to the server itself and acts in the same tick (etherwarps, pearls, levers and hits happen instantly). Fastest: acts on the next tick. Fast: one extra tick between actions. Careful: a few ticks between actions"
     )
-    private val etherTimeout by SliderSetting("Etherwarp Timeout", 12, 4, 40, 1, " ticks").withDescription("Give up on an etherwarp that did not land after this long and try again")
-    private val sprint by ToggleSetting("Sprint", true)
-    private val autoJump by ToggleSetting("Auto Jump", true).withDescription("Jumps when the next point is higher or something is in the way")
-    private val doMines by ToggleSetting("Break Stonk Blocks", true).section("Actions").withDescription("Breaks the route's mine blocks with a Dungeonbreaker or pickaxe from the hotbar")
-    private val doTnt by ToggleSetting("Place Superbooms", true).withDescription("Uses Superboom TNT on the route's crypt/wall spots")
-    private val doPearls by ToggleSetting("Throw Pearls", true).withDescription("Throws ender pearls at the recorded angle")
-    private val doLevers by ToggleSetting("Flip Levers", true)
-    private val climbAotv by ToggleSetting("Climb With AOTV", true).withDescription(
+    internal val etherTimeout by SliderSetting("Etherwarp Timeout", 12, 4, 40, 1, " ticks").withDescription("Give up on an etherwarp that did not land after this long and try again")
+    internal val sprint by ToggleSetting("Sprint", true)
+    internal val autoJump by ToggleSetting("Auto Jump", true).withDescription("Jumps when the next point is higher or something is in the way")
+    internal val doMines by ToggleSetting("Break Stonk Blocks", true).section("Actions").withDescription("Breaks the route's mine blocks with a Dungeonbreaker or pickaxe from the hotbar")
+    internal val doTnt by ToggleSetting("Place Superbooms", true).withDescription("Uses Superboom TNT on the route's crypt/wall spots")
+    internal val doPearls by ToggleSetting("Throw Pearls", true).withDescription("Throws ender pearls at the recorded angle")
+    internal val doLevers by ToggleSetting("Flip Levers", true)
+    internal val climbAotv by ToggleSetting("Climb With AOTV", true).withDescription(
         "When the next point is above you (a shaft, a ledge, after falling in a hole): etherwarps onto it if the landing checks out, otherwise teleports up with the AOTV"
     )
-    private val fastTravel by ToggleSetting("Fast Travel", true).withDescription(
+    internal val fastTravel by ToggleSetting("Fast Travel", true).withDescription(
         "Instead of walking to a point more than 6 blocks away: etherwarps onto it when the landing checks out, otherwise teleports with the AOTV when it's far enough (9.5+ blocks)"
     )
-    private val doSecret by ToggleSetting("Collect Secret", true).withDescription("Opens chests/levers/skulls and hits bats at the end of each step")
-    private val chatInfo by ToggleSetting("Chat Messages", true)
-    private val clearMode by DropdownSetting("Clear", 1, listOf("Off", "Star mobs + minibosses", "Whole room")).section("Combat").withDescription(
+    internal val doSecret by ToggleSetting("Collect Secret", true).withDescription("Opens chests/levers/skulls and hits bats at the end of each step")
+    internal val chatInfo by ToggleSetting("Chat Messages", true)
+    internal val clearMode by DropdownSetting("Clear", 1, listOf("Off", "Star mobs + minibosses", "Whole room")).section("Combat").withDescription(
         "Whole room: kills every mob in the room you are in before doing its secrets. Star mobs: only stops for starred mobs and minibosses near the route"
     )
-    private val useHype by ToggleSetting("Use Hyperion", true).withDescription("Wither Impact (Hyperion / Astraea / Scylla / Valkyrie): teleports into the pack and casts looking down. Falls back to hitting if none is in the hotbar")
-    private val hypeTeleport by ToggleSetting("Teleport Into Mobs", true).withDescription("Casts towards a pack up to 10 blocks away to get there instantly, instead of walking")
-    private val manaCost by SliderSetting("Mana Per Cast", 300, 0, 1000, 10).hideIf { clearMode.value == 0 }.withDescription("Wither Impact's mana cost for you. Below it, the Hyperion is swung as a sword instead")
-    private val castDelay by SliderSetting("Cast Delay", 3, 1, 20, 1, " ticks").withDescription("Ticks between Wither Impact casts (watch your mana)")
-    private val blastRadius by SliderSetting("Blast Radius", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("Wither Impact damage radius, used to decide when a pack is close enough")
-    private val killStars by ToggleSetting("Kill Star Mobs", true).hideIf { clearMode.value == 0 }.withDescription("Stops to kill starred (✯) mobs near the route")
-    private val killMinis by ToggleSetting("Kill Minibosses", true).hideIf { clearMode.value == 0 }.withDescription("Shadow Assassin, Lost / Frozen Adventurer, Angry Archaeologist, King Midas, Diamond Guy")
-    private val attackRange by SliderSetting("Attack Range", 3.0, 2.0, 3.0, 0.1, " blocks").withDescription("Normal hand reach at most")
-    private val detourRange by SliderSetting("Detour Range", 6.0, 0.0, 12.0, 0.5, " blocks").withDescription("How far it leaves the route to chase a target (0 = only hit what is already in reach)")
-    private val fightBack by ToggleSetting("Fight Back", true).withDescription("When something hits you, kills the closest mob within 3 blocks first (any mob, not just starred)")
-    private val hypePriority by ToggleSetting("Prioritise Star Mobs", true).hideIf { clearMode.value == 0 }.withDescription(
+    internal val useHype by ToggleSetting("Use Hyperion", true).withDescription("Wither Impact (Hyperion / Astraea / Scylla / Valkyrie): teleports into the pack and casts looking down. Falls back to hitting if none is in the hotbar")
+    internal val hypeTeleport by ToggleSetting("Teleport Into Mobs", true).withDescription("Casts towards a pack up to 10 blocks away to get there instantly, instead of walking")
+    internal val manaCost by SliderSetting("Mana Per Cast", 300, 0, 1000, 10).hideIf { clearMode.value == 0 }.withDescription("Wither Impact's mana cost for you. Below it, the Hyperion is swung as a sword instead")
+    internal val castDelay by SliderSetting("Cast Delay", 3, 1, 20, 1, " ticks").withDescription("Ticks between Wither Impact casts (watch your mana)")
+    internal val blastRadius by SliderSetting("Blast Radius", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("Wither Impact damage radius, used to decide when a pack is close enough")
+    internal val killStars by ToggleSetting("Kill Star Mobs", true).hideIf { clearMode.value == 0 }.withDescription("Stops to kill starred (✯) mobs near the route")
+    internal val killMinis by ToggleSetting("Kill Minibosses", true).hideIf { clearMode.value == 0 }.withDescription("Shadow Assassin, Lost / Frozen Adventurer, Angry Archaeologist, King Midas, Diamond Guy")
+    internal val attackRange by SliderSetting("Attack Range", 3.0, 2.0, 3.0, 0.1, " blocks").withDescription("Normal hand reach at most")
+    internal val detourRange by SliderSetting("Detour Range", 6.0, 0.0, 12.0, 0.5, " blocks").withDescription("How far it leaves the route to chase a target (0 = only hit what is already in reach)")
+    internal val fightBack by ToggleSetting("Fight Back", true).withDescription("When something hits you, kills the closest mob within 3 blocks first (any mob, not just starred)")
+    internal val hypePriority by ToggleSetting("Prioritise Star Mobs", true).hideIf { clearMode.value == 0 }.withDescription(
         "When picking where to cast, a starred mob or miniboss counts as 3 normal mobs"
     )
-    private val hypeLead by ToggleSetting("Lead Moving Mobs", true).hideIf { clearMode.value == 0 }.withDescription(
+    internal val hypeLead by ToggleSetting("Lead Moving Mobs", true).hideIf { clearMode.value == 0 }.withDescription(
         "Aims the teleport at where the pack will be a few ticks from now, not where it is"
     )
-    private val hitDelay by SliderSetting("Hit Delay", 2, 1, 10, 1, " ticks").withDescription("Ticks between hits")
-    private val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) to hold while fighting. 0 = keep the current item")
-    private val recover by ToggleSetting("Recover When Stuck", true).section("Recovery").withDescription(
+    internal val hitDelay by SliderSetting("Hit Delay", 2, 1, 10, 1, " ticks").withDescription("Ticks between hits")
+    internal val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) to hold while fighting. 0 = keep the current item")
+    internal val recover by ToggleSetting("Recover When Stuck", true).section("Recovery").withDescription(
         "Instead of stopping when stuck: jumps, teleports up/forward with the AOTV, then re-finds the closest point of the route. Stops only after several failed tries"
     )
-    private val etherRetries by SliderSetting("Etherwarp Retries", 3, 1, 8, 1).withDescription("Failed etherwarps to the same block before walking / AOTV-ing there instead")
-    private val skipStuckSecret by ToggleSetting("Skip Unreachable Secret", true).withDescription("If a secret can't be collected in 10 seconds, move on instead of stopping (Auto Dungeon goes to the next room)")
-    private val useAssistPath by ToggleSetting("Use Assist Path", true).section("Assist").withDescription(
+    internal val etherRetries by SliderSetting("Etherwarp Retries", 3, 1, 8, 1).withDescription("Failed etherwarps to the same block before walking / AOTV-ing there instead")
+    internal val skipStuckSecret by ToggleSetting("Skip Unreachable Secret", true).withDescription("If a secret can't be collected in 10 seconds, move on instead of stopping (Auto Dungeon goes to the next room)")
+    internal val useAssistPath by ToggleSetting("Use Assist Path", true).section("Assist").withDescription(
         "With Assist Core + Assist Path installed: when the straight walk is blocked, or the target is far, finds a way around with Assist Path (no breaking or placing)"
     )
-    private val smoothTurning by ToggleSetting("Smooth Turning", true).withDescription(
+    internal val smoothTurning by ToggleSetting("Smooth Turning", true).withDescription(
         "With Assist Core installed: turns with Assist's ease-in/ease-out head movement instead of snapping. Actions wait until the aim has arrived"
     )
-    private val aimPause by SliderSetting("Aim Pause", 2, 0, 10, 1, " ticks").withDescription(
+    internal val aimPause by SliderSetting("Aim Pause", 2, 0, 10, 1, " ticks").withDescription(
         "A short pause after the aim arrives, before clicking (varies by one tick each time). 0 = click right away"
     )
-    private val assistLog by ToggleSetting("Assist Journal", true).withDescription("Writes runs (room, why it stopped) to the Assist usage log")
-    private val showPlan by ToggleSetting("Show Plan", true).section("Debug").withDescription("Draws the next point, etherwarp and action in the world, even before you start - check the route is read right")
-    private val statusHud by ToggleSetting("Status HUD", true).withDescription("Room, step, phase and next action on screen (move it in the HUD editor)")
-    private val checkEther by ToggleSetting("Check Etherwarp Landing", true).withDescription("Before warping, tries a few aim points on the block and picks one whose predicted landing is the route's block")
+    internal val assistLog by ToggleSetting("Assist Journal", true).withDescription("Writes runs (room, why it stopped) to the Assist usage log")
+    internal val showPlan by ToggleSetting("Show Plan", true).section("Debug").withDescription("Draws the next point, etherwarp and action in the world, even before you start - check the route is read right")
+    internal val statusHud by ToggleSetting("Status HUD", true).withDescription("Room, step, phase and next action on screen (move it in the HUD editor)")
+    internal val checkEther by ToggleSetting("Check Etherwarp Landing", true).withDescription("Before warping, tries a few aim points on the block and picks one whose predicted landing is the route's block")
 
-    private const val REACH = 4.4
+    internal const val REACH = 4.4
 
-    private enum class Phase { MOVE, ETHER_AIM, ETHER_WAIT, ACTION_AIM, MINING, PEARL_WAIT, AOTV_WAIT, SECRET, DONE }
+    internal enum class Phase { MOVE, ETHER_AIM, ETHER_WAIT, ACTION_AIM, MINING, PEARL_WAIT, AOTV_WAIT, SECRET, DONE }
 
-    private class Step(
+    internal class Step(
         val path: List<BlockPos>,
         val ethers: MutableSet<BlockPos>,
         val mines: MutableList<BlockPos>,
@@ -120,46 +120,46 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         val secretPos: BlockPos?,
     )
 
-    private var running = false
-    private var stepRef: JsonObject? = null
-    private var step: Step? = null
-    private var pathIndex = 0
-    private var phase = Phase.MOVE
-    private var wait = 0
-    private var timer = 0
-    private var actionTarget: BlockPos? = null
-    private var actionUse = true
-    private var pendingPearl: Pair<Vec3, MathUtils.Rotation>? = null
-    private var etherTarget: BlockPos? = null
-    private var stuckTicks = 0
-    private var secretTimer = 0
-    private var status = "idle"
-    private var hitCooldown = 0
-    private var pendingCast = false
-    private var retaliating = false
-    private var assistFailedGoal: BlockPos? = null
-    private var settleKey: Pair<Float, Float>? = null
-    private var settleLeft = 0
-    private var fightTarget: Entity? = null
-    private val AOTV_IDS = setOf("ASPECT_OF_THE_VOID", "ASPECT_OF_THE_END")
-    private var climbTries = 0
-    private var aotvFromY = 0.0
-    private var aotvFrom: Vec3 = Vec3.ZERO
-    private val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
-    private val MINIBOSSES = setOf("Shadow Assassin", "Lost Adventurer", "Frozen Adventurer", "Angry Archaeologist", "King Midas", "Diamond Guy")
-    private var lastEtherCheck: Boolean? = null
-    private var lastPos: Vec3? = null
-    private var recoveries = 0
-    private val etherFails = HashMap<BlockPos, Int>()
-    private val ignored = HashMap<Int, Int>() // entity id -> ticks left
-    private var castsOnTarget = 0
-    private var retaliateTicks = 0
-    private var stallId = - 1
-    private var stallHp = 0f
-    private var stallPos: Vec3? = null
-    private var stallTicks = 0
-    private var targetHealth = - 1f
-    private var targetId = - 1
+    internal var running = false
+    internal var stepRef: JsonObject? = null
+    internal var step: Step? = null
+    internal var pathIndex = 0
+    internal var phase = Phase.MOVE
+    internal var wait = 0
+    internal var timer = 0
+    internal var actionTarget: BlockPos? = null
+    internal var actionUse = true
+    internal var pendingPearl: Pair<Vec3, MathUtils.Rotation>? = null
+    internal var etherTarget: BlockPos? = null
+    internal var stuckTicks = 0
+    internal var secretTimer = 0
+    internal var status = "idle"
+    internal var hitCooldown = 0
+    internal var pendingCast = false
+    internal var retaliating = false
+    internal var assistFailedGoal: BlockPos? = null
+    internal var settleKey: Pair<Float, Float>? = null
+    internal var settleLeft = 0
+    internal var fightTarget: Entity? = null
+    internal val AOTV_IDS = setOf("ASPECT_OF_THE_VOID", "ASPECT_OF_THE_END")
+    internal var climbTries = 0
+    internal var aotvFromY = 0.0
+    internal var aotvFrom: Vec3 = Vec3.ZERO
+    internal val WITHER_BLADES = setOf("HYPERION", "ASTRAEA", "SCYLLA", "VALKYRIE")
+    internal val MINIBOSSES = setOf("Shadow Assassin", "Lost Adventurer", "Frozen Adventurer", "Angry Archaeologist", "King Midas", "Diamond Guy")
+    internal var lastEtherCheck: Boolean? = null
+    internal var lastPos: Vec3? = null
+    internal var recoveries = 0
+    internal val etherFails = HashMap<BlockPos, Int>()
+    internal val ignored = HashMap<Int, Int>() // entity id -> ticks left
+    internal var castsOnTarget = 0
+    internal var retaliateTicks = 0
+    internal var stallId = - 1
+    internal var stallHp = 0f
+    internal var stallPos: Vec3? = null
+    internal var stallTicks = 0
+    internal var targetHealth = - 1f
+    internal var targetId = - 1
 
     /** Set by Auto Dungeon in Blood: blood mobs are players too, so anything that isn't a teammate or the Watcher counts. */
     @JvmField var campMode = false
@@ -170,7 +170,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     var lastStopReason: String? = null
         private set
     val isRunning get() = running
-    private val clearValue get() = if (forceClear) 2 else clearMode.value
+    internal val clearValue get() = if (forceClear) 2 else clearMode.value
 
     override fun init() {
         register<TickEvent.Start> {
@@ -221,7 +221,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     }
 
     /** The step being run, or (when idle) the step that would run, so the plan can be checked before starting. */
-    private fun currentStepForPreview(): Step? {
+    internal fun currentStepForPreview(): Step? {
         if (running) return step
         if (! RouteBridge.routeActive()) return null
         val room = Main.currentRoom ?: return null
@@ -259,7 +259,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         if (running) stop(reason)
     }
 
-    private fun start() {
+    internal fun start() {
         if (! RouteBridge.routeActive() && ! (clearValue == 2 && DungeonScanner.currentRoom != null)) return info("&cNo route or room here.")
         running = true
         stepRef = null
@@ -268,7 +268,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         if (assistLog.value) AssistBridge.logStart("Auto Routes in ${Main.currentRoom?.name ?: DungeonScanner.currentRoom?.getName() ?: "?"}")
     }
 
-    private fun stop(reason: String?) {
+    internal fun stop(reason: String?) {
         lastStopReason = reason
         if (running && assistLog.value) AssistBridge.logEnd(reason ?: "stopped", "room ${Main.currentRoom?.name ?: "-"}")
         running = false
@@ -279,16 +279,16 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         if (reason != null) info("&eAuto Routes $reason.")
     }
 
-    private fun info(msg: String) {
+    internal fun info(msg: String) {
         if (chatInfo.value) modMessage(msg)
     }
 
-    private val zeroTick get() = speed.value == 0
-    private val actionDelay get() = when (speed.value) { 0, 1 -> 0; 2 -> 1; else -> 3 } + if (speed.value != 0 && com.github.noamm9.features.impl.general.HumanBehaviour.enabled) com.github.noamm9.utils.Humanize.delay(1, 4) else 0
+    internal val zeroTick get() = speed.value == 0
+    internal val actionDelay get() = when (speed.value) { 0, 1 -> 0; 2 -> 1; else -> 3 } + if (speed.value != 0 && com.github.noamm9.features.impl.general.HumanBehaviour.enabled) com.github.noamm9.utils.Humanize.delay(1, 4) else 0
 
     // ------------------------------------------------------------------ main loop
 
-    private fun tick() {
+    internal fun tick() {
         val p = mc.player ?: return stop("no player")
         if (mc.gui.screen() != null) return releaseKeys()
         if (hitCooldown > 0) hitCooldown--
@@ -388,379 +388,6 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         }
     }
 
-    private fun move(s: Step, pos: Vec3) {
-        val eye = mc.player!!.eyePosition
-
-        // Things to do from where we are, before walking on.
-        if (doMines.value) s.mines.firstOrNull { eye.distanceTo(Vec3.atCenterOf(it)) <= REACH }?.let { m ->
-            if (mc.player!!.level().getBlockState(m).isAir) {
-                s.mines.remove(m); return
-            }
-            val slot = PlayerUtils.findHotbarSlot { it.skyblockId == "DUNGEONBREAKER" || it.skyblockId.contains("PICKAXE") || it.skyblockId.contains("DRILL") }
-            if (slot != null) PlayerUtils.swapToSlot(slot)
-            releaseMovement()
-            actionTarget = m
-            timer = 0
-            phase = Phase.MINING
-            return
-        }
-        if (doTnt.value) s.tnts.firstOrNull { eye.distanceTo(Vec3.atCenterOf(it)) <= REACH }?.let { t ->
-            val slot = PlayerUtils.findHotbarSlot { it.skyblockId.contains("SUPERBOOM") } ?: return run { s.tnts.remove(t) }
-            PlayerUtils.swapToSlot(slot)
-            if (aimThen(Vec3.atCenterOf(t), use = true)) s.tnts.remove(t)
-            return
-        }
-        if (doLevers.value) s.levers.firstOrNull { eye.distanceTo(Vec3.atCenterOf(it)) <= REACH }?.let { l ->
-            if (aimThen(Vec3.atCenterOf(l), use = true)) s.levers.remove(l)
-            return
-        }
-        if (doPearls.value) s.pearls.firstOrNull { horizontal(pos, it.first) < 0.8 && abs(pos.y - it.first.y) < 1.5 }?.let { pearl ->
-            val slot = PlayerUtils.findHotbarSlot { it.skyblockId == "ENDER_PEARL" || it.hoverName.string.contains("Ender Pearl") } ?: return run { s.pearls.remove(pearl) }
-            PlayerUtils.swapToSlot(slot)
-            releaseMovement()
-            if (! turn(pearl.second.yaw, pearl.second.pitch, 1f)) return
-            s.pearls.remove(pearl)
-            if (zeroTick) {
-                useNow()
-                wait = 10
-                return
-            }
-            phase = Phase.PEARL_WAIT
-            wait = actionDelay
-            return
-        }
-
-        if (pathIndex >= s.path.size) {
-            releaseMovement()
-            phase = Phase.SECRET
-            return
-        }
-
-        resync(s, pos)
-        val target = s.path[pathIndex]
-        val ether = if (target in s.ethers) target else target.below().takeIf { it in s.ethers }
-        if (ether != null && pos.distanceTo(standOn(ether)) > 1.2) {
-            val slot = PlayerUtils.findHotbarSlot { EtherwarpHelper.getEtherwarpDistance(it) != null }
-            if (slot != null) {
-                PlayerUtils.swapToSlot(slot)
-                releaseMovement()
-                val alreadySneaking = mc.player!!.isShiftKeyDown
-                PlayerUtils.toggleSneak(true)
-                val aim = etherAim(ether, mc.player!!.inventory.getItem(slot))
-                if (! turn(aim.yaw, aim.pitch, 1f)) return
-                etherTarget = ether
-                status = "etherwarp to ${ether.x}, ${ether.y}, ${ether.z}"
-                if (zeroTick && alreadySneaking) {
-                    useNow()
-                    phase = Phase.ETHER_WAIT
-                    timer = 0
-                }
-                else {
-                    phase = Phase.ETHER_AIM
-                    wait = actionDelay
-                }
-                return
-            }
-        }
-
-        val goal = if (ether != null) standOn(ether) else Vec3(target.x + 0.5, target.y.toDouble(), target.z + 0.5)
-        if (horizontal(pos, goal) < 0.55 && abs(pos.y - goal.y) < 1.6) {
-            pathIndex++
-            stuckTicks = 0
-            climbTries = 0
-            return
-        }
-        val flat = horizontal(pos, goal)
-        if (ether == null && mc.player!!.onGround()) {
-            if (climbAotv.value && goal.y - pos.y > 1.3 && (flat < 4.0 || stuckTicks > 10)) {
-                if (++climbTries > 80) return stop("can't get up to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}")
-                if (leap(s, pos, goal, allowAotv = true)) return
-            }
-            else if (fastTravel.value && flat > 6.0 && abs(goal.y - pos.y) < 8.0) {
-                if (leap(s, pos, goal, allowAotv = flat >= 9.5)) return
-            }
-        }
-        walkTowards(pos, goal)
-    }
-
-    private fun walkTowards(pos: Vec3, goal: Vec3) {
-        val p = mc.player!!
-        val goalBlock = BlockPos.containing(goal.x, goal.y, goal.z)
-        if (useAssistPath.value && AssistBridge.pathLoaded && goalBlock != assistFailedGoal && (AssistBridge.walking || stuckTicks > 8 || horizontal(pos, goal) > 14.0)) {
-            when (AssistBridge.walkTo(mc, p, goalBlock)) {
-                AssistBridge.RUN -> {
-                    stuckTicks = 0
-                    lastPos = pos
-                    status = "assist path to ${goalBlock.x}, ${goalBlock.y}, ${goalBlock.z}"
-                    return
-                }
-                AssistBridge.DONE -> {
-                    stuckTicks = 0
-                    releaseMovement()
-                    return
-                }
-                else -> {
-                    if (assistLog.value) AssistBridge.logEvent("Assist Path gave up: ${AssistBridge.failReason() ?: "no way"}")
-                    assistFailedGoal = goalBlock // don't plan to this point again, finish with the straight walk
-                    stuckTicks = 0
-                }
-            }
-        }
-        val yaw = Math.toDegrees(atan2(goal.z - pos.z, goal.x - pos.x)).toFloat() - 90f
-        turn(yaw, if (speed.value == 3) p.xRot else 10f, 6f, settle = false)
-        mc.options.keyUp.isDown = true
-        mc.options.keySprint.isDown = sprint.value
-        val needJump = autoJump.value && p.onGround() && ((goal.y - pos.y > 0.6 && horizontal(pos, goal) < 2.5) || p.horizontalCollision)
-        mc.options.keyJump.isDown = needJump
-
-        val moved = lastPos?.distanceTo(pos) ?: 1.0
-        lastPos = pos
-        stuckTicks = if (moved < 0.02) stuckTicks + 1 else 0
-        if (stuckTicks in 12 .. 30 && p.onGround()) mc.options.keyJump.isDown = true
-        if (stuckTicks > 40 && ! running) {
-            travelStuck = true
-            stuckTicks = 0
-            return
-        }
-        if (stuckTicks > 40) {
-            if (! recover.value || ++recoveries > 4) return stop("stuck - can't reach ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}")
-            stuckTicks = 0
-            status = "stuck, recovering (${recoveries}/4)"
-            if (assistLog.value) AssistBridge.logEvent("stuck near ${pos.x.toInt()}, ${pos.y.toInt()}, ${pos.z.toInt()}, recovery $recoveries")
-            assistFailedGoal = null
-            // 1: AOTV towards the goal (or straight up if it's above), 2+: also forget etherwarps here and re-find the route
-            val s = step
-            if (s != null && leap(s, pos, goal.add(0.0, if (goal.y > pos.y + 1) 0.0 else 1.0, 0.0), allowAotv = true)) return
-            if (s != null && recoveries >= 2) resync(s, pos, force = true)
-        }
-        status = "walk to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}"
-    }
-
-    private fun collectSecret(s: Step, pos: Vec3) {
-        val timer = ++secretTimer
-        val sp = s.secretPos
-        if (! doSecret.value || sp == null || s.secretType == null || s.secretType == "exitroute") {
-            if (timer > 40) phase = Phase.DONE
-            return
-        }
-        when (s.secretType) {
-            "interact" -> if (timer % 10 == 1) {
-                if (mc.player!!.eyePosition.distanceTo(Vec3.atCenterOf(sp)) > REACH) walkTowards(pos, Vec3.atCenterOf(sp))
-                else aimThen(Vec3.atCenterOf(sp), use = true)
-            }
-
-            "item" -> if (horizontal(pos, Vec3.atCenterOf(sp)) > 0.4) walkTowards(pos, Vec3(sp.x + 0.5, sp.y.toDouble(), sp.z + 0.5)) else releaseMovement()
-            "bat" -> {
-                releaseMovement()
-                val bat = mc.player!!.level().getEntitiesOfClass(Bat::class.java, mc.player!!.boundingBox.inflate(8.0)).minByOrNull { it.distanceTo(mc.player!!) }
-                if (bat != null && timer % 3 == 0) {
-                    if (! turnTo(bat.boundingBox.center)) return
-                    if (zeroTick) {
-                        sendRotation()
-                        mc.gameMode?.attack(mc.player!!, bat)
-                        mc.player!!.swing(InteractionHand.MAIN_HAND)
-                    }
-                    else {
-                        actionUse = false
-                        phase = Phase.ACTION_AIM
-                    }
-                }
-            }
-        }
-        if (timer > 200) {
-            if (skipStuckSecret.value) {
-                releaseMovement()
-                phase = Phase.DONE
-                status = "secret unreachable, skipped"
-                return stop("skipped an unreachable secret")
-            }
-            stop("couldn't get the secret")
-        }
-    }
-
-    /**
-     * Back on track after a fall or a knock-back: if the next point is far but another point further along
-     * (or the one before) is close, continue from there.
-     */
-    private fun resync(s: Step, pos: Vec3, force: Boolean = false) {
-        if (s.path.isEmpty() || pathIndex >= s.path.size) return
-        val cur = s.path[pathIndex]
-        val curDist = pos.distanceTo(Vec3(cur.x + 0.5, cur.y.toDouble(), cur.z + 0.5))
-        if (! force && curDist < 10.0) return
-        val from = (pathIndex - 1).coerceAtLeast(0)
-        val best = (from until s.path.size).minByOrNull { i ->
-            val b = s.path[i]
-            pos.distanceTo(Vec3(b.x + 0.5, b.y.toDouble(), b.z + 0.5)) + (i - pathIndex).coerceAtLeast(0) * 0.25
-        } ?: return
-        val bestDist = s.path[best].let { pos.distanceTo(Vec3(it.x + 0.5, it.y.toDouble(), it.z + 0.5)) }
-        if (best != pathIndex && bestDist + 3.0 < curDist) {
-            pathIndex = best
-            stuckTicks = 0
-            status = "back on route at point ${best + 1}"
-        }
-    }
-
-    // ------------------------------------------------------------------ combat
-
-    /** Kills the nearest star mob / miniboss in detour range. Returns true while busy fighting. */
-    private fun fight(): Boolean {
-        val p = mc.player ?: return false
-        if (retaliating) retaliateTicks++ else retaliateTicks = 0
-        val keepRetaliating = retaliating && retaliateTicks < 100 && fightTarget?.let { it.isAlive && it.distanceTo(p) < 4f } == true
-        var attacker = if (fightBack.value && (p.hurtTime > 0 || keepRetaliating)) findAttacker(p) else null
-        // hit from range (arrows, spells): go for the shooter only when Hyperion can reach it, never stand there
-        if (attacker == null && fightBack.value && p.hurtTime > 0) attacker = findShooter(p)
-        retaliating = attacker != null
-        if (clearValue == 0 && attacker == null) return false
-        val target = attacker ?: if (clearValue == 2) findRoomTarget(p) else findTarget(p)
-        if (target != null && target != fightTarget) hitCooldown = maxOf(hitCooldown, com.github.noamm9.utils.Humanize.reaction())
-        fightTarget = target
-        if (target == null) return false
-
-        // watchdog: a fight that gets nowhere (no damage dealt, we don't move) for 3 seconds is dropped for 10 s
-        val hp = (target as? LivingEntity)?.health ?: 0f
-        val here = p.position()
-        if (target.id != stallId || hp < stallHp - 0.01f || (stallPos?.distanceTo(here) ?: 0.0) > 1.5) {
-            stallId = target.id
-            stallHp = hp
-            stallPos = here
-            stallTicks = 0
-        }
-        if (++stallTicks > 60) {
-            ignored[target.id] = 200
-            stallTicks = 0
-            retaliating = false
-            if (assistLog.value) AssistBridge.logEvent("gave up on ${target.name.string}: no progress for 3 s")
-            return false
-        }
-
-        val hypeSlot = if (useHype.value) PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } else null
-        if (hypeSlot != null && com.github.noamm9.utils.ManaGuard.canCast(manaCost.value)) return hypeFight(p, target, hypeSlot)
-        if (hypeSlot != null && weaponSlot.value !in 1 .. 9) PlayerUtils.swapToSlot(hypeSlot) // no mana: swing it
-
-        val dist = p.eyePosition.distanceTo(target.boundingBox.clipNearest(p.eyePosition))
-        if (dist > attackRange.value) {
-            walkTowards(p.position(), target.position())
-            status = "chasing ${target.name.string}"
-            return true
-        }
-
-        releaseMovement()
-        if (weaponSlot.value in 1 .. 9) PlayerUtils.swapToSlot(weaponSlot.value - 1)
-        status = "fighting ${target.name.string}"
-        if (! turnTo(target.boundingBox.center, 4f)) return true
-        if (hitCooldown > 0) return true
-        hitCooldown = com.github.noamm9.utils.Humanize.around(hitDelay.value)
-        if (zeroTick) {
-            sendRotation()
-            mc.gameMode?.attack(p, target)
-            p.swing(InteractionHand.MAIN_HAND)
-        }
-        else PlayerUtils.leftClick() // rotation from last tick is already on the server
-        return true
-    }
-
-    /** Wither Impact: teleport into the pack (if far), then cast looking straight down so the blast covers us. */
-    private fun hypeFight(p: Player, target: Entity, slot: Int): Boolean {
-        PlayerUtils.swapToSlot(slot)
-        // a mob that has not lost health after many casts is out of reach (behind glass, in a wall...): leave it for a while
-        if (target.id != targetId) {
-            targetId = target.id
-            castsOnTarget = 0
-            targetHealth = (target as? LivingEntity)?.health ?: - 1f
-        }
-        val hp = (target as? LivingEntity)?.health ?: - 1f
-        if (hp < targetHealth - 0.01f) {
-            castsOnTarget = 0
-            targetHealth = hp
-        }
-        if (castsOnTarget >= 6) {
-            ignored[target.id] = 200
-            castsOnTarget = 0
-            status = "can't hurt ${target.name.string}, skipping it"
-            return false
-        }
-        val centre = packCentre(p, target)
-        val dist = p.position().distanceTo(centre)
-        val inBlast = dist <= blastRadius.value - 1.0
-        val canTp = hypeTeleport.value && dist <= 11.0 && clearSight(p, centre)
-        if (! inBlast && ! canTp) {
-            walkTowards(p.position(), centre)
-            status = "walking to ${target.name.string}"
-            return true
-        }
-        releaseMovement()
-        if (pendingCast) { // rotation went out last tick, now cast
-            PlayerUtils.rightClick()
-            pendingCast = false
-            return true
-        }
-        if (hitCooldown > 0) return true
-        hitCooldown = com.github.noamm9.utils.Humanize.around(castDelay.value)
-        castsOnTarget++
-        val aimed = if (inBlast) {
-            status = "casting on ${target.name.string}"
-            turn(p.yRot, 90f, 3f)
-        }
-        else {
-            status = "teleporting to ${target.name.string}"
-            turnTo(centre.add(0.0, 0.2, 0.0), 4f)
-        }
-        if (! aimed) {
-            hitCooldown = 0 // cast as soon as the aim arrives
-            return true
-        }
-        if (zeroTick) useNow() else pendingCast = true
-        return true
-    }
-
-    /** Middle of the mobs within blast range of [target] (moved ahead along their movement with Lead Moving Mobs). */
-    private fun packCentre(p: Player, target: Entity): Vec3 {
-        val r = blastRadius.value
-        val pack = p.level().getEntitiesOfClass(LivingEntity::class.java, target.boundingBox.inflate(r)) { e ->
-            e.isAlive && e !is ArmorStand && e !is Bat && e != p && e !is Player && e.id !in ignored
-        }.ifEmpty { listOf(target as? LivingEntity ?: return target.position()) }
-        var x = 0.0; var y = Double.MAX_VALUE; var z = 0.0
-        for (e in pack) {
-            val lead = if (hypeLead.value) e.deltaMovement.multiply(3.0, 0.0, 3.0) else Vec3.ZERO
-            x += e.x + lead.x; z += e.z + lead.z
-            y = minOf(y, e.y)
-        }
-        return Vec3(x / pack.size, y, z / pack.size)
-    }
-
-    /** Wither Impact stops at the first block: only teleport when nothing solid is in the way. */
-    private fun clearSight(p: Player, to: Vec3): Boolean {
-        val from = p.eyePosition
-        val hit = p.level().clip(net.minecraft.world.level.ClipContext(from, to.add(0.0, 0.5, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
-        return hit.type == net.minecraft.world.phys.HitResult.Type.MISS || hit.location.distanceTo(to) < 2.0
-    }
-
-    /** The mob to go for when clearing the whole room: the one with the most other mobs around it, then the closest. */
-    private fun findRoomTarget(p: Player): Entity? {
-        val room = DungeonScanner.currentRoom ?: return findTarget(p)
-        val centres = room.roomComponents.map { it.vec2() }.toSet()
-        val area = p.boundingBox.inflate(48.0, 20.0, 48.0)
-        val mobs = p.level().getEntitiesOfClass(LivingEntity::class.java, area) { e ->
-            e.isAlive && e.health > 0f && e !is ArmorStand && e !is Bat && e != p && e.id !in ignored &&
-                e.javaClass.simpleName != "WitherBoss" &&
-                (e !is Player || e.gameProfile.name in MINIBOSSES || e.name.string in MINIBOSSES || (campMode && isBloodMob(e))) &&
-                ! e.name.string.contains("Watcher") &&
-                DungeonScanner.getRoomCentre(e.blockX, e.blockZ) in centres
-        }
-        if (mobs.isEmpty()) return null
-        val r2 = blastRadius.value * blastRadius.value
-        val special = if (hypePriority.value) starredAndMinis(p, area) else emptySet()
-        fun weight(e: LivingEntity) = if (e.id in special) 3 else 1
-        return mobs.maxWithOrNull(compareBy<LivingEntity> { m -> mobs.filter { it.distanceToSqr(m) <= r2 }.sumOf(::weight) }.thenBy { - p.distanceToSqr(it) })
-    }
-
-    private fun isBloodMob(e: Player): Boolean {
-        if (e.isInvisible) return false
-        val n = e.gameProfile.name
-        return com.github.noamm9.utils.dungeons.DungeonListener.dungeonTeammates.none { it.name == n } && n != mc.player?.gameProfile?.name
-    }
-
     /** One tick of fighting in place (Blood camp): true while it has something to hit. */
     fun campTick(): Boolean {
         if (hitCooldown > 0) hitCooldown--
@@ -789,206 +416,12 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         return true
     }
 
-    /** Entity ids of starred mobs and minibosses in [area]. */
-    private fun starredAndMinis(p: Player, area: AABB): Set<Int> {
-        val level = p.level()
-        val out = HashSet<Int>()
-        for (stand in level.getEntitiesOfClass(ArmorStand::class.java, area)) {
-            val name = stand.customName?.string ?: continue
-            if (! name.contains("✯")) continue
-            val offset = if (name.uppercase().contains("WITHERMANCER")) 3 else 1
-            level.getEntity(stand.id - offset)?.takeIf { it !is ArmorStand }?.let { out += it.id }
-        }
-        for (other in level.getEntitiesOfClass(Player::class.java, area)) if (other != p && (other.gameProfile.name in MINIBOSSES || other.name.string in MINIBOSSES)) out += other.id
-        return out
-    }
-
-    /**
-     * Who is shooting us: the owner of an arrow / projectile close by, or failing that a visible skeleton-type mob.
-     * Only returned when Hyperion can get to it (in teleport range with a clear line), otherwise null so the route goes on.
-     */
-    private fun findShooter(p: Player): Entity? {
-        val level = p.level()
-        val hasHype = useHype.value && PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } != null
-        if (! hasHype) return null
-        val fromArrow = level.getEntitiesOfClass(net.minecraft.world.entity.projectile.Projectile::class.java, p.boundingBox.inflate(4.0)) { true }
-            .mapNotNull { it.owner as? LivingEntity }.firstOrNull { it != p && it.isAlive && it !is Player }
-        val shooter = fromArrow ?: level.getEntitiesOfClass(LivingEntity::class.java, p.boundingBox.inflate(16.0)) { e ->
-            e.isAlive && e !is Player && e !is ArmorStand && e.id !in ignored && e.javaClass.simpleName.contains("Skeleton") && p.hasLineOfSight(e)
-        }.minByOrNull { it.distanceToSqr(p) }
-        return shooter?.takeIf { it.id !in ignored && p.distanceTo(it) <= 11f && clearSight(p, it.position()) }
-    }
-
-    /** The closest hostile-looking mob within 3 blocks (something that can be hitting us). */
-    private fun findAttacker(p: Player): Entity? = p.level().getEntitiesOfClass(LivingEntity::class.java, p.boundingBox.inflate(3.5)) { e ->
-        e.isAlive && e.health > 0f && e !is ArmorStand && e !is Bat && e != p && (e !is Player || e.gameProfile.name in MINIBOSSES) &&
-            e.distanceTo(p) <= 3.5f && e.id !in ignored && p.hasLineOfSight(e)
-    }.minByOrNull { it.distanceToSqr(p) }
-
-    private fun AABB.clipNearest(from: Vec3) = Vec3(from.x.coerceIn(minX, maxX), from.y.coerceIn(minY, maxY), from.z.coerceIn(minZ, maxZ))
-
-    private fun findTarget(p: Player): Entity? {
-        val range = maxOf(detourRange.value, attackRange.value)
-        val level = p.level()
-        val area = p.boundingBox.inflate(range + 2.0)
-        val found = LinkedHashSet<Entity>()
-
-        if (killStars.value) for (stand in level.getEntitiesOfClass(ArmorStand::class.java, area)) {
-            val name = stand.customName?.string ?: continue
-            if (! name.contains("✯")) continue
-            val offset = if (name.uppercase().contains("WITHERMANCER")) 3 else 1
-            val byId = level.getEntity(stand.id - offset)
-            val mob = byId?.takeIf { it !is ArmorStand && it is LivingEntity }
-                ?: level.getEntities(stand, stand.boundingBox.move(0.0, - 1.5, 0.0).inflate(0.6, 1.0, 0.6)) { it is LivingEntity && it !is ArmorStand && it != p }.minByOrNull { it.distanceToSqr(stand) }
-            if (mob != null) found += mob
-        }
-        if (killMinis.value) for (other in level.getEntitiesOfClass(Player::class.java, area)) {
-            if (other == p || other.isInvisible) continue
-            if (other.gameProfile.name in MINIBOSSES || other.name.string in MINIBOSSES) found += other
-        }
-
-        return found.filter { it.id !in ignored && it.isAlive && (it as? LivingEntity)?.health?.let { h -> h > 0f } != false && p.distanceTo(it) <= range + 1.0 }
-            .minByOrNull { p.distanceToSqr(it) }
-    }
-
-    /** Rotate now, click on a later tick (the server needs the new rotation first). */
-    /** Aims at [target], then uses / hits it. Returns false while still turning (call again next tick). */
-    private fun aimThen(target: Vec3, use: Boolean): Boolean {
-        releaseMovement()
-        if (! turnTo(target)) return false
-        if (zeroTick) {
-            sendRotation()
-            if (use) PlayerUtils.rightClick() else PlayerUtils.leftClick()
-            return true
-        }
-        actionUse = use
-        phase = Phase.ACTION_AIM
-        wait = actionDelay
-        return true
-    }
-
-    /** Snaps, or with Smooth Turning turns like Assist Core does. True once looking within [tolerance] degrees. */
-    private fun turn(yaw: Float, pitch: Float, tolerance: Float = 2f, settle: Boolean = true): Boolean {
-        val p = mc.player ?: return false
-        val arrived = if (smoothTurning.value) com.github.noamm9.utils.Humanize.turnTo(p, yaw, pitch, tolerance)
-        else {
-            PlayerUtils.rotate(yaw, pitch)
-            true
-        }
-        if (! arrived) return false // keep the settle state: chasing a moving aim must not restart the pause
-        if (! settle || aimPause.value <= 0) return true
-
-        // The same aim (within 12 degrees, so a moving mob or a knock-back doesn't count as new) waits once.
-        val prev = settleKey
-        val same = prev != null && abs(wrapDeg(yaw - prev.first)) < 12f && abs(pitch - prev.second) < 12f
-        if (! same) {
-            settleKey = yaw to pitch
-            settleLeft = com.github.noamm9.utils.Humanize.around(aimPause.value)
-        }
-        if (settleLeft > 0) {
-            settleLeft--
-            return false
-        }
-        return true
-    }
-
-    private fun wrapDeg(d: Float): Float {
-        var x = d % 360f
-        if (x > 180f) x -= 360f
-        if (x < - 180f) x += 360f
-        return x
-    }
-
-    private fun turnTo(target: Vec3, tolerance: Float = 2f, settle: Boolean = true): Boolean {
-        val rot = MathUtils.calcYawPitch(com.github.noamm9.utils.Humanize.aimPoint(target))
-        return turn(rot.yaw, rot.pitch, tolerance, settle)
-    }
-
-    /** 0-Tick: tell the server the new look direction right away, so a click in this same tick uses it. */
-    private fun sendRotation() {
-        val p = mc.player ?: return
-        mc.connection?.send(ServerboundMovePlayerPacket.Rot(p.yRot, p.xRot, p.onGround(), p.horizontalCollision))
-    }
-
-    /** 0-Tick right click with the held item (etherwarp, pearl): rotation packet first, then the use packet. */
-    private fun useNow() {
-        val p = mc.player ?: return
-        sendRotation()
-        mc.gameMode?.useItem(p, InteractionHand.MAIN_HAND)
-        p.swing(InteractionHand.MAIN_HAND)
-    }
-
-    /**
-     * Gets up to [goal] when walking can't: etherwarp onto the block under it if the landing is predicted,
-     * otherwise an AOTV teleport (no sneak) towards it. Returns true if it started something this tick.
-     */
-    private fun leap(s: Step, pos: Vec3, goal: Vec3, allowAotv: Boolean): Boolean {
-        val p = mc.player ?: return false
-        val under = BlockPos.containing(goal.x, goal.y - 0.5, goal.z)
-        val etherSlot = PlayerUtils.findHotbarSlot { EtherwarpHelper.getEtherwarpDistance(it) != null }
-        if (etherSlot != null && under !in s.ethers && ! p.level().getBlockState(under).isAir) {
-            etherAim(under, p.inventory.getItem(etherSlot))
-            if (lastEtherCheck == true) {
-                s.ethers += under // the normal etherwarp step takes it from here
-                status = "etherwarp to ${under.x}, ${under.y}, ${under.z}"
-                return true
-            }
-        }
-        if (! allowAotv) return false
-        return aotvLeap(pos, goal)
-    }
-
-    /** AOTV (no sneak) towards [goal]. True if it started (or is turning for) a teleport this tick. */
-    private fun aotvLeap(pos: Vec3, goal: Vec3): Boolean {
-        val p = mc.player ?: return false
-        val aotvSlot = PlayerUtils.findHotbarSlot { it.skyblockId in AOTV_IDS } ?: return false
-        PlayerUtils.swapToSlot(aotvSlot)
-        releaseMovement()
-        PlayerUtils.toggleSneak(false)
-        if (mc.player!!.isShiftKeyDown) return true // let the un-sneak reach the server first
-        val dx = goal.x - pos.x
-        val dz = goal.z - pos.z
-        val yaw = Math.toDegrees(atan2(dz, dx)).toFloat() - 90f
-        val flat = sqrt(dx * dx + dz * dz)
-        val pitch = - Math.toDegrees(atan2(goal.y + 0.2 - (pos.y + p.eyeHeight), flat)).toFloat()
-        status = "AOTV to ${goal.x.toInt()}, ${goal.y.toInt()}, ${goal.z.toInt()}"
-        if (! turn(yaw, pitch.coerceIn(- 90f, 90f), 2f)) return true
-        aotvFromY = pos.y
-        aotvFrom = pos
-        if (zeroTick) useNow() else PlayerUtils.rightClick()
-        phase = Phase.AOTV_WAIT
-        timer = 0
-        return true
-    }
-
-    /**
-     * Picks where to look so the etherwarp lands on [target]: tries the top face centre and a few points around it,
-     * using Noamm's etherwarp prediction (same raycast rules as the server), sneaking eye height.
-     */
-    private fun etherAim(target: BlockPos, stack: ItemStack): MathUtils.Rotation {
-        val centre = Vec3(target.x + 0.5, target.y + 0.98, target.z + 0.5)
-        val fallback = MathUtils.calcYawPitch(centre)
-        if (! checkEther.value) return fallback.also { lastEtherCheck = null }
-        val p = mc.player ?: return fallback
-        val dist = EtherwarpHelper.getEtherwarpDistance(stack) ?: 57.0
-        val offsets = listOf(0.0, 0.25, - 0.25, 0.4, - 0.4)
-        for (dx in offsets) for (dz in offsets) {
-            val rot = MathUtils.calcYawPitch(centre.add(dx, 0.0, dz))
-            val look = Vec3.directionFromRotation(rot.pitch, rot.yaw)
-            val landing = EtherwarpHelper.getEtherPos(p.position(), look, dist)
-            if (landing.succeeded && landing.pos == target) {
-                lastEtherCheck = true
-                return rot
-            }
-        }
-        lastEtherCheck = false
-        return fallback
-    }
+    internal fun AABB.clipNearest(from: Vec3) = Vec3(from.x.coerceIn(minX, maxX), from.y.coerceIn(minY, maxY), from.z.coerceIn(minZ, maxZ))
 
     // ------------------------------------------------------------------ travel API (Auto Dungeon)
 
-    private var travelWait = 0
-    private var travelStuck = false
+    internal var travelWait = 0
+    internal var travelStuck = false
 
     enum class Travel { MOVING, ARRIVED, STUCK }
 
@@ -1042,76 +475,19 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         AssistBridge.reset()
     }
 
-    private fun releaseMovement() {
+    internal fun releaseMovement() {
         mc.options.keyUp.isDown = false
         mc.options.keyJump.isDown = false
         mc.options.keySprint.isDown = false
     }
 
-    private fun releaseKeys() {
+    internal fun releaseKeys() {
         releaseMovement()
         mc.options.keyAttack.isDown = false
         PlayerUtils.toggleSneak(false)
     }
 
-    // ------------------------------------------------------------------ route data
-
-    private fun standOn(b: BlockPos) = Vec3(b.x + 0.5, b.y + 1.0, b.z + 0.5)
-
-    private fun horizontal(a: Vec3, b: Vec3): Double {
-        val dx = a.x - b.x
-        val dz = a.z - b.z
-        return sqrt(dx * dx + dz * dz)
-    }
-
-    private fun parse(o: JsonObject, roomName: String?): Step {
-        val boss = roomName == "f7boss"
-        val dir = RoomDirectionUtils.roomDirection()
-        val corner = RoomDirectionUtils.roomCorner()
-        fun block(a: JsonArray): BlockPos {
-            val rel = BlockPos(a[0].asInt, a[1].asInt, a[2].asInt)
-            return if (boss) rel else RoomRotationUtils.relativeToActual(rel, dir, corner)
-        }
-        fun blocks(key: String) = o.getAsJsonArray(key)?.map { block(it.asJsonArray) } ?: emptyList()
-        fun point(a: JsonArray): Vec3 {
-            val x = a[0].asDouble
-            val y = a[1].asDouble
-            val z = a[2].asDouble
-            if (boss) return Vec3(x, y, z)
-            val cx = corner?.getX() ?: 0.0
-            val cz = corner?.getY() ?: 0.0
-            return when (dir) {
-                "W" -> Vec3(cx - z, y, cz + x)
-                "N" -> Vec3(cx - x, y, cz - z)
-                "E" -> Vec3(cx + z, y, cz - x)
-                else -> Vec3(cx + x, y, cz + z)
-            }
-        }
-
-        val pearls = ArrayList<Pair<Vec3, MathUtils.Rotation>>()
-        val pearlPos = o.getAsJsonArray("enderpearls")
-        val pearlAngles = o.getAsJsonArray("enderpearlangles")
-        if (pearlPos != null && pearlAngles != null) for (i in 0 until minOf(pearlPos.size(), pearlAngles.size())) {
-            val angle = pearlAngles[i].asJsonArray
-            val pitch = angle[0].asFloat.coerceIn(- 90f, 90f)
-            val yaw = if (boss) angle[1].asFloat else RotationUtils.relativeToActualYaw(angle[1].asFloat, dir)
-            pearls += point(pearlPos[i].asJsonArray) to MathUtils.Rotation(yaw, pitch)
-        }
-
-        val secret = o.getAsJsonObject("secret")
-        return Step(
-            path = blocks("locations"),
-            ethers = blocks("etherwarps").toMutableSet(),
-            mines = blocks("mines").toMutableList(),
-            tnts = blocks("tnts").toMutableList(),
-            levers = blocks("interacts").toMutableList(),
-            pearls = pearls,
-            secretType = secret?.get("type")?.takeUnless { it.isJsonNull }?.asString,
-            secretPos = secret?.getAsJsonArray("location")?.let(::block),
-        )
-    }
-
     @Suppress("unused")
-    private fun ItemStack.isEtherItem() = EtherwarpHelper.getEtherwarpDistance(this) != null
+    internal fun ItemStack.isEtherItem() = EtherwarpHelper.getEtherwarpDistance(this) != null
 }
 //#endif
