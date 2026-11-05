@@ -144,8 +144,9 @@ object Style {
 
     /** Pill-shaped on/off switch. [progress] 0 = off, 1 = on (animated by the caller). */
     fun drawSwitch(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, progress: Float) {
-        val off = Color(46, 36, 64)
-        roundRect(ctx, x, y, w, h, h / 2f, off)
+        // off: a lighter track with a hairline edge, so "off" reads clearly on the dark cards
+        roundRect(ctx, x - 0.5f, y - 0.5f, w + 1f, h + 1f, h / 2f + 0.5f, Color(150, 130, 190, (90 * (1f - progress)).toInt()))
+        roundRect(ctx, x, y, w, h, h / 2f, Color(62, 50, 86))
         if (progress > 0.01f) {
             // the purple -> pink fill grows in from the left as it switches on
             val a = (255 * progress).toInt()
@@ -157,7 +158,7 @@ object Style {
         val stretch = if (progress > 0.02f && progress < 0.98f) kotlin.math.sin(progress * Math.PI).toFloat() * knob * 0.5f else 0f
         val kw = knob + stretch
         val kx = x + 1f + (w - kw - 2f) * progress
-        roundRect(ctx, kx, y + 1f, kw, knob, knob / 2f, Color(138, 127, 163).lerpTo(Color.WHITE, progress))
+        roundRect(ctx, kx, y + 1f, kw, knob, knob / 2f, Color(178, 168, 204).lerpTo(Color.WHITE, progress))
     }
 
     private fun Color.lerpTo(other: Color, t: Float): Color {

@@ -132,6 +132,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         class Tabs(val feature: Feature, val tabs: List<String>, val current: String): Entry()
     }
 
+    private val RAIL_W = 104f
+    private val RAIL_ROW = 17f
     private val tabOf = HashMap<Feature, String>()
     private val drawnTabs = ArrayList<Pair<String, FloatArray>>()
 
@@ -476,16 +478,27 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val h = contentH()
 
         entries = buildEntries()
+        // tabs that don't fit on one line become a column on the left, settings beside it
+        val tabsEntry = entries.firstNotNullOfOrNull { it as? Entry.Tabs }
+        val rail = tabsEntry != null && tabLayout(tabsEntry.tabs, w).any { it[1] > 0f }
+        val ox = if (rail) x + RAIL_W + 8f else x
+        val ow = if (rail) w - RAIL_W - 8f else w
         val heights = entries.map {
             when (it) {
                 is Entry.Header -> 16f
                 is Entry.FeatureCard -> featureCardHeight(it.feature, w)
-                is Entry.Option -> optionHeight(it, w)
-                is Entry.Tabs -> (tabLayout(it.tabs, w).maxOf { r -> r[1] } + 22f)
+                is Entry.Option -> optionHeight(it, ow)
+                is Entry.Tabs -> if (rail) 0f else (tabLayout(it.tabs, w).maxOf { r -> r[1] } + 22f)
             }
         }
         drawnTabs.clear()
-        scroll.update(heights.sum() + entries.size * CARD_GAP, h)
+        var total = heights.sum() + entries.size * CARD_GAP
+        if (rail) {
+            val idx = entries.indexOf(tabsEntry)
+            val before = heights.take(idx).sum() + idx * CARD_GAP
+            total = maxOf(total, before + tabsEntry!!.tabs.size * (RAIL_ROW + 3f))
+        }
+        scroll.update(total, h)
 
         drawnFeatureCards.clear()
         drawnOptionCards.clear()
@@ -545,7 +558,21 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     }
                 }
 
-                is Entry.Tabs -> if (visible) {
+                is Entry.Tabs -> if (rail) {
+                    entry.tabs.forEachIndexed { ti, name ->
+                        val rect = floatArrayOf(x, y + ti * (RAIL_ROW + 3f), RAIL_W, RAIL_ROW)
+                        drawnTabs += name to rect
+                        val sel = name == entry.current
+                        val hov = anim("tab:${entry.feature.name}:$name", 120).also { it.update(if (insideContent && inside(mx, my, rect)) 1f else 0f) }.value
+                        if (sel) {
+                            Style.roundRect(ctx, rect[0], rect[1], rect[2], rect[3], 5f, Style.mix(card, cardHover, 0.9f))
+                            ctx.drawVerticalGradient(rect[0] + 1f, rect[1] + 3f, 2f, rect[3] - 6f, Style.accentColor.withAlpha(240), Style.accent2.withAlpha(240))
+                        }
+                        else Style.roundRect(ctx, rect[0], rect[1], rect[2], rect[3], 5f, Style.mix(card, cardHover, hov).withAlpha((120 + 135 * hov).toInt()))
+                        ctx.drawString(name, rect[0] + 9f, rect[1] + (RAIL_ROW - 8f) / 2f, if (sel) textMain else Style.mix(textDim, textSoft, hov), shadow = false)
+                    }
+                }
+                else if (visible) {
                     val layout = tabLayout(entry.tabs, w)
                     entry.tabs.forEachIndexed { ti, name ->
                         val r = layout[ti]
@@ -562,22 +589,22 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                 is Entry.Option -> {
                     val widget = entry.widget
                     if (visible) {
-                        val ohov = anim(widget, 150).also { it.update(if (insideContent && my in y .. y + eh && mx in x .. x + w) 1f else 0f) }.value
-                        Style.roundRect(ctx, x, y, w, eh, 4f, Style.mix(card, cardHover, ohov * 0.6f))
-                        drawnOptionCards += floatArrayOf(x, y, w, eh)
+                        val ohov = anim(widget, 150).also { it.update(if (insideContent && my in y .. y + eh && mx in ox .. ox + ow) 1f else 0f) }.value
+                        Style.roundRect(ctx, ox, y, ow, eh, 4f, Style.mix(card, cardHover, ohov * 0.6f))
+                        drawnOptionCards += floatArrayOf(ox, y, ow, eh)
                         var wy = y + CARD_PAD
                         if (entry.prefix != null) {
-                            ctx.drawString("§8${entry.prefix} ›", x + CARD_PAD, wy + 1f, textFaint, shadow = false)
+                            ctx.drawString("§8${entry.prefix} ›", ox + CARD_PAD, wy + 1f, textFaint, shadow = false)
                             wy += LINE_H
                         }
-                        widget.x = (x + CARD_PAD).toInt()
+                        widget.x = (ox + CARD_PAD).toInt()
                         widget.y = wy.toInt()
-                        widget.width = (w - CARD_PAD * 2).toInt()
+                        widget.width = (ow - CARD_PAD * 2).toInt()
                         widget.draw(ctx, mouseX, mouseY)
                         shown += widget
                         var ly = wy + widget.height + 3f
-                        for (line in wrap(widget.config.description.orEmpty(), (w - CARD_PAD * 2) / DESC_SCALE)) {
-                            ctx.drawString(line, x + CARD_PAD + 2f, ly + 0.5f, textDim, scale = DESC_SCALE, shadow = false)
+                        for (line in wrap(widget.config.description.orEmpty(), (ow - CARD_PAD * 2) / DESC_SCALE)) {
+                            ctx.drawString(line, ox + CARD_PAD + 2f, ly + 0.5f, textDim, scale = DESC_SCALE, shadow = false)
                             ly += LINE_H
                         }
                     }

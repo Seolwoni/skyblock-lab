@@ -119,7 +119,10 @@ object ChatUtils: ISelfInit {
         return if (outPos == len) this else String(out, 0, outPos)
     }
 
-    fun modMessage(msg: Any?) = chat(NoammAddons.PREFIX.copy().append(if (NoammAddons.isCheat) RiftChat.body(" $msg".addColor()) else Component.literal(" $msg".addColor())))
+    fun modMessage(msg: Any?) = chat(NoammAddons.PREFIX.copy().append(if (NoammAddons.isCheat) RiftChat.body(" $msg".addColor()) else Component.literal(" $msg".addColor())).let { c ->
+        // the menu's font for our own messages (children inherit it; their colours stay)
+        if (runCatching { com.github.noamm9.features.impl.dev.ClickGui.chatFont.value }.getOrDefault(false)) c.withStyle { it.withFont(com.github.noamm9.utils.render.UiFont.regular) } else c
+    })
 
     fun debug(flag: String, msg: Any?) {
         if (NoammAddons.debugFlags.contains(flag)) modMessage(msg)

@@ -25,6 +25,8 @@ object UiFont {
     )
 
     private val REGULAR = FontDescription.Resource(Identifier.fromNamespaceAndPath(MOD_ID, "riftwalk"))
+    /** The menu font, for chat components. */
+    val regular: FontDescription get() = REGULAR
     private val BOLD = FontDescription.Resource(Identifier.fromNamespaceAndPath(MOD_ID, "riftwalk_bold"))
 
     private val cache = object: LinkedHashMap<String, Component>(256, 0.75f, true) {

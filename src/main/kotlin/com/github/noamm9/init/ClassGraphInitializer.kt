@@ -89,7 +89,21 @@ class ClassGraphInitializer {
             if (com.github.noamm9.features.impl.routes.AssistBridge.hudHidden()) return@register // Assist Core's H key
 
             Resolution.push(event.context)
-            FeatureManager.hudElements.forEach { if (it.shouldDraw) it.renderElement(event.context, false) }
+            val shown = FeatureManager.hudElements.filter { it.toggle && it.shouldDraw }
+            if (com.github.noamm9.features.impl.dev.ClickGui.hudAvoidOverlap.value) {
+                // panels that would overlap are drawn just below each other (positions in the config don't change)
+                val rects = shown.map { h ->
+                    val sw = h.width * h.scale; val sh = h.height * h.scale
+                    com.github.noamm9.utils.HudLayout.R(h.x - (if (h.centered()) sw / 2f else 0f) - 5f * h.scale, h.y - 3.5f * h.scale, sw + 10f * h.scale, sh + 7f * h.scale)
+                }
+                val dy = com.github.noamm9.utils.HudLayout.offsets(rects, Resolution.height.toFloat())
+                shown.forEachIndexed { i, h ->
+                    if (dy[i] == 0f) return@forEachIndexed h.renderElement(event.context, false)
+                    h.y += dy[i]
+                    try { h.renderElement(event.context, false) } finally { h.y -= dy[i] }
+                }
+            }
+            else shown.forEach { it.renderElement(event.context, false) }
             Resolution.pop(event.context)
         }
     }

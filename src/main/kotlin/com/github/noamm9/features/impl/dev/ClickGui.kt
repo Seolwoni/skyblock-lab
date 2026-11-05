@@ -28,6 +28,8 @@ object ClickGui: Feature("A feature used to change the ClickGui configuration.",
     val hudPanels by ToggleSetting("HUD Panels", true).section("HUD Look")
         .withDescription("Draws a soft dark rounded panel with an accent strip behind every HUD element")
     val hudFont by ToggleSetting("Smooth HUD Font", true)
+    val hudAvoidOverlap by ToggleSetting("Keep HUDs Apart", true).withDescription("Panels that would overlap are drawn just below each other (where you placed them is kept)")
+    val chatFont by ToggleSetting("Smooth Chat Font", true).withDescription("Riftwalk's own chat messages in the same font as the menu")
         .withDescription("HUD text uses the same smooth font as the menu instead of Minecraft's pixel font")
     val hudColors by ToggleSetting("Theme HUD Colours", true)
         .withDescription("Softens the bright Minecraft colours in HUD text into Void Rift tones (green stays green, red stays red)")
