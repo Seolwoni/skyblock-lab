@@ -128,6 +128,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val whipDelay by SliderSetting("Whip Delay", 6, 2, 30, 1, " ticks").withDescription("Time between whip swings (a little random on top)").showIf { weaponType.value != 0 }
     internal val weaponSlot by SliderSetting("Weapon Slot", 0, 0, 9, 1).withDescription("Hotbar slot (1-9) of the weapon. 0 = Hyperion / Astraea / Scylla / Valkyrie if found")
     internal val hitDelay by SliderSetting("Hit Delay", 4, 1, 20, 1, " ticks")
+    internal val hypeDelay by SliderSetting("Hyperion Cast Delay", 2, 1, 10, 1, " ticks").withDescription("Typical time between Hyperion casts (log-normal around it, Click Spread). 2 = about 8-10 casts a second")
+    internal val immuneWindow by SliderSetting("Immunity Check Window", 20, 0, 60, 1, " ticks").withDescription("Only a creature that came up this recently gets the one 'took no damage, wait' pause (0 = never wait)")
+    internal val immuneWaitMin by SliderSetting("Immunity Wait Min", 6, 0, 30, 1, " ticks").showIf { immuneWindow.value > 0 }
+    internal val immuneWaitMax by SliderSetting("Immunity Wait Max", 10, 0, 40, 1, " ticks").showIf { immuneWindow.value > 0 }
 
     internal val hotspots by ToggleSetting("Go To Hotspots", false).section("Hotspots").withDescription(
         "Finds the nearest fishing Hotspot, walks to a spot on the shore next to it and casts into it. When it goes away, moves on to the next one. With none around it fishes where you started"

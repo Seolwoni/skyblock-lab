@@ -356,6 +356,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 if (castDownPitch == 0f) castDownPitch = 78f + RANDOM.nextFloat() * 11f
                 if (lavaAround(p) || ! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
                 if (! turn(p, p.yRot, castDownPitch, 3f)) return
+                com.github.noamm9.utils.Humanize.glide(p, p.yRot, castDownPitch) // the last few degrees, so the cast stage takes it as is
                 val swapped = p.inventory.selectedSlot != hype
                 hold(hype) // the Hyperion comes out once we're looking down
                 hypeStage = 2
@@ -366,10 +367,10 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 // only ever looking down: a stage left over from before (or a look that wandered up) goes back to "look down"
                 if (p.xRot < 75f) { hypeStage = 1; journal.log("hyperion held: looking ${"%.0f".format(p.xRot)} deg, turning down first"); return }
                 // next to lava: straight down only, whatever the pitch drifted to
-                if (lavaAround(p) && abs(p.xRot - 90f) > 0.5f) { castDownPitch = 90f; hypeStage = 1; return }
+                if (lavaAround(p) && abs(p.xRot - 90f) > 2f) { castDownPitch = 90f; com.github.noamm9.utils.Humanize.glide(p, p.yRot, 90f); return }
                 if (! blastSafe(p, p.yRot, p.xRot)) { // this look would teleport us off the edge: straight down instead
                     castDownPitch = 90f
-                    if (abs(p.xRot - 90f) > 0.5f) { hypeStage = 1; return }
+                    if (abs(p.xRot - 90f) > 2f) { com.github.noamm9.utils.Humanize.glide(p, p.yRot, 90f); return }
                     if (! blastSafe(p, p.yRot, 90f)) { // no safe blast from here: fight it with the sword instead
                         blastBlocked = true
                         hypeStage = 0
@@ -383,8 +384,9 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                     val before = castHp[m0.id]
                     val nowHp = hpOf(m0).toFloat()
                     // a fresh creature that took nothing from the first blast is still immune: wait once, then keep blasting
-                    if (before != null && nowHp >= before - 0.01f && hitCooldown == 0 && hypeBeat == 0 && immuneWaited.add(m0.id)) {
-                        hypeBeat = delay(14, 24)
+                    val fresh = (seenAt[m0.id]?.let { tickCount - it } ?: 0) < immuneWindow.value
+                    if (fresh && before != null && nowHp >= before - 0.01f && hitCooldown == 0 && hypeBeat == 0 && immuneWaited.add(m0.id)) {
+                        hypeBeat = delay(immuneWaitMin.value, immuneWaitMax.value)
                         status = "${m0.name.string} took no damage, waiting a moment"
                         castHp[m0.id] = nowHp
                         return
@@ -396,7 +398,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 journal.log("hyperion  pitch=${"%.1f".format(p.xRot)}  at=${"%.2f,%.2f,%.2f".format(p.x, p.y, p.z)}  lavaNear=${lavaAround(p)}")
                 hypeFrom = p.position()
                 TravelBlink.fire(p)
-                hitCooldown = clickGap(hitDelay.value)
+                hitCooldown = clickGap(hypeDelay.value)
                 castDownPitch = if (lavaAround(p)) 90f else (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
                 if (abs(castDownPitch - p.xRot) > 1.5f) {
                     // keep casting: drift the view to the new pitch in place instead of restarting the sequence
