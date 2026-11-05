@@ -114,6 +114,8 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val noticeMax by SliderSetting("Notice Delay Max", 26, 0, 60, 1, " ticks")
     internal val readyMin by SliderSetting("Own Catch Notice Min", 2, 0, 20, 1, " ticks").withDescription("With Quick Kill: how fast your own just-caught creature is noticed (you're expecting it)")
     internal val readyMax by SliderSetting("Own Catch Notice Max", 6, 0, 30, 1, " ticks")
+    internal val maxHeight by SliderSetting("Max Height Above Fluid", 3, 1, 10, 1, " blocks").withDescription("Fishing spots are picked at most this high above the water / lava, so your sea creatures can reach you (and the Hyperion reaches them)")
+    internal val moveDown by ToggleSetting("Move Down To Fish", true).withDescription("Started up high looking at the fluid: walks down to a spot just above it first")
     internal val leaveFightAfter by SliderSetting("Leave Fight After", 6, 2, 40, 1, " ticks").withDescription("Once everything of yours is dead, back to fishing after this long (still 1.5 s while one of yours is alive but out of reach)")
     internal val recastAfterFight by ToggleSetting("Quick Recast After Fight", true).withDescription("No extra 'reading the catch' pause after a fight: cast as soon as the view is back on the spot")
     internal val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")

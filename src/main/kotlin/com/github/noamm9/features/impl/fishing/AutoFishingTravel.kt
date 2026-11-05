@@ -114,16 +114,27 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
 }
 
 /** A block on the shore 4-10 blocks from the hotspot, with a clear view of it, as close to us as possible. */
+/** The y of the fluid surface at / under [at] (top of the highest wanted-fluid block within 12 below), or null. */
+internal fun AutoFishing.surfaceY(at: Vec3): Double? {
+    val c = BlockPos.containing(at)
+    for (dy in 2 downTo - 12) if (wantedFluid(c.offset(0, dy, 0)) && ! wantedFluid(c.offset(0, dy + 1, 0))) return c.y + dy + 0.9
+    return null
+}
+
 internal fun AutoFishing.shoreSpot(p: LocalPlayer, centre: Vec3): Vec3? {
     val level = p.level()
-    val c = BlockPos.containing(centre)
+    // stand low over the fluid: our sea creatures come up at the surface and can't climb to a high ledge
+    val surface = surfaceY(centre)
+    val c = if (surface != null) BlockPos.containing(centre.x, surface, centre.z) else BlockPos.containing(centre)
+    val maxUp = maxHeight.value
     var best: Vec3? = null
     var bestScore = Double.MAX_VALUE
     for (dx in - 10 .. 10) for (dz in - 10 .. 10) {
         val flat = kotlin.math.sqrt((dx * dx + dz * dz).toDouble())
         if (flat < 4.0 || flat > 10.0) continue
-        for (dy in - 2 .. 5) {
+        for (dy in - 1 .. 5) {
             val feet = BlockPos(c.x + dx, c.y + dy, c.z + dz)
+            if (surface != null && feet.y - surface > maxUp) break // too high above the fluid
             val below = feet.below()
             if (level.getBlockState(below).getCollisionShape(level, below).isEmpty) continue
             if (! level.getFluidState(below).isEmpty) continue
@@ -134,7 +145,8 @@ internal fun AutoFishing.shoreSpot(p: LocalPlayer, centre: Vec3): Vec3? {
             val clip = level.clip(net.minecraft.world.level.ClipContext(eye, centre.add(0.0, 0.3, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
             if (clip.type != net.minecraft.world.phys.HitResult.Type.MISS && clip.location.distanceTo(centre) > 1.5) continue
             val pos = Vec3(feet.x + 0.5, feet.y.toDouble(), feet.z + 0.5)
-            val score = pos.distanceTo(p.position()) + abs(flat - 7.0) * 2
+            val height = if (surface != null) (feet.y - surface).coerceAtLeast(0.0) else 0.0
+            val score = pos.distanceTo(p.position()) + abs(flat - 7.0) * 2 + height * 4
             if (score < bestScore) { bestScore = score; best = pos }
             break
         }

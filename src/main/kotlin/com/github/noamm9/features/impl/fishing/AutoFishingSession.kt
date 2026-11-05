@@ -95,6 +95,20 @@ internal fun AutoFishing.nearestFluid(p: LocalPlayer, radius: Int): Vec3? {
 /** Where to fish when nothing better is known: here if we're looking at it, else walk to the nearest pool. */
 internal fun AutoFishing.goToFluid(p: LocalPlayer) {
     val here = lookingAtFluid(p)
+    // looking at it from high up: walk down to a spot just above it first (creatures can't reach a high ledge)
+    if (here != null && moveDown.value && p.y - (surfaceY(here) ?: here.y) > maxHeight.value + 0.5) {
+        val spot = shoreSpot(p, here)
+        if (spot != null && spot.y < p.y - 1.0) {
+            fishTarget = here
+            stand = spot
+            path = emptyList()
+            travelStuck = 0
+            state = FishingState.TRAVEL
+            journal.log("standing ${"%.0f".format(p.y - (surfaceY(here) ?: here.y))} blocks above the ${fluidName()} - moving down to ${BlockPos.containing(spot).toShortString()}")
+            info("&7Too high above the ${fluidName()} - moving down to fish.")
+            return
+        }
+    }
     if (here != null) {
         stand = Vec3.atBottomCenterOf(BlockPos.containing(p.position()))
         fishTarget = here
