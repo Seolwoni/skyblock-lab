@@ -103,4 +103,47 @@ object HumanMotion {
         if (t == last) t = if (t <= minTicks || rnd.nextBoolean()) t + 1 else t - 1
         return t
     }
+
+    // ---- movement
+
+    /** Log-normal tick count around [median] (sigma [spread]), clamped to [min]..[max]. */
+    fun lognormalTicks(median: Double, spread: Double, min: Int, max: Int, rnd: Random): Int {
+        val lo = minOf(min, max); val hi = maxOf(min, max)
+        val v = if (spread <= 0) median else median * exp(rnd.nextGaussian() * spread)
+        return Math.round(v).toInt().coerceIn(lo, hi)
+    }
+
+    /** [base] ticks moved by up to ±[spreadShare] of itself (uniform), at least 1. */
+    fun jittered(base: Int, spreadShare: Double, rnd: Random): Int {
+        if (base <= 0) return 1
+        val d = (rnd.nextDouble() * 2 - 1) * spreadShare.coerceIn(0.0, 1.0) * base
+        return maxOf(1, Math.round(base + d).toInt())
+    }
+
+    /**
+     * A fresh (x, z) offset for a waypoint's arrival point, each axis uniform in ±[maxPerAxis];
+     * never exactly [previous] (drawn again if it is).
+     */
+    fun waypointOffset(maxPerAxis: Double, previous: DoubleArray?, rnd: Random): DoubleArray {
+        val m = abs(maxPerAxis)
+        if (m == 0.0) return doubleArrayOf(0.0, 0.0)
+        while (true) {
+            val o = doubleArrayOf((rnd.nextDouble() * 2 - 1) * m, (rnd.nextDouble() * 2 - 1) * m)
+            if (previous == null || ! o.contentEquals(previous)) return o
+        }
+    }
+
+    /** Largest per-axis offset for an arrival [radius] that keeps the waypoint centre itself an arrival (|o| <= radius / 2). */
+    fun offsetCap(radius: Double) = radius / 2 / sqrt(2.0)
+
+    /**
+     * Arrival with an offset centre: within (radius - |offset|) of the offset point. That circle lies inside the
+     * original one, so every position that counts as arrived also counted before (same arrival coordinates).
+     */
+    fun arrived(dx: Double, dz: Double, ox: Double, oz: Double, radius: Double): Boolean {
+        val r = radius - sqrt(ox * ox + oz * oz)
+        if (r <= 0) return dx == 0.0 && dz == 0.0
+        val ex = dx - ox; val ez = dz - oz
+        return ex * ex + ez * ez < r * r
+    }
 }

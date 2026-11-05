@@ -164,6 +164,9 @@ class HumanMotionTest {
             last = HumanMotion.clickInterval(5.0, 0.45, r, last); out += last.toDouble()
             out += HumanMotion.between(3, 9, r).toDouble()
             out += if (HumanMotion.chance(5.0, r)) 1.0 else 0.0
+            out += HumanMotion.lognormalTicks(1.5, 0.6, 0, 5, r).toDouble()
+            out += HumanMotion.jittered(10, 0.3, r).toDouble()
+            out += HumanMotion.waypointOffset(0.15, null, r).toList()
         }
         return out
     }
@@ -171,5 +174,74 @@ class HumanMotionTest {
     @Test fun sameSeedSameSequence() {
         assertEquals(run(1234), run(1234))
         assertTrue(run(1234) != run(1235))
+    }
+
+    // ---- movement distributions
+
+    private fun pctI(xs: List<Int>, q: Double) = xs.sorted()[((xs.size - 1) * q).toInt()]
+
+    @Test fun waypointOffsetDistribution() {
+        var prev: DoubleArray? = null
+        val xs = ArrayList<Double>()
+        repeat(40_000) {
+            val o = HumanMotion.waypointOffset(0.15, prev, rnd)
+            assertTrue(prev == null || ! o.contentEquals(prev!!), "same offset twice in a row")
+            prev = o
+            xs += o[0]; xs += o[1]
+        }
+        assertTrue(xs.all { it >= -0.15 && it <= 0.15 }, "outside ±0.15")
+        assertEquals(0.0, pct(xs, 0.5), 0.005)                  // median at the centre
+        assertEquals(0.147, pct(xs, 0.99), 0.003)               // uniform: P99 = 0.98 x 0.15
+        assertTrue(pct(xs, 0.0) < -0.149 && pct(xs, 1.0) > 0.149) // reaches both ends
+        assertTrue(xs.toSet().size > 70_000, "values repeat")
+    }
+
+    @Test fun offsetArrivalIsInsideTheOriginalCircle() {
+        // every point counted as arrived with an offset was arrived without one (same arrival coordinates)
+        for (radius in listOf(0.55, kotlin.math.sqrt(0.12), 1.2, 2.5)) {
+            val cap = minOf(0.15, HumanMotion.offsetCap(radius))
+            repeat(20_000) {
+                val o = HumanMotion.waypointOffset(cap, null, rnd)
+                val dx = (rnd.nextDouble() * 2 - 1) * radius * 1.5
+                val dz = (rnd.nextDouble() * 2 - 1) * radius * 1.5
+                if (HumanMotion.arrived(dx, dz, o[0], o[1], radius)) assertTrue(dx * dx + dz * dz < radius * radius, "r=$radius")
+                assertTrue(HumanMotion.arrived(0.0, 0.0, o[0], o[1], radius), "centre must still arrive (r=$radius)")
+            }
+        }
+        // puzzle steps: arrival never in a neighbouring block
+        val r = kotlin.math.sqrt(0.12)
+        val cap = minOf(0.15, HumanMotion.offsetCap(r))
+        assertEquals(0.1225, cap, 0.0005)
+        repeat(20_000) {
+            val o = HumanMotion.waypointOffset(cap, null, rnd)
+            val dx = rnd.nextDouble() - 0.5; val dz = rnd.nextDouble() - 0.5
+            if (HumanMotion.arrived(dx * 2, dz * 2, o[0], o[1], r)) assertTrue(abs(dx * 2) < 0.5 && abs(dz * 2) < 0.5)
+        }
+    }
+
+    @Test fun jumpTimingDistribution() {
+        val xs = List(50_000) { HumanMotion.lognormalTicks(1.8, 0.6, 0, 5, rnd) }
+        assertTrue(xs.all { it in 0 .. 5 }, "outside 0-5")
+        assertEquals(2, pctI(xs, 0.5))                          // median 1.8 ticks rounds to 2
+        assertTrue(pctI(xs, 0.99) > 2 * pctI(xs, 0.5), "P99 ${pctI(xs, 0.99)} median ${pctI(xs, 0.5)}")
+        assertEquals(0, xs.minOrNull()); assertEquals(5, xs.maxOrNull())
+    }
+
+    @Test fun sprintDelayDistribution() {
+        val xs = List(30_000) { HumanMotion.between(1, 3, rnd) }
+        assertTrue(xs.all { it in 1 .. 3 })
+        assertEquals(2, pctI(xs, 0.5))
+        assertEquals(3, pctI(xs, 0.99))
+        assertEquals(1, xs.minOrNull()); assertEquals(3, xs.maxOrNull())
+        val c = IntArray(4); xs.forEach { c[it]++ }
+        assertTrue((1 .. 3).all { c[it] in 9_400 .. 10_600 }, c.joinToString())
+    }
+
+    @Test fun repathIntervalSpread() {
+        val xs = List(30_000) { HumanMotion.jittered(10, 0.3, rnd) }
+        assertTrue(xs.all { it in 7 .. 13 }, "outside ±30%")
+        assertEquals(10, pctI(xs, 0.5))
+        assertEquals(13, pctI(xs, 0.99))
+        assertTrue(xs.toSet().size == 7)
     }
 }
