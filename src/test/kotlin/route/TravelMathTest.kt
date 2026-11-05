@@ -132,13 +132,14 @@ class TravelMathTest {
 
     @Test fun aimErrorAboutOneAndAHalfDegreesP99UnderFour() {
         val r = Random(71)
-        val yaw = List(20_000) { abs(TravelMath.aimError(1.5, r)[0]) }
-        assertEquals(1.0, pct(yaw, 0.5), 0.1)             // |N(0, 1.5)| median = 0.674 sigma
-        assertTrue(pct(yaw, 0.99) in 3.4 .. 4.4, "P99 ${pct(yaw, 0.99)}")
-        assertTrue(pct(yaw, 0.99) > 2 * pct(yaw, 0.5))
-        val both = List(20_000) { TravelMath.aimError(1.5, r).let { hypot(it[0], it[1]) } }
-        assertTrue(both.all { it.isFinite() })
-        assertEquals(0.0, TravelMath.aimError(0.0, r).sum())
+        val size = List(20_000) { TravelMath.aimError(1.5, 0.42, r).let { hypot(it[0], it[1] / 0.6) } }
+        assertEquals(1.5, pct(size, 0.5), 0.1)
+        assertTrue(pct(size, 0.99) in 3.4 .. 4.6, "P99 ${pct(size, 0.99)}")
+        assertTrue(pct(size, 0.99) > 2 * pct(size, 0.5))
+        // a fresh error every time
+        val a = TravelMath.aimError(1.5, 0.42, r); val b = TravelMath.aimError(1.5, 0.42, r)
+        assertTrue(! a.contentEquals(b))
+        assertEquals(0.0, TravelMath.aimError(0.0, 0.42, r).sum())
     }
 
     @Test fun blinkGapsMedianThreeTailNoTriple() {
@@ -165,7 +166,7 @@ class TravelMathTest {
             TravelMath.blinkLanding(0.5, 1.0, 0.5, v, 0, w)
         }
         assertTrue(TravelMath.aim(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).all { it.isFinite() })
-        for (s in listOf(0.0, 1.5, 10.0)) repeat(200) { assertTrue(TravelMath.aimError(s, r).all { it.isFinite() }) }
+        for (s in listOf(0.0, 1.5, 10.0)) for (sp in listOf(0.0, 0.42, 1.0)) repeat(200) { assertTrue(TravelMath.aimError(s, sp, r).all { it.isFinite() }) }
         val m = TravelMath.CostModel()
         for (mv in Move.entries) for (dist in listOf(0.0, 61.0, 1e6)) assertTrue(TravelMath.cost(mv, dist, 300, 1, m).isFinite())
     }

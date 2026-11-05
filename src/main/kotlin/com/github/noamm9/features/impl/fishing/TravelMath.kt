@@ -147,9 +147,16 @@ object TravelMath {
         return out
     }
 
-    /** Aim error for one teleport (degrees, yaw and pitch): normal with [sigma] per axis, so |error| P99 is about 2.6 sigma. */
-    fun aimError(sigma: Double, rnd: Random): DoubleArray =
-        if (sigma <= 0) doubleArrayOf(0.0, 0.0) else doubleArrayOf(rnd.nextGaussian() * sigma, rnd.nextGaussian() * sigma * 0.6)
+    /**
+     * Aim error for one teleport (degrees, yaw and pitch): its size is log-normal around [median] (sigma [spread]),
+     * in a random direction (pitch at 60%). Median 1.5 with spread 0.42 gives P99 about 4 degrees.
+     */
+    fun aimError(median: Double, spread: Double, rnd: Random): DoubleArray {
+        if (median <= 0) return doubleArrayOf(0.0, 0.0)
+        val size = median * kotlin.math.exp(rnd.nextGaussian() * spread.coerceAtLeast(0.0))
+        val a = rnd.nextDouble() * 2 * Math.PI
+        return doubleArrayOf(size * cos(a), size * sin(a) * 0.6)
+    }
 
     /**
      * Ticks between two blinks in a row: log-normal around [median], [min]..[max], and never the same gap three
