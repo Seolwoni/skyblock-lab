@@ -288,8 +288,8 @@ internal fun AutoFishing.sendDiscord(reason: String, lines: List<String>, ms: Lo
 internal fun AutoFishing.logFiles(): List<java.nio.file.Path> {
     val dir = java.nio.file.Path.of(journal.path).parent
     val out = ArrayList<java.nio.file.Path>()
-    out += dir.resolve("fishing.log")
-    runCatching { java.nio.file.Files.list(dir.resolve("sessions")).use { st -> st.sorted(Comparator.reverseOrder()).limit(3).forEach { out += it } } }
+    out.add(dir.resolve("fishing.log"))
+    runCatching { java.nio.file.Files.list(dir.resolve("sessions")).use { st -> st.sorted(Comparator.reverseOrder()).limit(3).forEach { out.add(it) } } }
     return out
 }
 
