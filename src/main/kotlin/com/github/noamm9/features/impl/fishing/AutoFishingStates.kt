@@ -446,7 +446,7 @@ internal object ReelState : FishingStateHandler {
             // where the creature will come up: the hook now, or where it was at the bite if it's gone already
             val at = hook?.position() ?: biteAt
             if (at != null) {
-                reels += Reel(tickCount, at)
+                reels += AutoFishing.Reel(tickCount, at)
                 if (reels.size > 6) reels.removeFirst()
             }
             if (hook != null) use(p)
