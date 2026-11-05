@@ -62,6 +62,54 @@ internal fun AutoFishing.nearFluid(hook: FishingHook, tag: net.minecraft.tags.Ta
 }
 
 /** Simulates this throw: true when it comes down on water / lava (not a block on the way, not dry ground). */
+/** Where the throw comes down in the wanted fluid, or null when it hits a block first (or nothing). */
+internal fun AutoFishing.throwLanding(p: LocalPlayer, yaw: Float, pitch: Float): Vec3? {
+    val lvl = p.level()
+    val t = FishingMath.throwStart(yaw, pitch)
+    var pos = Vec3(p.x + t.offX, p.eyeY, p.z + t.offZ)
+    var v = Vec3(t.vx, t.vy, t.vz)
+    repeat(160) {
+        val next = pos.add(v)
+        val hit = lvl.clip(net.minecraft.world.level.ClipContext(pos, next, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.ANY, p))
+        if (hit.type == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+            val bp = (hit as net.minecraft.world.phys.BlockHitResult).blockPos
+            return if (wantedFluid(bp) || wantedFluid(BlockPos.containing(hit.location))) hit.location else null
+        }
+        if (next.y < p.y - 30) return null
+        pos = next
+        v = Vec3(v.x * FishingMath.DRAG, v.y * FishingMath.DRAG - FishingMath.GRAVITY, v.z * FishingMath.DRAG)
+    }
+    return null
+}
+
+/** Open fluid around a landing: no block with a collision shape within 1 block, at the surface and just above it. */
+internal fun AutoFishing.wallClear(at: Vec3): Boolean {
+    val lvl = mc.level ?: return true
+    val c = BlockPos.containing(at)
+    for (dx in - 1 .. 1) for (dz in - 1 .. 1) for (dy in 0 .. 1) {
+        val b = c.offset(dx, dy, dz)
+        if (! lvl.getBlockState(b).getCollisionShape(lvl, b).isEmpty) return false
+    }
+    return true
+}
+
+/** The closest fluid surface within [r] blocks of [at] that's clear of walls ([wallClear]), as a point to aim at. */
+internal fun AutoFishing.openSpotNear(at: Vec3, r: Int): Vec3? {
+    val lvl = mc.level ?: return null
+    val c = BlockPos.containing(at)
+    var best: Vec3? = null
+    var bestD = Double.MAX_VALUE
+    for (dx in - r .. r) for (dz in - r .. r) for (dy in - 1 .. 1) {
+        val b = c.offset(dx, dy, dz)
+        if (! wantedFluid(b) || ! lvl.getBlockState(b.above()).isAir) continue
+        val pt = Vec3(b.x + 0.5, b.y + 0.9, b.z + 0.5)
+        if (! wallClear(pt)) continue
+        val d = pt.distanceToSqr(at)
+        if (d < bestD) { bestD = d; best = pt }
+    }
+    return best
+}
+
 internal fun AutoFishing.throwLandsInFluid(p: LocalPlayer, yaw: Float, pitch: Float): Boolean {
     // follow the throw tick by tick: water / lava first -> good; a block first -> it lands on the ground
     val lvl = p.level()

@@ -362,6 +362,8 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
             }
             else -> { // cast; between casts keep looking down, each cast a little different
                 if (hitCooldown > 0) return
+                // only ever looking down: a stage left over from before (or a look that wandered up) goes back to "look down"
+                if (p.xRot < 75f) { hypeStage = 1; journal.log("hyperion held: looking ${"%.0f".format(p.xRot)} deg, turning down first"); return }
                 // next to lava: straight down only, whatever the pitch drifted to
                 if (lavaAround(p) && abs(p.xRot - 90f) > 0.5f) { castDownPitch = 90f; hypeStage = 1; return }
                 if (! blastSafe(p, p.yRot, p.xRot)) { // this look would teleport us off the edge: straight down instead

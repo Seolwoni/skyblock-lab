@@ -149,6 +149,7 @@ interface FishingVars {
     var lastLoggedState: FishingState?
     var fightMobs: List<LivingEntity>
     var hypeFrom: Vec3?
+    var heightWarned: Boolean
     var biteAt: Vec3?
     var tabStats: String
     var guiWasOpen: Boolean
@@ -334,6 +335,7 @@ class FishingVarsImpl : FishingVars {
     override var catchMsgsWork: Boolean = false
     override val journal: com.github.noamm9.utils.Journal = com.github.noamm9.utils.Journal("fishing")
     override var lastLoggedState: FishingState? = null
+    override var heightWarned: Boolean = false // told once per session that ours are below the Hyperion's reach
     override var hypeFrom: Vec3? = null // where the last Hyperion cast was fired from (journal: where it took us)
     override var fightMobs: List<LivingEntity> = emptyList() // sea creatures the shared check picked this tick (FIGHT handler)
     override var biteAt: Vec3? = null               // where the hook was at the bite (it can vanish before we reel)

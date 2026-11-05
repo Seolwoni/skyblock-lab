@@ -112,6 +112,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     )
     internal val noticeMin by SliderSetting("Notice Delay Min", 8, 0, 40, 1, " ticks").withDescription("How long it takes to notice a sea creature that came up, before reacting")
     internal val noticeMax by SliderSetting("Notice Delay Max", 26, 0, 60, 1, " ticks")
+    internal val readyMin by SliderSetting("Own Catch Notice Min", 2, 0, 20, 1, " ticks").withDescription("With Quick Kill: how fast your own just-caught creature is noticed (you're expecting it)")
+    internal val readyMax by SliderSetting("Own Catch Notice Max", 6, 0, 30, 1, " ticks")
+    internal val leaveFightAfter by SliderSetting("Leave Fight After", 6, 2, 40, 1, " ticks").withDescription("Once everything of yours is dead, back to fishing after this long (still 1.5 s while one of yours is alive but out of reach)")
+    internal val recastAfterFight by ToggleSetting("Quick Recast After Fight", true).withDescription("No extra 'reading the catch' pause after a fight: cast as soon as the view is back on the spot")
     internal val giveUp by SliderSetting("Give Up After", 5, 1, 30, 1, " s").withDescription("A creature that doesn't come within reach in this time is left alone and fishing goes on")
     internal val manaCost by SliderSetting("Mana Per Cast", 300, 0, 1000, 10).withDescription("Wither Impact's mana cost for you. Below it, the Hyperion swings as a sword instead of casting (no more standing there with no mana)")
     internal val pauseMana by SliderSetting("Pause Below Mana", 35, 0, 90, 5, "%").withDescription("Stops casting the rod while mana is under this, so no new sea creatures come up until it has refilled (0 = never pause)")
@@ -410,6 +414,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         lastLookYaw = null
         lastTickPos = null; lastTickLevel = null; lastTickPlayer = null
         TravelBlink.reset()
+        hypeStage = 0; hypeBeat = 0; castDownPitch = 0f; blastBlocked = false; hypeFrom = null; heightWarned = false
         reelTiming = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
         castYawSeries = 0.0; castPitchSeries = 0.0; lastClickGap = - 1
         wobYaw = 0f; wobPitch = 0f

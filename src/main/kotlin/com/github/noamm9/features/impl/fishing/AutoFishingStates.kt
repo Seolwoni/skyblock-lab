@@ -199,14 +199,15 @@ internal fun AutoFishing.tick() {
     // a person needs a moment to notice something new: each creature gets its own notice time
     // right after our own reel we know something may come up: a person who's ready reacts faster
     val ready = quickKill.value && reels.isNotEmpty() && tickCount - reels.last().tick < 60
-    for (m in seen) noticeAt.getOrPut(m.id) { tickCount + if (ready && m.id in mine) delay(3, 8) else delay(noticeMin.value, noticeMax.value) }
+    for (m in seen) noticeAt.getOrPut(m.id) { tickCount + if (ready && m.id in mine) delay(readyMin.value, readyMax.value) else delay(noticeMin.value, noticeMax.value) }
     if (noticeAt.size > 200) noticeAt.keys.retainAll(seen.map { it.id }.toSet())
     val noticed = seen.filter { (noticeAt[it.id] ?: 0) <= tickCount }
     // only stop fishing for what we can actually hit from here; one bobbing up and down below us
     // (in and out of reach) mustn't make us reel in, take the Hyperion out and put it away over and over
     val reach = fightReach()
     val inReach = noticed.filter { p.distanceTo(it) <= reach }
-    val coming = noticed.filter { p.distanceTo(it) <= reach * 1.6 && it.y >= p.y - 2.0 }
+    // our own just-caught creature counts even below us (fishing from up high it drops away otherwise)
+    val coming = noticed.filter { p.distanceTo(it) <= reach * 1.6 && (it.y >= p.y - 2.0 || (it.id in mine && p.distanceTo(it) <= reach * 1.25)) }
     val hurt = p.hurtTime > 0
     val mobs = when {
         state == FishingState.FIGHT -> if (inReach.isNotEmpty() || coming.isNotEmpty() || hurt) noticed.filter { p.distanceTo(it) <= reach * 1.6 } else emptyList()
@@ -215,7 +216,15 @@ internal fun AutoFishing.tick() {
         else -> inReach
     }
     // leave a fight only after 1.5 s with nothing to hit, so it doesn't flap
-    if (state == FishingState.FIGHT && mobs.isEmpty() && ++noReachTicks < 30) { status = "watching ${noticed.firstOrNull()?.name?.string ?: "around"}"; return }
+    // leave a fight quickly once everything of ours is dead; 1.5 s while one is alive but out of reach (no flapping)
+    val leaveAfter = if (mineAlive.isEmpty()) leaveFightAfter.value else 30
+    // up high with the Hyperion: ours that sit further below than its reach can't be hit - say so once
+    if (! heightWarned && weaponType.value == 0 && noticed.any { it.id in mine && p.y - it.y > reach }) {
+        heightWarned = true
+        journal.log("a creature of ours is ${"%.0f".format(p.y - noticed.first { it.id in mine }.y)} blocks below, past the Hyperion's reach")
+        info("&eYour sea creature is below the Hyperion's reach - fish closer to the lava (2-4 blocks above it) or use a whip.")
+    }
+    if (state == FishingState.FIGHT && mobs.isEmpty() && ++noReachTicks < leaveAfter) { status = "watching ${noticed.firstOrNull()?.name?.string ?: "around"}"; return }
     if (mobs.isNotEmpty()) noReachTicks = 0
     if (state == FishingState.FIGHT || mobs.isNotEmpty()) {
         fightMobs = mobs
@@ -312,6 +321,22 @@ internal object CastState : FishingStateHandler {
                 aimAtPoint(p, target)
                 status = "re-aiming at the ${fluidName()}"
                 return
+            }
+            // lands in the fluid but right against a wall / the shore: the hook catches on it - aim at open fluid instead
+            if (hook == null) throwLanding(p, ty, tp)?.let { land ->
+                if (! wallClear(land)) {
+                    if (++aimFixes > 3) { aimFixes = 0; journal.log("no open spot away from the walls - casting anyway") }
+                    else {
+                        val open = openSpotNear(land, 5)
+                        if (open != null) {
+                            journal.log("cast would land against a wall at ${BlockPos.containing(land).toShortString()} - re-aiming at ${BlockPos.containing(open).toShortString()}")
+                            fishTarget = open
+                            aimAtPoint(p, open)
+                            status = "aiming away from the wall"
+                            return
+                        }
+                    }
+                }
             }
             aimFixes = 0
             hold(rod)
@@ -466,6 +491,7 @@ internal object ReelState : FishingStateHandler {
 
 /** FIGHT: kill the sea creatures picked by the shared creature check ([AutoFishing.fightMobs]). */
 internal object FightState : FishingStateHandler {
+    override fun enter() { with(AutoFishing) { if (hypeStage == 2) hypeStage = 1 } } // a new fight starts by looking down again
     override fun tick(player: LocalPlayer?) {
         with(AutoFishing) {
             val p = player!!
@@ -480,6 +506,7 @@ internal object FightState : FishingStateHandler {
                 castDownPitch = 0f
                 state = FishingState.CAST
                 returning = true
+                if (recastAfterFight.value) justCaughtSomething = false // no extra "reading the catch" pause after a fight
                 wait = castWait()
                 status = "back to fishing"
                 return
