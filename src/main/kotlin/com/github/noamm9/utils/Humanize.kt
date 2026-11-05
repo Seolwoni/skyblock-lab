@@ -47,7 +47,7 @@ object Humanize {
         settle(p)
         gFromYaw = p.yRot
         gFromPitch = p.xRot
-        gToYaw = gFromYaw + wrap(yaw - gFromYaw)
+        gToYaw = HumanMotion.glideTarget(gFromYaw, yaw)
         gToPitch = pitch.coerceIn(- 90f, 90f)
         gStart = System.nanoTime()
         gTick = net.minecraft.client.Minecraft.getInstance().level?.gameTime ?: 0L
@@ -70,7 +70,7 @@ object Humanize {
         val mc = net.minecraft.client.Minecraft.getInstance()
         val now = mc.level?.gameTime ?: 0L
         val t = if (gTick == now) mc.deltaTracker.getGameTimeDeltaPartialTick(true).coerceIn(0f, 1f) else 1f
-        write(p, gFromYaw + (gToYaw - gFromYaw) * t, gFromPitch + (gToPitch - gFromPitch) * t)
+        write(p, HumanMotion.glideAt(gFromYaw, gToYaw, t), HumanMotion.glideAt(gFromPitch, gToPitch, t))
         if (t >= 1f) gliding = false
     }
 
@@ -114,12 +114,7 @@ object Humanize {
         timing.tick()
     }
 
-    private fun wrap(d: Float): Float {
-        var x = d % 360f
-        if (x > 180f) x -= 360f
-        if (x < - 180f) x += 360f
-        return x
-    }
+    private fun wrap(d: Float): Float = HumanMotion.wrapDeg(d)
 
     /** A reaction delay in ticks within [min, max], scaled by pace. Plain uniform when Human Behaviour is off. */
     fun delay(min: Int, max: Int): Int {

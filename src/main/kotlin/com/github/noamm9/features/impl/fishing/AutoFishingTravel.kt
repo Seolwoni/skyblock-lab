@@ -247,48 +247,19 @@ internal fun AutoFishing.standable(feet: BlockPos): Boolean {
     return level.getBlockState(head).getCollisionShape(level, head).isEmpty && ! isFluid(head)
 }
 
-/** A* over standable blocks: never steps into or next to lava, keeps a block's distance from edges when it can. */
+/** A* over standable blocks: never steps into or next to lava, keeps a block's distance from edges when it can (PathMath). */
 internal fun AutoFishing.findPath(p: LocalPlayer, goal: BlockPos): List<BlockPos>? {
     val start = p.blockPosition()
-    if (start.distManhattan(goal) > 160) return null
-    data class N(val pos: BlockPos, val g: Double, val f: Double)
-    val open = java.util.PriorityQueue<N>(compareBy { it.f })
-    val came = HashMap<BlockPos, BlockPos>()
-    val best = HashMap<BlockPos, Double>()
-    fun h(b: BlockPos) = kotlin.math.sqrt(b.distSqr(goal))
-    open += N(start, 0.0, h(start))
-    best[start] = 0.0
-    var expanded = 0
-    val dirs = listOf(1 to 0, - 1 to 0, 0 to 1, 0 to - 1, 1 to 1, 1 to - 1, - 1 to 1, - 1 to - 1)
-    while (open.isNotEmpty() && expanded++ < 6000) {
-        val cur = open.poll()
-        if (cur.pos.distManhattan(goal) <= 1 && abs(cur.pos.y - goal.y) <= 1) {
-            val out = ArrayList<BlockPos>()
-            var c: BlockPos? = cur.pos
-            while (c != null) { out += c; c = came[c] }
-            out.reverse()
-            return out
+    fun bp(q: com.github.noamm9.utils.PathMath.P) = BlockPos(q.x, q.y, q.z)
+    val world = object : com.github.noamm9.utils.PathMath.World {
+        override fun standable(p: com.github.noamm9.utils.PathMath.P) = this@findPath.standable(bp(p))
+        override fun headroom(p: com.github.noamm9.utils.PathMath.P): Boolean {
+            val up = bp(p).above(2)
+            return mc.level!!.getBlockState(up).getCollisionShape(mc.level!!, up).isEmpty
         }
-        if (cur.g > (best[cur.pos] ?: Double.MAX_VALUE)) continue
-        for ((dx, dz) in dirs) {
-            for (dy in intArrayOf(0, 1, - 1, - 2, - 3)) {
-                val n = cur.pos.offset(dx, dy, dz)
-                if (! standable(n)) continue
-                if (dx != 0 && dz != 0 && (! standable(cur.pos.offset(dx, 0, 0)) || ! standable(cur.pos.offset(0, 0, dz)))) continue
-                if (dy == 1 && ! mc.level!!.getBlockState(cur.pos.above(2)).getCollisionShape(mc.level!!, cur.pos.above(2)).isEmpty) continue
-                if (nearLava(n, 0)) continue
-                val step = (if (dx != 0 && dz != 0) 1.414 else 1.0) + (if (dy != 0) 0.5 else 0.0) + (if (nearLava(n, 1)) 6.0 else 0.0)
-                val g = cur.g + step
-                if (g < (best[n] ?: Double.MAX_VALUE)) {
-                    best[n] = g
-                    came[n] = cur.pos
-                    open += N(n, g, g + h(n))
-                }
-                break // one height per direction (the first that fits)
-            }
-        }
+        override fun nearLava(p: com.github.noamm9.utils.PathMath.P, r: Int) = this@findPath.nearLava(bp(p), r)
     }
-    return null
+    return com.github.noamm9.utils.PathMath.aStar(com.github.noamm9.utils.PathMath.P(start.x, start.y, start.z), com.github.noamm9.utils.PathMath.P(goal.x, goal.y, goal.z), world)?.map { bp(it) }
 }
 
 /** Walks the path node to node with eased turns; hops along long safe straight stretches with the AOTV. */

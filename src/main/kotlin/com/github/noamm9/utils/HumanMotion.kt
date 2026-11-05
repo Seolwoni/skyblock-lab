@@ -146,4 +146,20 @@ object HumanMotion {
         val ex = dx - ox; val ez = dz - oz
         return ex * ex + ez * ez < r * r
     }
+
+    // ---- view glide (Humanize.glide / frame)
+
+    /** [d] degrees folded into -180..180 (same arithmetic Humanize always used). */
+    fun wrapDeg(d: Float): Float {
+        var x = d % 360f
+        if (x > 180f) x -= 360f
+        if (x < - 180f) x += 360f
+        return x
+    }
+
+    /** Where a glide from [from] to [to] is at partial tick [t] (0..1). */
+    fun glideAt(from: Float, to: Float, t: Float): Float = from + (to - from) * t
+
+    /** The glide's end yaw for a turn to [yaw] from [fromYaw]: the short way round. */
+    fun glideTarget(fromYaw: Float, yaw: Float): Float = fromYaw + wrapDeg(yaw - fromYaw)
 }
