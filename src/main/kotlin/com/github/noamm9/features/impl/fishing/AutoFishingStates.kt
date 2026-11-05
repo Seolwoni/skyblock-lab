@@ -131,7 +131,14 @@ internal fun AutoFishing.tick() {
         return stop("done - goal reached ($goalHit)")
     }
     val p = mc.player ?: return stop("no player")
-    if (stopHealth.value > 0 && p.health / p.maxHealth * 100f < stopHealth.value) return stop("health is low")
+    val hp = p.health / p.maxHealth * 100f
+    if (lowHealth.value == 1) { if (stopHealth.value > 0 && hp < stopHealth.value) return stop("health is low") }
+    else {
+        // like the mana wait: stop casting until health is back; only a really low health still ends the session
+        if (criticalHealth.value > 0 && hp < criticalHealth.value) return stop("health critically low (${hp.toInt()}%)")
+        if (! healthWaiting && stopHealth.value > 0 && hp < stopHealth.value) { healthWaiting = true; journal.log("health ${hp.toInt()}% - waiting for it to come back") }
+        if (healthWaiting && hp >= resumeHealth.value) { healthWaiting = false; journal.log("health back to ${hp.toInt()}% - fishing again") }
+    }
     if (hitCooldown > 0) hitCooldown--
     if (ownMoveTicks > 0) ownMoveTicks--
     // a sudden big jump in where we look (more than any turn of ours can do in a tick): stop
@@ -296,6 +303,11 @@ internal object CastState : FishingStateHandler {
                 return
             }
             val mf = com.github.noamm9.utils.ManaGuard.fraction
+            if (healthWaiting) {
+                if (p.inventory.selectedSlot != rod) hold(rod)
+                status = "waiting for health (${(p.health / p.maxHealth * 100).toInt()}%)"
+                return
+            }
             if (killCreatures.value && pauseMana.value > 0 && mf != null && mf * 100 < pauseMana.value && hasHype() && manaWait < 600) {
                 manaWait++ // at most 30 s, then fish anyway
                 if (p.inventory.selectedSlot != rod) hold(rod) // wait with the rod, not standing there with the Hyperion
@@ -370,6 +382,12 @@ internal object WaitBiteState : FishingStateHandler {
             val p = player!!
             val rod = rod() ?: return stop("no fishing rod in the hotbar")
             val hook = p.fishing
+            if (healthWaiting) { // low on health: reel in and wait (CAST holds until it's back)
+                if (hook != null) { hold(rod); use(p) }
+                state = FishingState.CAST
+                wait = castWait()
+                return
+            }
             if (hook == null) {
                 if (++timer > 20) { // hook never came / line broke
                     state = FishingState.CAST

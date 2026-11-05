@@ -222,7 +222,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }.withDescription("Copies where fishing.log is, to send it over after a test")
     internal val stopAfterMin by SliderSetting("Stop After", 0, 0, 600, 10, " min").withDescription("Ends the session on its own after this long (0 = never)")
     internal val stopAfterKills by SliderSetting("Stop After Kills", 0, 0, 5000, 50).withDescription("Ends the session after this many sea creature kills (0 = never)")
-    internal val stopHealth by SliderSetting("Stop Below Health", 30, 0, 90, 5, "%").section("Safety").withDescription("Stops when your health drops below this (0 = never)")
+    internal val lowHealth by DropdownSetting("On Low Health", 0, listOf("Wait", "Stop")).section("Safety").withDescription("Wait: no new casts until health is back (fights go on, the creatures are what hurts); Stop: end the session")
+    internal val stopHealth by SliderSetting("Low Health", 30, 0, 90, 5, "%").withDescription("Below this, wait (or stop). 0 = never")
+    internal val resumeHealth by SliderSetting("Resume At", 70, 10, 100, 5, "%").showIf { lowHealth.value == 0 }.withDescription("Fishing goes on once health is back up to this")
+    internal val criticalHealth by SliderSetting("Stop Below (Always)", 15, 0, 50, 5, "%").showIf { lowHealth.value == 0 }.withDescription("Still stops when it gets this low while waiting (0 = never)")
     internal val chatInfo by ToggleSetting("Chat Messages", true)
     internal val statusHud by ToggleSetting("Status HUD", true)
 
@@ -420,7 +423,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         lastLookYaw = null
         lastTickPos = null; lastTickLevel = null; lastTickPlayer = null
         TravelBlink.reset()
-        hypeStage = 0; hypeBeat = 0; castDownPitch = 0f; blastBlocked = false; hypeFrom = null; heightWarned = false
+        hypeStage = 0; hypeBeat = 0; castDownPitch = 0f; blastBlocked = false; hypeFrom = null; heightWarned = false; healthWaiting = false
         reelTiming = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
         castYawSeries = 0.0; castPitchSeries = 0.0; lastClickGap = - 1
         wobYaw = 0f; wobPitch = 0f
