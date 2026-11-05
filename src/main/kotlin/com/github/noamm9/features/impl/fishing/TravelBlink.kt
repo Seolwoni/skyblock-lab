@@ -70,8 +70,7 @@ internal object TravelBlink {
 
     /** Soulflow from the tab list ("Soulflow: 1,234"), or null when it isn't shown. */
     fun soulflow(): Int? = runCatching {
-        com.github.noamm9.utils.TabListUtils.getTabList().asSequence().map { it.first.string.replace(Regex("§."), "") }
-            .firstNotNullOfOrNull { Regex("Soulflow:\\s*([\\d,]+)").find(it)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull() }
+        SkyblockTravel.soulflowFrom(com.github.noamm9.utils.TabListUtils.getTabList().asSequence().map { it.first.string })
     }.getOrNull()
 
     /** Uses the held teleport / Wither Impact item (also used by the fights' Hyperion). */

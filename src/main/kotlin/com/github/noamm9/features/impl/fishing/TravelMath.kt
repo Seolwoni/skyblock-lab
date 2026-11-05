@@ -28,13 +28,23 @@ object TravelMath {
         fun inWorld(y: Int): Boolean
     }
 
-    /** A landing needs [air] free blocks (feet up), something solid under the feet, no lava around and inside the world. */
-    fun landable(feet: P, b: Blocks, air: Int = 2): Boolean {
-        if (! b.inWorld(feet.y - 1) || ! b.inWorld(feet.y + air - 1)) return false
-        for (i in 0 until air) if (! b.passable(feet.offset(0, i, 0))) return false
-        if (! b.solid(feet.offset(0, - 1, 0))) return false
-        return ! lavaNear(feet, b)
+    /** Why a landing is or isn't usable. */
+    enum class Why { OK, SPACE, LAVA, RANGE, WORLD }
+
+    /**
+     * The landing check, with its reason: inside the world, [air] free blocks (feet up), something solid under the
+     * feet, no lava around. [landable] is this == OK.
+     */
+    fun landingReason(feet: P, b: Blocks, air: Int = 2): Why {
+        if (! b.inWorld(feet.y - 1) || ! b.inWorld(feet.y + air - 1)) return Why.WORLD
+        for (i in 0 until air) if (! b.passable(feet.offset(0, i, 0))) return Why.SPACE
+        if (! b.solid(feet.offset(0, - 1, 0))) return Why.SPACE
+        if (lavaNear(feet, b)) return Why.LAVA
+        return Why.OK
     }
+
+    /** A landing needs [air] free blocks (feet up), something solid under the feet, no lava around and inside the world. */
+    fun landable(feet: P, b: Blocks, air: Int = 2): Boolean = landingReason(feet, b, air) == Why.OK
 
     /** Lava in or next to the landing (feet level and the block under it). */
     fun lavaNear(feet: P, b: Blocks): Boolean {
@@ -82,6 +92,15 @@ object TravelMath {
      */
     fun etherwarpLanding(ex: Double, ey: Double, ez: Double, dir: DoubleArray, range: Int, b: Blocks, pitch: Double, pitchMin: Double = - 90.0, pitchMax: Double = 90.0, air: Int = 2): P? {
         if (pitch < pitchMin || pitch > pitchMax) return null
+        val hit = raycastSolid(ex, ey, ez, dir, range.toDouble(), b) ?: return null
+        return hit.block.offset(0, 1, 0).takeIf { landable(it, b, air) }
+    }
+
+    /** The first solid block a look from [ex, ey, ez] along [dir] hits within [maxDist] (voxel walk), and how far. */
+    data class Hit(val block: P, val dist: Double)
+
+    /** Null when nothing solid is hit within [maxDist], the ray leaves the world, or it meets fluid first. */
+    fun raycastSolid(ex: Double, ey: Double, ez: Double, dir: DoubleArray, maxDist: Double, b: Blocks): Hit? {
         var x = floor(ex).toInt(); var y = floor(ey).toInt(); var z = floor(ez).toInt()
         val sx = if (dir[0] > 0) 1 else - 1; val sy = if (dir[1] > 0) 1 else - 1; val sz = if (dir[2] > 0) 1 else - 1
         fun first(o: Double, d: Double, s: Int): Double = if (d == 0.0) Double.MAX_VALUE else ((if (s > 0) floor(o) + 1 - o else o - floor(o)) / abs(d))
@@ -91,7 +110,7 @@ object TravelMath {
         val dtz = if (dir[2] == 0.0) Double.MAX_VALUE else 1 / abs(dir[2])
         while (true) {
             val t = minOf(tx, ty, tz)
-            if (t > range) return null
+            if (t > maxDist) return null
             when (t) {
                 tx -> { x += sx; tx += dtx }
                 ty -> { y += sy; ty += dty }
@@ -99,7 +118,7 @@ object TravelMath {
             }
             if (! b.inWorld(y)) return null
             val c = P(x, y, z)
-            if (b.solid(c)) return c.offset(0, 1, 0).takeIf { landable(it, b, air) }
+            if (b.solid(c)) return Hit(c, t)
             if (! b.passable(c)) return null // fluid: no landing through it
         }
     }

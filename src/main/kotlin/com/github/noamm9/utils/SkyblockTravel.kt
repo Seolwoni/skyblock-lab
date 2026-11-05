@@ -25,6 +25,12 @@ object SkyblockTravel {
     const val ETHERWARP_MANA = 45
     const val ETHERWARP_SOULFLOW = 1
 
+    private val SOULFLOW = Regex("Soulflow:\\s*([\\d,]+)")
+
+    /** Soulflow from tab list lines ("Soulflow: 1,234", colour codes allowed), or null when no line shows it. */
+    fun soulflowFrom(lines: Sequence<String>): Int? =
+        lines.map { it.replace(Regex("§."), "") }.firstNotNullOfOrNull { SOULFLOW.find(it)?.groupValues?.get(1)?.replace(",", "")?.toIntOrNull() }
+
     // ---- landing
     /** Air blocks needed at the landing (feet + head). */
     const val LANDING_AIR = 2
