@@ -1,0 +1,10 @@
+features registered: 123
+routes features: 5
+features that failed to load: []
+secret routes loaded: true
+rw-01-skyhanni open: SkyHanniScreen
+rw-02-classic open: ClickGuiScreen
+rw-04-settings open: SkyHanniScreen
+switched on: 113
+all on/off: on before 10, on while off 0, restored true
+RESULT: PASS

@@ -1,0 +1,122 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Running Stonecutter 0.9.8
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :buildSrc:generateExternalPluginSpecBuilders
+> Task :buildSrc:extractPrecompiledScriptPluginPlugins
+> Task :buildSrc:generateScriptPluginAdapters
+> Task :buildSrc:pluginDescriptors
+> Task :buildSrc:processResources
+> Task :buildSrc:compilePluginsBlocks
+
+> Task :buildSrc:generatePrecompiledScriptPluginAccessors
+Fabric Loom: 1.19.1
+Fabric Loom: 1.19.1
+
+> Task :buildSrc:compileKotlin
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:classes
+> Task :buildSrc:jar
+
+> Configure project :26.2
+Fabric Loom: 1.19.1
+
+> Configure project :26.3
+Fabric Loom: 1.19.1
+
+> Task :26.2:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :26.2:stonecutterPrepare
+> Task :26.2:stonecutterGenerate
+> Task :26.2:preprocessMain
+> Task :26.2:preprocessLegit
+> Task :26.2:processResources
+> Task :26.2:processIncludeJars
+> Task :26.2:preprocessCheat
+> Task :26.2:processCheatResources
+> Task :26.2:processLegitResources
+> Task :26.2:stonecutterPrepareTest
+> Task :26.2:stonecutterGenerateTest
+> Task :26.2:processTestResources NO-SOURCE
+> Task :26.2:validateAccessWidener
+> Task :26.2:compileKotlin
+> Task :26.2:compileCheatKotlin
+> Task :26.2:compileLegitKotlin
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/legit/kotlin/com/github/noamm9/features/impl/misc/InventorySearch.kt:54:62 Redundant call of conversion method.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/legit/kotlin/com/github/noamm9/features/impl/misc/InventorySearch.kt:54:80 Redundant call of conversion method.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/legit/kotlin/com/github/noamm9/init/ClassGraphInitializer.kt:99:93 Redundant call of conversion method.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/legit/kotlin/com/github/noamm9/ui/clickgui/SkyHanniScreen.kt:499:52 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SkyHanniScreen.Entry.Tabs'.
+
+> Task :26.2:compileKotlin
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingCast.kt:75:27 Cast is redundant.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingCast.kt:123:27 Cast is redundant.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingCombat.kt:427:38 Condition is always 'true'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingSafety.kt:178:34 Unnecessary safe call on a non-null receiver of type 'Component'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingSession.kt:65:19 Cast is redundant.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingStates.kt:436:25 Condition is always 'true'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/fishing/TravelBlink.kt:259:97 Unnecessary non-null assertion (!!) on a non-null receiver of type 'BlockPos'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/misc/InventorySearch.kt:54:62 Redundant call of conversion method.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/misc/InventorySearch.kt:54:80 Redundant call of conversion method.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/routes/AutoDungeon.kt:172:17 Unnecessary safe call on a non-null receiver of type 'UniqueRoom'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/routes/AutoDungeon.kt:176:17 Condition is always 'true'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/features/impl/routes/AutoDungeon.kt:186:48 Condition is always 'true'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/init/ClassGraphInitializer.kt:99:93 Redundant call of conversion method.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/main/kotlin/com/github/noamm9/ui/clickgui/SkyHanniScreen.kt:499:52 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SkyHanniScreen.Entry.Tabs'.
+
+> Task :26.2:compileCheatKotlin
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingCast.kt:74:27 Cast is redundant.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingCast.kt:122:27 Cast is redundant.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingCombat.kt:426:38 Condition is always 'true'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingSafety.kt:177:34 Unnecessary safe call on a non-null receiver of type 'Component'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingSession.kt:64:19 Cast is redundant.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/fishing/AutoFishingStates.kt:435:25 Condition is always 'true'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/fishing/TravelBlink.kt:258:97 Unnecessary non-null assertion (!!) on a non-null receiver of type 'BlockPos'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/misc/InventorySearch.kt:54:62 Redundant call of conversion method.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/misc/InventorySearch.kt:54:80 Redundant call of conversion method.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/routes/AutoDungeon.kt:171:17 Unnecessary safe call on a non-null receiver of type 'UniqueRoom'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/routes/AutoDungeon.kt:175:17 Condition is always 'true'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/features/impl/routes/AutoDungeon.kt:185:48 Condition is always 'true'.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/init/ClassGraphInitializer.kt:99:93 Redundant call of conversion method.
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/preprocessed/cheat/kotlin/com/github/noamm9/ui/clickgui/SkyHanniScreen.kt:499:52 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SkyHanniScreen.Entry.Tabs'.
+
+> Task :26.2:compileCheatJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :26.2:compileJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :26.2:classes
+> Task :26.2:cheatClasses
+> Task :26.2:jar
+> Task :26.2:jarCheat
+> Task :26.2:assemble
+
+> Task :26.2:compileLegitJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :26.2:legitClasses
+> Task :26.2:jarLegit
+
+> Task :26.2:compileTestKotlin
+w: file:///home/runner/work/skyblock-lab/skyblock-lab/versions/26.2/build/generated/stonecutter/test/kotlin/human/HumanMotionTest.kt:188:62 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DoubleArray'.
+
+> Task :26.2:compileTestJava NO-SOURCE
+> Task :26.2:testClasses UP-TO-DATE
+> Task :26.2:test
+> Task :26.2:check
+> Task :26.2:build
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_4-1793921625325.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/skyblock-lab/skyblock-lab/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2m 44s
+32 actionable tasks: 32 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.2/userguide/configuration_cache_enabling.html

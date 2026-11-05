@@ -1,0 +1,123 @@
+total 35644
+drwxr-xr-x 2 runner runner     4096 Nov  5 23:36 .
+drwxr-xr-x 4 runner runner     4096 Nov  5 23:36 ..
+-rw-r--r-- 1 runner runner 17958206 Nov  5 23:36 Riftwalk-1.1.146-26.2-legit.jar
+-rw-r--r-- 1 runner runner 18530299 Nov  5 23:36 Riftwalk-1.1.146-26.2.jar
+== build/libs/Riftwalk-1.1.146-26.2.jar
+100
+assist stubs in jar: 0
+     8897  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AssistBridge.class
+      939  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoBoss$WhenMappings.class
+     3487  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoBoss$phase3$Task.class
+    33833  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoBoss.class
+     2386  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoDungeon$State.class
+     1979  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoDungeon$Waypoint.class
+     2086  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoDungeon$WhenMappings.class
+    49033  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoDungeon.class
+    19342  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoPuzzles.class
+     2464  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutes$Phase.class
+     4148  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutes$Step.class
+     2115  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutes$Travel.class
+     1228  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutes$WhenMappings.class
+    79916  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutes.class
+     7610  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutesAimKt.class
+     4693  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutesCombatKt$findRoomTarget$$inlined$compareBy$1.class
+     2785  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutesCombatKt$findRoomTarget$$inlined$thenBy$1.class
+    34705  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutesCombatKt.class
+     9205  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutesDataKt.class
+    35803  1980-02-01 00:00   com/github/noamm9/features/impl/routes/AutoRoutesMoveKt.class
+     2224  1980-02-01 00:00   com/github/noamm9/features/impl/routes/RouteBridge.class
+     2388  1980-02-01 00:00   com/github/noamm9/features/impl/routes/SecretRoutes$EntriesMappings.class
+   123999  1980-02-01 00:00   com/github/noamm9/features/impl/routes/SecretRoutes.class
+      268  1980-02-01 00:00   secretroutes.mixins.json
+    22195  1980-02-01 00:00   assets/secretroutesmod/rooms.json
+    59664  1980-02-01 00:00   assets/secretroutesmod/secretlocations.json
+        0  1980-02-01 00:00   com/github/noamm9/features/impl/routes/
+{
+    "schemaVersion": 1,
+    "id": "noammaddons",
+    "version": "1.1.146",
+    "name": "Riftwalk",
+    "description": "Riftwalk for 26.2 - dungeon toolkit built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
+    "authors": [
+        "Noamm"
+    ],
+    "contact": {
+        "homepage": "https://github.com/Noamm9",
+        "sources": "https://github.com/Noamm9/NoammAddons",
+        "issues": "https://github.com/Noamm9/NoammAddons/issues"
+    },
+    "license": "CC0-1.0",
+    "icon": "assets/noammaddons/icon.png",
+    "environment": "*",
+    "entrypoints": {
+        "modmenu": [
+            "com.github.noamm9.ui.clickgui.ModMenuIntegration"
+        ],
+        "client": [
+            {
+                "value": "com.github.noamm9.NoammAddons",
+                "adapter": "kotlin"
+            },
+            "xyz.yourboykyle.secretroutes.Main"
+        ]
+    },
+    "mixins": [
+        "noammaddons.mixins.json",
+        "secretroutes.mixins.json"
+    ],
+    "accessWidener": "noammaddons.accesswidener",
+    "depends": {
+        "fabricloader": ">=0.19.5",
+        "minecraft": "26.2",
+        "java": ">=25",
+        "fabric-api": "*",
+        "fabric-language-kotlin": "*"
+    },
+    "suggests": {
+        "assistcore": "*",
+        "assistpath": "*"
+    },
+    "custom": {
+        "modmenu": {
+            "links": {
+                "Discord": "https://discord.com/invite/pj9mQGxMxB"
+            }
+        }
+    },
+    "jars": [
+        {
+            "file": "META-INF/jars/annotations-23.0.0.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlin-stdlib-2.3.21.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-coroutines-core-jvm-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-coroutines-slf4j-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-datetime-jvm-0.8.0-0.6.x-compat.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-io-bytestring-jvm-0.9.1.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-io-core-jvm-0.9.1.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-serialization-core-jvm-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-serialization-json-io-jvm-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-serialization-json-jvm-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/slf4j-api-2.0.19.jar"
+        }
+    ]
+}
