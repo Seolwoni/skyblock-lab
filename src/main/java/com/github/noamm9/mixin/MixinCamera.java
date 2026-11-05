@@ -19,6 +19,17 @@ import static com.github.noamm9.features.impl.misc.Camera.*;
 
 @Mixin(Camera.class)
 public abstract class MixinCamera {
+    /** Free Look: mark the camera lining up with its entity, so getViewYRot / getViewXRot give the free angles. */
+    @Inject(method = "alignWithEntity", at = @At("HEAD"))
+    private void riftwalk$freeLookStart(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        com.github.noamm9.features.impl.misc.FreeLook.aligning = true;
+    }
+
+    @Inject(method = "alignWithEntity", at = @At("RETURN"))
+    private void riftwalk$freeLookEnd(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        com.github.noamm9.features.impl.misc.FreeLook.aligning = false;
+    }
+
     //#if CHEAT
     @Redirect(method = "alignWithEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/LivingEntity;getAttributeValue(Lnet/minecraft/core/Holder;)D"))
     private double setCameraDistance(LivingEntity instance, Holder<Attribute> attribute) {

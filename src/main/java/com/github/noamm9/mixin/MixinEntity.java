@@ -24,6 +24,25 @@ public abstract class MixinEntity implements IGlowingEntity {
     @Shadow
     public abstract float getYRot();
 
+    /** Free Look: the mouse turns the camera, not the player. */
+    @Inject(method = "turn", at = @At("HEAD"), cancellable = true)
+    private void riftwalk$freeLookTurn(double dx, double dy, CallbackInfo ci) {
+        if ((Object) this == net.minecraft.client.Minecraft.getInstance().player && com.github.noamm9.features.impl.misc.FreeLook.turn(dx, dy)) ci.cancel();
+    }
+
+    /** Free Look: while the camera lines up with us, it reads the free angles. */
+    @Inject(method = "getViewYRot", at = @At("HEAD"), cancellable = true)
+    private void riftwalk$freeLookYaw(float partialTick, CallbackInfoReturnable<Float> cir) {
+        if (com.github.noamm9.features.impl.misc.FreeLook.aligning && com.github.noamm9.features.impl.misc.FreeLook.active && (Object) this == net.minecraft.client.Minecraft.getInstance().getCameraEntity())
+            cir.setReturnValue(com.github.noamm9.features.impl.misc.FreeLook.yaw);
+    }
+
+    @Inject(method = "getViewXRot", at = @At("HEAD"), cancellable = true)
+    private void riftwalk$freeLookPitch(float partialTick, CallbackInfoReturnable<Float> cir) {
+        if (com.github.noamm9.features.impl.misc.FreeLook.aligning && com.github.noamm9.features.impl.misc.FreeLook.active && (Object) this == net.minecraft.client.Minecraft.getInstance().getCameraEntity())
+            cir.setReturnValue(com.github.noamm9.features.impl.misc.FreeLook.pitch);
+    }
+
     @Inject(method = "getTeamColor", at = @At("HEAD"), cancellable = true)
     private void onGetTeamColorValue(CallbackInfoReturnable<Integer> cir) {
         if (noammaddons$isGlowing() && !Box3D.INSTANCE.enabled) {
