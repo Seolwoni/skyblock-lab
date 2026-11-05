@@ -302,9 +302,17 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
     val hype = hypeSlot?.takeIf { ! blastBlocked && com.github.noamm9.utils.ManaGuard.canCast(manaCost.value) }
     if (hypeSlot != null && hype == null) {
         hold(hypeSlot)
-        if (tickCount - noManaLoggedAt > 100) { // why it's swinging instead of casting, at most every 5 s
+        val why = if (blastBlocked) "no safe blast here" else "not enough mana (${com.github.noamm9.utils.ManaGuard.mana ?: "?"}/${manaCost.value})"
+        if (tickCount - noManaLoggedAt > 100) { // at most every 5 s
             noManaLoggedAt = tickCount
-            journal.log("hyperion: ${if (blastBlocked) "no safe blast here" else "not enough mana (${com.github.noamm9.utils.ManaGuard.mana ?: "?"}/${manaCost.value})"} - swinging it")
+            journal.log("hyperion: $why - ${if (hypeMelee.value) "swinging it" else "waiting"}")
+        }
+        // no sword swings with the Hyperion: wait for the mana (the rod stays in, Pause Below Mana holds new casts)
+        if (! hypeMelee.value) {
+            stopWalking()
+            status = if (blastBlocked) "no safe blast here, waiting" else "waiting for mana (${com.github.noamm9.utils.ManaGuard.mana ?: "?"}/${manaCost.value})"
+            if (blastBlocked && tickCount % 40 == 0) blastBlocked = false // the spot may be fine again (we moved, it moved)
+            return
         }
     }
     val reach = if (hype != null) blastRange.value else 3.2
