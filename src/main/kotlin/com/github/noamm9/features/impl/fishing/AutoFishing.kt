@@ -383,6 +383,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             }
         }
         register<MainThreadPacketReceivedEvent.Pre> {
+            // the server picking the held slot itself (it does after some menus / items): not you changing it
+            if (running && event.packet is net.minecraft.network.protocol.game.ClientboundSetHeldSlotPacket) serverSlotAt = tickCount
+        }
+        register<MainThreadPacketReceivedEvent.Pre> {
             if (! running || ! failsafe.value || ownMoveTicks > 0 || state == FishingState.RESUME) return@register
             val name = event.packet.javaClass.simpleName
             if (event.packet is ClientboundPlayerPositionPacket || name.contains("PlayerRotation")) mc.execute { if (running) failStop("the server moved or turned you") }

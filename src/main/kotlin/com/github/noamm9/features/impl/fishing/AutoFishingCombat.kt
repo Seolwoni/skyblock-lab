@@ -130,6 +130,7 @@ internal fun AutoFishing.claimCompanions(p: LocalPlayer, around: List<Mob>) {
     while (deaths.isNotEmpty() && tickCount - deaths.first().first > 30) deaths.removeFirst()
     for (e in around) {
         if (e.id in mine) continue
+        if (tagOf(e) == null) continue // no SkyBlock name tag: a plain mob of the island (e.g. a vanilla magma cube), never a catch
         val first = seenAt[e.id] ?: continue
         if (tickCount - first > 40) continue
         val at = seenPos[e.id] ?: continue

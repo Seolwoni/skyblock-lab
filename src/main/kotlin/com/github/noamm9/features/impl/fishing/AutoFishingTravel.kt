@@ -291,7 +291,15 @@ internal fun AutoFishing.walkPath(p: LocalPlayer) {
     if (goalNow != null) {
         val d = horizontalDist(p.position(), goalNow)
         if (d < walkBest - 0.5) { walkBest = d; walkNoProgress = 0 }
-        else if (++walkNoProgress > 60) {
+        else if (++walkNoProgress > 60 && d < 3.5 && walkReplans >= 2) {
+            // a few blocks off the spot and re-planning keeps failing (log: 4x "2.8 left"): fish from here
+            journal.log("stuck ${"%.1f".format(d)} from the spot (height ${"%.1f".format(p.y - goalNow.y)}), fishing from here")
+            walkNoProgress = 0; walkReplans = 0
+            stopWalking(); path = emptyList()
+            arrive(p)
+            return
+        }
+        else if (walkNoProgress > 60) {
             journal.log("no progress for 3 s (${"%.1f".format(d)} left), planning again")
             walkNoProgress = 0; walkBest = Double.MAX_VALUE
             stopWalking(); repath = 0; path = emptyList()

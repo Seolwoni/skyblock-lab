@@ -156,7 +156,13 @@ internal fun AutoFishing.tick() {
     if (failsafe.value && stopOnStaff.value && tickCount % 20 == 0) staffNearby(p)?.let { return failStop("staff nearby: $it") }
     timing.tick()
     if (failsafe.value) {
-        if (expectedSlot >= 0 && p.inventory.selectedSlot != expectedSlot) return failStop("your held item was changed")
+        if (expectedSlot >= 0 && p.inventory.selectedSlot != expectedSlot) {
+            if (tickCount - serverSlotAt <= 3) { // the server switched it: take that as ours and carry on
+                journal.log("the server switched the held slot ${expectedSlot + 1} -> ${p.inventory.selectedSlot + 1}")
+                expectedSlot = p.inventory.selectedSlot
+            }
+            else return failStop("your held item was changed (slot ${expectedSlot + 1} -> ${p.inventory.selectedSlot + 1})")
+        }
         val sc = mc.gui.screen()
         if (sc is AbstractContainerScreen<*> && sc !is InventoryScreen && state != FishingState.SELL && ownMoveTicks <= 0) return failStop("a menu opened by itself (${sc.title.string})")
     }

@@ -93,6 +93,18 @@ internal fun AutoFishing.nearestFluid(p: LocalPlayer, radius: Int): Vec3? {
 }
 
 /** Where to fish when nothing better is known: here if we're looking at it, else walk to the nearest pool. */
+/** Our feet on the ground: the block centre under us, dropping to the first solid block when we're in the air (max 6). */
+internal fun AutoFishing.groundSpot(p: LocalPlayer): Vec3 {
+    val lvl = p.level()
+    var b = BlockPos.containing(p.position())
+    if (! p.onGround()) for (i in 0 until 6) {
+        val below = b.below()
+        if (! lvl.getBlockState(below).getCollisionShape(lvl, below).isEmpty) break
+        b = below
+    }
+    return Vec3.atBottomCenterOf(b)
+}
+
 internal fun AutoFishing.goToFluid(p: LocalPlayer) {
     val here = lookingAtFluid(p)
     // looking at it from high up: walk down to a spot just above it first (creatures can't reach a high ledge)
@@ -110,7 +122,7 @@ internal fun AutoFishing.goToFluid(p: LocalPlayer) {
         }
     }
     if (here != null) {
-        stand = Vec3.atBottomCenterOf(BlockPos.containing(p.position()))
+        stand = groundSpot(p)
         fishTarget = here
         aimAtPoint(p, here)
         state = FishingState.CAST
@@ -120,7 +132,7 @@ internal fun AutoFishing.goToFluid(p: LocalPlayer) {
     val pool = nearestFluid(p, spotSearch.value)
     val spot = pool?.let { shoreSpot(p, it) }
     if (pool == null || spot == null) {
-        stand = Vec3.atBottomCenterOf(BlockPos.containing(p.position()))
+        stand = groundSpot(p)
         fishTarget = null
         state = FishingState.CAST
         info("&7No ${fluidName()} found within ${spotSearch.value} blocks - casting where you look.")
