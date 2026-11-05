@@ -29,6 +29,26 @@ object PathMath {
     private val HEIGHTS = intArrayOf(0, 1, - 1, - 2, - 3)
 
     /**
+     * The blocks one walking step from [from], in search order, with their step cost (1 straight, 1.414 diagonal,
+     * +0.5 for a height change, +6 next to lava). 8 directions, no corner cutting, up 1 / down 3, one height per direction.
+     */
+    fun walkNeighbours(from: P, world: World): List<Pair<P, Double>> {
+        val out = ArrayList<Pair<P, Double>>(8)
+        for ((dx, dz) in DIRS) {
+            for (dy in HEIGHTS) {
+                val n = from.offset(dx, dy, dz)
+                if (! world.standable(n)) continue
+                if (dx != 0 && dz != 0 && (! world.standable(from.offset(dx, 0, 0)) || ! world.standable(from.offset(0, 0, dz)))) continue
+                if (dy == 1 && ! world.headroom(from)) continue
+                if (world.nearLava(n, 0)) continue
+                out += n to (if (dx != 0 && dz != 0) 1.414 else 1.0) + (if (dy != 0) 0.5 else 0.0) + (if (world.nearLava(n, 1)) 6.0 else 0.0)
+                break // one height per direction (the first that fits)
+            }
+        }
+        return out
+    }
+
+    /**
      * A* over standable blocks: never steps into or next to lava, keeps a block's distance from lava when it can,
      * 8 directions (no corner cutting), up 1 / down 3. Null when there's no path within [maxExpand] nodes or
      * the goal is more than [maxManhattan] away.
@@ -53,21 +73,12 @@ object PathMath {
                 return out
             }
             if (cur.g > (best[cur.pos] ?: Double.MAX_VALUE)) continue
-            for ((dx, dz) in DIRS) {
-                for (dy in HEIGHTS) {
-                    val n = cur.pos.offset(dx, dy, dz)
-                    if (! world.standable(n)) continue
-                    if (dx != 0 && dz != 0 && (! world.standable(cur.pos.offset(dx, 0, 0)) || ! world.standable(cur.pos.offset(0, 0, dz)))) continue
-                    if (dy == 1 && ! world.headroom(cur.pos)) continue
-                    if (world.nearLava(n, 0)) continue
-                    val step = (if (dx != 0 && dz != 0) 1.414 else 1.0) + (if (dy != 0) 0.5 else 0.0) + (if (world.nearLava(n, 1)) 6.0 else 0.0)
-                    val g = cur.g + step
-                    if (g < (best[n] ?: Double.MAX_VALUE)) {
-                        best[n] = g
-                        came[n] = cur.pos
-                        open += N(n, g, g + h(n))
-                    }
-                    break // one height per direction (the first that fits)
+            for ((n, step) in walkNeighbours(cur.pos, world)) {
+                val g = cur.g + step
+                if (g < (best[n] ?: Double.MAX_VALUE)) {
+                    best[n] = g
+                    came[n] = cur.pos
+                    open += N(n, g, g + h(n))
                 }
             }
         }

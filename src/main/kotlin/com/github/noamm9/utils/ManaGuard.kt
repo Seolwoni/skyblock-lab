@@ -27,6 +27,9 @@ object ManaGuard: ISelfInit {
     /** Current mana, or null when the action bar hasn't shown it lately. */
     val mana: Int? get() = ActionBarParser.currentMana.takeIf { fresh }
 
+    /** Maximum mana, or null when the action bar hasn't shown it lately. */
+    val max: Int? get() = ActionBarParser.maxMana.takeIf { fresh }
+
     /** Mana as 0..1 of the maximum, or null when unknown. */
     val fraction: Float? get() = if (fresh) ActionBarParser.currentMana / ActionBarParser.maxMana.toFloat() else null
 
