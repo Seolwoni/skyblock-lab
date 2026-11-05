@@ -150,6 +150,7 @@ interface FishingVars {
     var fightMobs: List<LivingEntity>
     var hypeFrom: Vec3?
     var heightWarned: Boolean
+    var noManaLoggedAt: Int
     var healthWaiting: Boolean
     var serverSlotAt: Int
     var biteAt: Vec3?
@@ -339,6 +340,7 @@ class FishingVarsImpl : FishingVars {
     override var lastLoggedState: FishingState? = null
     override var serverSlotAt: Int = - 1000 // tick the server last set the held slot
     override var healthWaiting: Boolean = false // below Low Health: no casts until Resume At
+    override var noManaLoggedAt: Int = - 1000
     override var heightWarned: Boolean = false // told once per session that ours are below the Hyperion's reach
     override var hypeFrom: Vec3? = null // where the last Hyperion cast was fired from (journal: where it took us)
     override var fightMobs: List<LivingEntity> = emptyList() // sea creatures the shared check picked this tick (FIGHT handler)

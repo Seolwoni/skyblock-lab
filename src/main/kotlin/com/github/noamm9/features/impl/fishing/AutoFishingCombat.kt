@@ -300,7 +300,13 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
     val hypeSlot = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
     // no mana: the Hyperion is still a sword, swing it instead of standing there
     val hype = hypeSlot?.takeIf { ! blastBlocked && com.github.noamm9.utils.ManaGuard.canCast(manaCost.value) }
-    if (hypeSlot != null && hype == null) hold(hypeSlot)
+    if (hypeSlot != null && hype == null) {
+        hold(hypeSlot)
+        if (tickCount - noManaLoggedAt > 100) { // why it's swinging instead of casting, at most every 5 s
+            noManaLoggedAt = tickCount
+            journal.log("hyperion: ${if (blastBlocked) "no safe blast here" else "not enough mana (${com.github.noamm9.utils.ManaGuard.mana ?: "?"}/${manaCost.value})"} - swinging it")
+        }
+    }
     val reach = if (hype != null) blastRange.value else 3.2
     // a creature that's in reach but never loses health (out of the blast, immune, already dead): leave it
     val inReachLimit = maxOf(giveUp.value * 20 * 2, 200)
@@ -395,7 +401,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 }
                 if (clickMissed()) return
                 ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
-                journal.log("hyperion  pitch=${"%.1f".format(p.xRot)}  at=${"%.2f,%.2f,%.2f".format(p.x, p.y, p.z)}  lavaNear=${lavaAround(p)}")
+                journal.log("hyperion  pitch=${"%.1f".format(p.xRot)}  at=${"%.2f,%.2f,%.2f".format(p.x, p.y, p.z)}  lavaNear=${lavaAround(p)}  mana=${com.github.noamm9.utils.ManaGuard.mana ?: "?"}")
                 hypeFrom = p.position()
                 TravelBlink.fire(p)
                 hitCooldown = clickGap(hypeDelay.value)
