@@ -187,4 +187,40 @@ object TravelMath {
         if (t == last && t == beforeLast) t = if (t < max && (t == min || rnd.nextBoolean())) t + 1 else t - 1
         return t
     }
+
+    // ---- etherwarp spots (overlay)
+
+    /** A place an etherwarp could put you: the feet spot on top of the block a look hits, and whether it works. */
+    data class Candidate(val feet: P, val why: Why, val dist: Double)
+
+    /**
+     * Candidates around a look: rays in a [cone]-degree square around yaw / pitch every [step] degrees, each to the first
+     * solid block within [range] + [extra] (the extra marks spots just out of range). One candidate per spot (closest
+     * ray kept), sorted by [sortCandidates].
+     */
+    fun etherwarpCandidates(ex: Double, ey: Double, ez: Double, yaw: Double, pitch: Double, range: Int, b: Blocks, cone: Double = 6.0, step: Double = 3.0, extra: Int = 20, air: Int = 2): List<Candidate> {
+        val best = HashMap<P, Candidate>()
+        val n = if (step <= 0) 0 else (cone / step).toInt()
+        for (i in - n .. n) for (j in - n .. n) {
+            val pp = (pitch + j * step).coerceIn(- 90.0, 90.0)
+            val hit = raycastSolid(ex, ey, ez, look(yaw + i * step, pp), (range + extra).toDouble(), b) ?: continue
+            val feet = hit.block.offset(0, 1, 0)
+            val why = if (hit.dist > range) Why.RANGE else landingReason(feet, b, air)
+            val c = Candidate(feet, why, hit.dist)
+            val old = best[feet]
+            if (old == null || c.dist < old.dist) best[feet] = c
+        }
+        return sortCandidates(best.values.toList())
+    }
+
+    private val ORDER = compareBy<Candidate>({ it.why != Why.OK }, { it.dist }, { it.feet.x }, { it.feet.y }, { it.feet.z })
+
+    /** Usable ones first, then by distance (ties by position, so the order never flickers). */
+    fun sortCandidates(list: List<Candidate>): List<Candidate> = list.sortedWith(ORDER)
+
+    /** The closest usable candidate, or null when there is none. */
+    fun nearestValid(list: List<Candidate>): Candidate? = list.filter { it.why == Why.OK }.minWithOrNull(ORDER)
+
+    /** Fade-in share (0..1) [sinceMs] after a change, over [durationMs]. */
+    fun fade(sinceMs: Long, durationMs: Long): Float = if (durationMs <= 0) 1f else (sinceMs.toFloat() / durationMs).coerceIn(0f, 1f)
 }
