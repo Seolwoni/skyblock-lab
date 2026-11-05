@@ -134,23 +134,37 @@ internal fun AutoFishing.blastSafe(p: LocalPlayer, yaw: Float, pitch: Float): Bo
     val look = Vec3.directionFromRotation(pitch, yaw)
     val eyeH = p.eyeHeight.toDouble()
     fun solid(b: BlockPos) = ! lvl.getBlockState(b).getCollisionShape(lvl, b).isEmpty
-    var end = p.position()
-    var d = 0.25
-    while (d <= 10.0) {
-        val feet = p.eyePosition.add(look.scale(d)).subtract(0.0, eyeH, 0.0)
-        val bp = BlockPos.containing(feet)
-        if (solid(bp) || solid(bp.above())) break
-        end = feet
-        d += 0.25
+    fun lava(b: BlockPos) = lvl.getFluidState(b).`is`(FluidTags.LAVA)
+    // the whole body, not just its middle: the centre and the four corners of the hitbox must all end up safe
+    fun safeFrom(ox: Double, oz: Double): Boolean {
+        val eye = p.eyePosition.add(ox, 0.0, oz)
+        var end = p.position().add(ox, 0.0, oz)
+        var d = 0.25
+        while (d <= 10.0) {
+            val feet = eye.add(look.scale(d)).subtract(0.0, eyeH, 0.0)
+            val bp = BlockPos.containing(feet)
+            if (solid(bp) || solid(bp.above())) break
+            end = feet
+            d += 0.25
+        }
+        val at = BlockPos.containing(end)
+        if (lava(at) || lava(at.above())) return false
+        for (dy in 1 .. 4) {
+            val b = at.below(dy - 1).below()
+            if (lava(b)) return false
+            if (solid(b)) return true
+        }
+        return false // nothing under us: we'd fall
     }
-    val at = BlockPos.containing(end)
-    if (lvl.getFluidState(at).`is`(FluidTags.LAVA) || lvl.getFluidState(at.above()).`is`(FluidTags.LAVA)) return false
-    for (dy in 1 .. 4) {
-        val b = at.below(dy - 1).below()
-        if (lvl.getFluidState(b).`is`(FluidTags.LAVA)) return false
-        if (solid(b)) return true
-    }
-    return false // nothing under us: we'd fall
+    val r = p.bbWidth / 2.0 - 0.01
+    return safeFrom(0.0, 0.0) && safeFrom(r, r) && safeFrom(r, - r) && safeFrom(- r, r) && safeFrom(- r, - r)
+}
+
+/** Lava within 2 blocks around (and up to 2 below) the feet: then the Hyperion only ever goes straight down. */
+internal fun AutoFishing.lavaAround(p: LocalPlayer): Boolean {
+    val at = BlockPos.containing(p.position())
+    for (dx in - 2 .. 2) for (dz in - 2 .. 2) for (dy in - 2 .. 0) if (isLava(at.offset(dx, dy, dz))) return true
+    return false
 }
 
 

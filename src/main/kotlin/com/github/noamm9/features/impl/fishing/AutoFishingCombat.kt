@@ -325,7 +325,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
         // quick kill: it's on its way - Hyperion out and looking down already, so it goes off the moment it's in reach
         if (quickKill.value && hype != null && p.distanceTo(far) < 14f && (blastSafe(p, p.yRot, 90f) || centered(p))) {
             if (castDownPitch == 0f) castDownPitch = 80f + RANDOM.nextFloat() * 9f
-            if (! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
+            if (lavaAround(p) || ! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
             if (turn(p, p.yRot, castDownPitch, 3f)) {
                 if (p.inventory.selectedSlot != hype) { hold(hype); hypeBeat = delay(1, 4) }
                 hypeStage = 2
@@ -353,7 +353,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
             }
             1 -> { // then look down so the blast covers everything around us
                 if (castDownPitch == 0f) castDownPitch = 78f + RANDOM.nextFloat() * 11f
-                if (! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
+                if (lavaAround(p) || ! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
                 if (! turn(p, p.yRot, castDownPitch, 3f)) return
                 val swapped = p.inventory.selectedSlot != hype
                 hold(hype) // the Hyperion comes out once we're looking down
@@ -362,6 +362,8 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
             }
             else -> { // cast; between casts keep looking down, each cast a little different
                 if (hitCooldown > 0) return
+                // next to lava: straight down only, whatever the pitch drifted to
+                if (lavaAround(p) && abs(p.xRot - 90f) > 0.5f) { castDownPitch = 90f; hypeStage = 1; return }
                 if (! blastSafe(p, p.yRot, p.xRot)) { // this look would teleport us off the edge: straight down instead
                     castDownPitch = 90f
                     if (abs(p.xRot - 90f) > 0.5f) { hypeStage = 1; return }
@@ -388,9 +390,11 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 }
                 if (clickMissed()) return
                 ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
+                journal.log("hyperion  pitch=${"%.1f".format(p.xRot)}  at=${"%.2f,%.2f,%.2f".format(p.x, p.y, p.z)}  lavaNear=${lavaAround(p)}")
+                hypeFrom = p.position()
                 TravelBlink.fire(p)
                 hitCooldown = clickGap(hitDelay.value)
-                castDownPitch = (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
+                castDownPitch = if (lavaAround(p)) 90f else (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
                 if (abs(castDownPitch - p.xRot) > 1.5f) {
                     // keep casting: drift the view to the new pitch in place instead of restarting the sequence
                     com.github.noamm9.utils.Humanize.glide(p, p.yRot, castDownPitch)

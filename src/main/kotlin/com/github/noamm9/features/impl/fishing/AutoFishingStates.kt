@@ -163,6 +163,11 @@ internal fun AutoFishing.tick() {
 
     tickCount++
     if (! p.isInLava && ! p.isInWater && p.onGround()) { lastSafe = p.position(); lavaTicks = 0 }
+    hypeFrom?.let { from -> // the tick after a Hyperion cast: write down where it took us
+        hypeFrom = null
+        val moved = from.distanceTo(p.position())
+        if (moved > 0.6 || p.isInLava) journal.log("hyperion moved ${"%.2f".format(moved)}  to=${"%.2f,%.2f,%.2f".format(p.x, p.y, p.z)}${if (p.isInLava) "  IN LAVA" else ""}")
+    }
     if (p.isInLava) return escapeLava(p)
 
     if (state == FishingState.FIND || state == FishingState.TRAVEL || state == FishingState.SELL) return FishingStates.of(state).tick(p)
