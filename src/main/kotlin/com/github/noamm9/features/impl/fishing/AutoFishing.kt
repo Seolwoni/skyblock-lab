@@ -788,9 +788,12 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         return lastClickGap
     }
 
-    /** True when this attack click doesn't go through (Click Miss); tried again after a short gap. */
-    internal fun clickMissed(): Boolean {
-        if (! com.github.noamm9.utils.HumanMotion.chance(com.github.noamm9.features.impl.general.HumanBehaviour.clickMiss.value, RANDOM)) return false
+    /** The profile for attack clicks: Human Behaviour's, with Click Miss as its failure rate. */
+    internal fun clickProfile() = com.github.noamm9.utils.Humanize.profile().copy(failRate = com.github.noamm9.features.impl.general.HumanBehaviour.clickMiss.value / 100.0)
+
+    /** True when this attack click doesn't go through ([profile]'s failure rate); tried again after a short gap. */
+    internal fun clickMissed(profile: com.github.noamm9.utils.HumanProfile = clickProfile()): Boolean {
+        if (! com.github.noamm9.utils.HumanMotion.chance(profile.failRate * 100, RANDOM)) return false
         hitCooldown = com.github.noamm9.utils.HumanMotion.between(1, 3, RANDOM)
         journal.log("click miss")
         return true

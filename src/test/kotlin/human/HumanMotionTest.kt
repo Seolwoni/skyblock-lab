@@ -148,4 +148,28 @@ class HumanMotionTest {
         assertTrue(xs.all { it >= 1 })
         assertTrue(xs.toSet().size >= 8, "too few distinct gaps")
     }
+
+    // ---- seed reproducibility: the same seed gives the same sequence
+
+    private fun run(seed: Long): List<Double> {
+        val r = Random(seed)
+        val out = ArrayList<Double>()
+        var w = 0f; var c = 0.0; var last = -1
+        repeat(500) {
+            w = HumanMotion.walk(w, 0.5f, 3f, r); out += w.toDouble()
+            out += HumanMotion.overshoot(40f, 0.1f, 0.3f, r).toDouble()
+            out += HumanMotion.faceOffset(0.12, r).toList()
+            out += HumanMotion.turnStep(4f, 0.4, 0.08, r).toDouble()
+            c = HumanMotion.carried(c, 0.6, 0.3, r); out += c
+            last = HumanMotion.clickInterval(5.0, 0.45, r, last); out += last.toDouble()
+            out += HumanMotion.between(3, 9, r).toDouble()
+            out += if (HumanMotion.chance(5.0, r)) 1.0 else 0.0
+        }
+        return out
+    }
+
+    @Test fun sameSeedSameSequence() {
+        assertEquals(run(1234), run(1234))
+        assertTrue(run(1234) != run(1235))
+    }
 }
