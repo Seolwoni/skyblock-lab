@@ -18,6 +18,7 @@
 | 던전: 문 열기·키 줍기 클릭 주기 (`% 4`, `% 5` 고정) | 남음 | `AutoDungeon.kt:284`, `:313` |
 | 퍼즐 (Auto Puzzles): 걷기 도착 오프셋(축당 최대 0.12, 같은 블록 유지), 스프린트 지연 | 구현 | `AutoPuzzles.walk` |
 | 시선 직접 대입 (네 파일) | 없음 (전부 `Humanize` 경유) | - |
+| 텔레포트 이동 (AOTE / AOTV / 이더워프, TRAVEL에서만): 발동 전 정지, 슬롯 전환 지연, 매번 새 조준 오차, 조준 유지, 착지 후 정착, 연속 간격, 실패 분류·재시도·간선 강등 | 구현 (기본 꺼짐, 실서버 미검증) | `TravelBlink.kt`, `TravelPlanner.kt`, `TravelMath.kt`, `TravelFail.kt` |
 
 ## 수치 (전부 설정값)
 
@@ -35,5 +36,9 @@
 | 재계산 주기 | 10틱 ±30% (막힘 점프·Assist 전환 기준도 같은 분산) | Re-path Every / Re-path Spread |
 | 스프린트 지연 | 1-3틱 | Sprint Delay Min / Max |
 | 정지 시 시선 | 랜덤워크 ±2°, 걸음 0.3° (걷기 피치도 같음) | Idle Drift / Idle Step |
+| 텔레포트 조준 오차 | 크기 로그정규 중앙값 1.5°, σ 0.42 (P99 약 4°), 방향 랜덤, 매번 새로 | Auto Fishing › Teleport › Teleport Aim Error / Spread |
+| 텔레포트 연속 간격 | 로그정규 중앙값 3틱, σ 0.5, 같은 간격 3연속 금지 | Teleport Gap / Gap Spread |
+| 텔레포트 단계 지연 | 정지 1-2, 슬롯 1-2, 조준 유지 1-2, 착지 정착 2-5틱 (정수 틱: sub-tick은 범위 밖) | Stop Before / Item Swap / Aim Hold / Settle After |
+| 마나 | 예약분 300 밑이면 걷기, 비용 = 이동 틱 + 마나 회복 틱 × 가중치 + 소울플로우 × 40 | Mana Reserve / Mana Weight |
 
 순수 수학: `utils/HumanMotion.kt`, `utils/WatchSigns.kt` ↔ `src/test/kotlin/human/HumanMotionTest.kt`, `WatchSignsTest.kt`.

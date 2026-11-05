@@ -138,6 +138,24 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val hotspotRange by SliderSetting("Search Range", 200, 16, 400, 8, " blocks").withDescription("How far it looks for a Hotspot. Hotspots seen earlier are remembered for 3 minutes, even after they're out of sight")
     internal val useEther by ToggleSetting("Etherwarp On The Way", true).withDescription("Plans etherwarps (and AOTV hops) to get to far or high spots, checking where each one lands, like Secret Routes does")
     internal val showRoute by ToggleSetting("Show Route", true).withDescription("Draws the planned walk and the next etherwarp / AOTV landing in the world")
+    internal val tpAote by ToggleSetting("Use AOTE", false).section("Teleport").withDescription("Plans blinks with the Aspect of the End on the way to a spot (8 blocks, 50 mana). Only while travelling")
+    internal val tpAotv by ToggleSetting("Use AOTV", false).withDescription("Plans blinks with the Aspect of the Void (8 blocks, 45 mana)")
+    internal val tpEther by ToggleSetting("Use Etherwarp", false).withDescription("Plans etherwarps (AOTV with Etherwarp Conduit, up to 61 blocks onto a block; needs soulflow, read from the tab list)")
+    internal val tpMaxChain by SliderSetting("Max Teleports In A Row", 3, 1, 8, 1).showIf { tpAote.value || tpAotv.value || tpEther.value }
+    internal val tpManaReserve by SliderSetting("Mana Reserve", 300, 0, 3000, 50).showIf { tpAote.value || tpAotv.value || tpEther.value }.withDescription("Mana kept for fighting: below it, travel walks")
+    internal val tpManaWeight by SliderSetting("Mana Weight", 1.0, 0.0, 5.0, 0.1, "x").showIf { tpAote.value || tpAotv.value || tpEther.value }.withDescription("How much spent mana counts against a teleport, per tick of mana regen it takes back (1 = one tick)")
+    internal val tpAimMedian by SliderSetting("Teleport Aim Error", 1.5, 0.0, 5.0, 0.1, "°").showIf { tpAote.value || tpAotv.value || tpEther.value }.withDescription("Typical aim error of a teleport (a fresh one each time); coming down a bit short is normal")
+    internal val tpAimSpread by SliderSetting("Teleport Aim Spread", 0.42, 0.0, 1.0, 0.02).showIf { tpAote.value || tpAotv.value || tpEther.value }.withDescription("Log-normal sigma of that error (0.42 with 1.5 gives about 4 degrees at P99)")
+    internal val tpGapMedian by SliderSetting("Teleport Gap", 3.0, 1.0, 10.0, 0.5, " ticks").showIf { tpAote.value || tpAotv.value || tpEther.value }.withDescription("Typical gap between two teleports in a row (log-normal, never the same three times)")
+    internal val tpGapSpread by SliderSetting("Teleport Gap Spread", 0.5, 0.0, 1.2, 0.05).showIf { tpAote.value || tpAotv.value || tpEther.value }
+    internal val tpPauseMin by SliderSetting("Stop Before Min", 1, 0, 5, 1, " ticks").showIf { tpAote.value || tpAotv.value || tpEther.value }.withDescription("Standing still before a teleport")
+    internal val tpPauseMax by SliderSetting("Stop Before Max", 2, 0, 8, 1, " ticks").showIf { tpAote.value || tpAotv.value || tpEther.value }
+    internal val tpSwapMin by SliderSetting("Item Swap Min", 1, 0, 5, 1, " ticks").showIf { tpAote.value || tpAotv.value || tpEther.value }.withDescription("Delay of the item swap, and of swapping back after landing")
+    internal val tpSwapMax by SliderSetting("Item Swap Max", 2, 0, 8, 1, " ticks").showIf { tpAote.value || tpAotv.value || tpEther.value }
+    internal val tpHoldMin by SliderSetting("Aim Hold Min", 1, 0, 5, 1, " ticks").showIf { tpAote.value || tpAotv.value || tpEther.value }.withDescription("Waiting on the aim before using the item")
+    internal val tpHoldMax by SliderSetting("Aim Hold Max", 2, 0, 8, 1, " ticks").showIf { tpAote.value || tpAotv.value || tpEther.value }
+    internal val tpSettleMin by SliderSetting("Settle After Min", 2, 0, 10, 1, " ticks").showIf { tpAote.value || tpAotv.value || tpEther.value }.withDescription("After landing, the view stays put this long before turning to what's next")
+    internal val tpSettleMax by SliderSetting("Settle After Max", 5, 0, 15, 1, " ticks").showIf { tpAote.value || tpAotv.value || tpEther.value }
     internal val hotspotRadius by SliderSetting("Hotspot Size", 2.5, 1.0, 6.0, 0.5, " blocks").withDescription("How close to the Hotspot's centre the hook has to land; it adjusts the aim until it does")
     internal val stayHome by ToggleSetting("Return To Spot", true).withDescription("Walks back to the fishing spot if you get pushed away from it")
 
@@ -387,6 +405,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         timing = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
         lastLookYaw = null
         lastTickPos = null; lastTickLevel = null; lastTickPlayer = null
+        TravelBlink.reset()
         reelTiming = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
         castYawSeries = 0.0; castPitchSeries = 0.0; lastClickGap = - 1
         wobYaw = 0f; wobPitch = 0f

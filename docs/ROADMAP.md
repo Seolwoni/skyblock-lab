@@ -21,8 +21,14 @@ Done:
 - Auto sell, long breaks, session goals, reboot comeback, session report, Discord webhook.
 - Fishing Check button, fishing.log journal, unit tests in CI.
 
+- Teleport travel (in code, not tried on a server yet): AOTE / AOTV blinks and etherwarps planned into the route
+  (TravelPlanner on a worker thread, 8 ms budget, mana reserve, soulflow, last 2–3 blocks walked), carried out by
+  TravelBlink (stop, item swap, aim with a fresh error, hold, use, settle, swap back), failures in TravelFail
+  (miss → one retry at half the error → walk; rubberband / two fails → edge off for the session). Off by default.
+
 Next:
 - Real-server runs → fix what fishing.log / session reports show (repeat 2–3 times).
+- Teleport travel on the server: landing accuracy, rubberbands, mana use; then decide the defaults.
 
 On hold:
 - Discord bot (remote /status /stop /start /screenshot /report). Webhook alerts are enough for now.

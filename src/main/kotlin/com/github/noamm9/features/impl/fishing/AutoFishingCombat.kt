@@ -388,7 +388,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 }
                 if (clickMissed()) return
                 ownMoveTicks = 20 // Wither Impact moves us: our doing, not the server's
-                use(p)
+                TravelBlink.fire(p)
                 hitCooldown = clickGap(hitDelay.value)
                 castDownPitch = (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
                 if (abs(castDownPitch - p.xRot) > 1.5f) {

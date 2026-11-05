@@ -240,8 +240,9 @@ internal object FindState : FishingStateHandler {
     override fun tick(player: LocalPlayer?) = with(AutoFishing) { findHotspot(player!!) }
 }
 
-/** TRAVEL: walk / hop to the spot. */
+/** TRAVEL: walk / hop / teleport to the spot. */
 internal object TravelState : FishingStateHandler {
+    override fun exit() = TravelBlink.abort()
     override fun tick(player: LocalPlayer?) = with(AutoFishing) { travel(player!!) }
 }
 

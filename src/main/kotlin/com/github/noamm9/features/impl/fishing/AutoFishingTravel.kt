@@ -157,6 +157,8 @@ internal fun AutoFishing.travel(p: LocalPlayer) {
         arrive(p)
         return
     }
+    // teleport travel (AOTE / AOTV / etherwarp planner): a teleport going on, or walking its walking legs
+    if (TravelBlink.travelTick(p, goal)) return
     // a hop in progress
     if (hop != null) return doHop(p)
     if (hopWait > 0) hopWait--
@@ -172,7 +174,7 @@ internal fun AutoFishing.travel(p: LocalPlayer) {
     }
     // far, high, or no walkable way: plan an etherwarp / AOTV hop, checking where it lands
     val needHop = path.isEmpty() || flat > 14 || rise > 3
-    if (useEther.value && needHop && hopWait <= 0 && p.onGround() && --planIn <= 0) {
+    if (useEther.value && ! TravelBlink.enabled() && needHop && hopWait <= 0 && p.onGround() && --planIn <= 0) {
         planIn = 6
         val walkable = path.isNotEmpty()
         if (! walkable || RANDOM.nextInt(100) >= walkSome.value) planHop(p, goal)?.let {
@@ -298,7 +300,7 @@ internal fun AutoFishing.walkPath(p: LocalPlayer) {
     }
 
     if (hopWait > 0) hopWait--
-    if (tryHop(p)) return
+    if (! TravelBlink.enabled() && tryHop(p)) return
 
     // steer at a point a few blocks further along the path (rounds the corners), the view gliding after it
     // every frame; falls back to the next node when cutting the corner would cross anything unsafe
