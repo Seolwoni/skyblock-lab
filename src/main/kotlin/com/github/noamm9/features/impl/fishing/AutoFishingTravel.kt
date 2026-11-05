@@ -70,7 +70,7 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
             scouting = true
             path = emptyList()
             travelStuck = 0
-            state = AutoFishing.State.TRAVEL
+            state = FishingState.TRAVEL
             info("&7Heading for a hotspot seen earlier &8(${p.position().distanceTo(far).toInt()} blocks)")
             return
         }
@@ -84,7 +84,7 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
                 scouting = true
                 path = emptyList()
                 travelStuck = 0
-                state = AutoFishing.State.TRAVEL
+                state = FishingState.TRAVEL
                 return
             }
         }
@@ -109,7 +109,7 @@ internal fun AutoFishing.findHotspot(p: LocalPlayer) {
     aimTries = 0
     travelStuck = 0
     path = emptyList()
-    state = AutoFishing.State.TRAVEL
+    state = FishingState.TRAVEL
     info("&7Hotspot found &8(${p.position().distanceTo(hs.position()).toInt()} blocks)&7, going there.")
 }
 
@@ -143,7 +143,7 @@ internal fun AutoFishing.shoreSpot(p: LocalPlayer, centre: Vec3): Vec3? {
 }
 
 internal fun AutoFishing.travel(p: LocalPlayer) {
-    val goal = stand ?: return run { state = AutoFishing.State.FIND }
+    val goal = stand ?: return run { state = FishingState.FIND }
     ownMoveTicks = 20 // our own walking / AOTV: not the server's doing
     expectedSlot = - 1
     val hd = horizontalDist(p.position(), goal)
@@ -190,7 +190,7 @@ internal fun AutoFishing.travel(p: LocalPlayer) {
             hotspot?.let { badHotspots += it.id }
             hotspot = null
             scouting = false
-            state = AutoFishing.State.FIND
+            state = FishingState.FIND
             status = "no safe way there"
         }
         else status = "planning a way there"
@@ -204,7 +204,7 @@ internal fun AutoFishing.arrive(p: LocalPlayer) {
     if (scouting) { // got near a remembered hotspot: look for it properly now
         scouting = false
         remembered.clear()
-        state = AutoFishing.State.FIND
+        state = FishingState.FIND
         return
     }
     val hs = hotspot
@@ -215,7 +215,7 @@ internal fun AutoFishing.arrive(p: LocalPlayer) {
     stand = Vec3.atBottomCenterOf(BlockPos.containing(p.position()))
     arrivedAt = tickCount
     returning = true
-    state = AutoFishing.State.CAST
+    state = FishingState.CAST
     wait = castWait()
     status = "at the spot"
 }

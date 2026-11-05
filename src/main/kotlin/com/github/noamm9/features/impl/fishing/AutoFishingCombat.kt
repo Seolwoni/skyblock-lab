@@ -36,6 +36,7 @@ import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.entity.projectile.FishingHook
 import net.minecraft.world.item.Items
 import net.minecraft.world.phys.Vec3
+import com.github.noamm9.config.types.TextInputSetting
 
 // Sea creatures: which ones are ours, the Hyperion and whip fights, and the smooth per-frame tracking.
 
@@ -263,9 +264,9 @@ internal fun AutoFishing.trackFrame() {
     trackLastNs = now
     val p = mc.player ?: return
     val e = track
-    if (running && state == AutoFishing.State.TRAVEL && walkSteer && hop == null) { steerFrame(p, dt); return }
-    walkSteer = walkSteer && state == AutoFishing.State.TRAVEL
-    if (! running || e == null || ! e.isAlive || state != AutoFishing.State.FIGHT) { trackVelYaw = 0f; trackVelPitch = 0f; return }
+    if (running && state == FishingState.TRAVEL && walkSteer && hop == null) { steerFrame(p, dt); return }
+    walkSteer = walkSteer && state == FishingState.TRAVEL
+    if (! running || e == null || ! e.isAlive || state != FishingState.FIGHT) { trackVelYaw = 0f; trackVelPitch = 0f; return }
     if (dt <= 0f) return
     val ms = System.currentTimeMillis()
     if (ms >= trackOffNext) { // pick a new spot on its body every 0.4-1.2 s
@@ -407,6 +408,41 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
     hitCooldown = clickGap(hitDelay.value)
     mc.gameMode?.attack(p, target)
     p.swing(InteractionHand.MAIN_HAND)
+}
+
+
+
+/** A Golden Fish is out: tell the player loudly (once a minute at most), and pause if they want to catch it themselves. */
+internal fun AutoFishing.onGoldenFish(how: String) {
+    if (goldenFish.value == 0 || tickCount - goldenSeenAt < 1200) return
+    goldenSeenAt = tickCount
+    journal.log("GOLDEN FISH  $how")
+    NotificationManager.push("Golden Fish!", "&6A Golden Fish is out &7($how)", 8000L)
+    com.github.noamm9.utils.ChatUtils.showTitle("§6§lGOLDEN FISH", "§fit's out - go get it")
+    repeat(3) { com.github.noamm9.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1f, 1.5f) }
+    if (goldenFish.value == 2) {
+        mc.player?.let { pl -> if (pl.fishing != null) rod()?.let { hold(it); use(pl) } }
+        stop("paused for the Golden Fish - start again when you've caught it")
+    }
+}
+
+
+/** How far our weapon reaches: the Hyperion blast, the whip, or a sword swing. */
+internal fun AutoFishing.fightReach(): Double {
+    val whip = WHIPS[weaponType.value]?.let { id -> PlayerUtils.findHotbarSlot { it.skyblockId == id } }
+    return when {
+        whip != null -> whipRange.value
+        hasHype() || PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES } != null -> blastRange.value
+        else -> 3.2
+    }
+}
+
+
+/** "1.2k" -> 1200.0, "3,400" -> 3400.0 */
+internal fun AutoFishing.parseShort(v: String): Double {
+    val t = v.replace(",", "")
+    val mult = when (t.lastOrNull()?.lowercaseChar()) { 'k' -> 1e3; 'm' -> 1e6; 'b' -> 1e9; else -> 1.0 }
+    return (t.trimEnd('k', 'K', 'm', 'M', 'b', 'B').toDoubleOrNull() ?: 0.0) * mult
 }
 
 //#endif

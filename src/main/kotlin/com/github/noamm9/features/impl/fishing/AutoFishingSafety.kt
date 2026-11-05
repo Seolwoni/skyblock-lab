@@ -36,6 +36,7 @@ import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.entity.projectile.FishingHook
 import net.minecraft.world.item.Items
 import net.minecraft.world.phys.Vec3
+import com.github.noamm9.config.types.TextInputSetting
 
 // Staying safe: standing in the middle of a safe block, Hyperion blasts that can't land in lava, getting out of lava.
 
@@ -67,7 +68,7 @@ internal fun AutoFishing.escapeLava(p: LocalPlayer) {
         failStop("fell into lava and couldn't get out")
         return
     }
-    state = AutoFishing.State.TRAVEL
+    state = FishingState.TRAVEL
     repath = 0
 }
 
@@ -150,6 +151,27 @@ internal fun AutoFishing.blastSafe(p: LocalPlayer, yaw: Float, pitch: Float): Bo
         if (solid(b)) return true
     }
     return false // nothing under us: we'd fall
+}
+
+
+
+/** "[TAG] name" of a player near us whose name carries a staff tag, or null. */
+internal fun AutoFishing.staffNearby(p: LocalPlayer): String? {
+    val tags = com.github.noamm9.utils.WatchSigns.parseTags(staffTags.value)
+    val r = staffRange.value.toDouble()
+    for (o in p.level().players()) {
+        if (o === p || o.distanceToSqr(p) > r * r) continue
+        val shown = o.displayName?.string ?: o.name.string
+        val tag = com.github.noamm9.utils.WatchSigns.staffTag(shown, tags)
+            ?: mc.connection?.getPlayerInfo(o.uuid)?.tabListDisplayName?.string?.let { com.github.noamm9.utils.WatchSigns.staffTag(it, tags) }
+        if (tag != null) return "[$tag] ${o.name.string}"
+    }
+    // name tags floating over players (servers often draw ranks as a separate text)
+    for ((_, text) in com.github.noamm9.utils.FloatingText.near(p.level(), p.boundingBox.inflate(r))) {
+        val tag = com.github.noamm9.utils.WatchSigns.staffTag(text, tags) ?: continue
+        if (Regex("\\[$tag\\+*] ?[A-Za-z0-9_]{1,16}", RegexOption.IGNORE_CASE).containsMatchIn(text.replace(Regex("§."), ""))) return text.replace(Regex("§."), "").take(40)
+    }
+    return null
 }
 
 //#endif

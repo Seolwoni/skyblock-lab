@@ -38,6 +38,7 @@ import net.minecraft.world.phys.Vec3
 
 import com.github.noamm9.utils.SkyblockText
 import com.github.noamm9.ui.notification.NotificationManager
+import com.github.noamm9.config.types.TextInputSetting
 
 // Starting anywhere (walk to the nearest water / lava or hotspot), coming back after a server reboot,
 // and the end-of-session report.
@@ -98,7 +99,7 @@ internal fun AutoFishing.goToFluid(p: LocalPlayer) {
         stand = Vec3.atBottomCenterOf(BlockPos.containing(p.position()))
         fishTarget = here
         aimAtPoint(p, here)
-        state = AutoFishing.State.CAST
+        state = FishingState.CAST
         status = "fishing where you look"
         return
     }
@@ -107,7 +108,7 @@ internal fun AutoFishing.goToFluid(p: LocalPlayer) {
     if (pool == null || spot == null) {
         stand = Vec3.atBottomCenterOf(BlockPos.containing(p.position()))
         fishTarget = null
-        state = AutoFishing.State.CAST
+        state = FishingState.CAST
         info("&7No ${fluidName()} found within ${spotSearch.value} blocks - casting where you look.")
         return
     }
@@ -115,7 +116,7 @@ internal fun AutoFishing.goToFluid(p: LocalPlayer) {
     stand = spot
     path = emptyList()
     travelStuck = 0
-    state = AutoFishing.State.TRAVEL
+    state = FishingState.TRAVEL
     info("&7Going to the ${if (mc.level?.getFluidState(BlockPos.containing(pool))?.`is`(FluidTags.LAVA) == true) "lava" else "water"} &8(${p.position().distanceTo(pool).toInt()} blocks)")
 }
 
@@ -159,7 +160,7 @@ internal fun AutoFishing.rebootWindow() = resumeAfterReboot.value && System.curr
 
 /** Moved by the reboot: keep running, and come back. */
 internal fun AutoFishing.beginResume() {
-    state = AutoFishing.State.RESUME
+    state = FishingState.RESUME
     resumeStage = 0
     resumeWait = 100 + RANDOM.nextInt(300) // 5-20 s after the new world is in
     warpTries = 0
@@ -195,12 +196,12 @@ internal fun AutoFishing.resumeTick() {
     // on the island
     val spot = rebootSpot
     journal.log("back on ${area ?: "the island"}")
-    if (rebootHotspot && hotspots.value) state = AutoFishing.State.FIND
+    if (rebootHotspot && hotspots.value) state = FishingState.FIND
     else if (spot != null && spot.distanceTo(p.position()) < 250) {
         stand = spot
         path = emptyList()
         travelStuck = 0
-        state = AutoFishing.State.TRAVEL
+        state = FishingState.TRAVEL
     }
     else goToFluid(p)
     rebootAt = 0L
@@ -298,4 +299,90 @@ internal fun AutoFishing.sendLogs() {
         info(if (ok) "&aLogs sent to Discord." else "&cSending failed: $why")
     }
 }
+
+
+internal fun AutoFishing.stateLabel() = when (state) {
+    FishingState.FIND -> "Looking for a hotspot"
+    FishingState.TRAVEL -> "Travelling"
+    FishingState.CAST -> if (returning) "Re-aiming" else "Casting"
+    FishingState.WAIT_BITE -> "Waiting"
+    FishingState.REEL -> "Reeling"
+    FishingState.FIGHT -> "Attacking"
+    FishingState.SELL -> "Selling"
+    FishingState.BREAK -> "On a break"
+    FishingState.RESUME -> "Coming back"
+}
+
+
+internal fun AutoFishing.clock(ms: Long): String {
+    val s = (ms / 1000).coerceAtLeast(0)
+    return if (s >= 3600) "${s / 3600}h ${(s / 60) % 60}m" else if (s >= 60) "${s / 60}m ${s % 60}s" else "${s}s"
+}
+
+
+/** The status card: icon, state, kills per hour big, then sea creatures / session / per hour / next break. */
+internal fun AutoFishing.drawCard(ctx: net.minecraft.client.gui.GuiGraphicsExtractor, example: Boolean): Pair<Number, Number> {
+    val st = com.github.noamm9.ui.clickgui.components.settings.Style
+    val w = 150f
+    val stats = if (example) "SCC 21%  DHC 8%  Speed 120" else tabStats
+    val h = if (stats.isNotEmpty()) 104f else 92f
+    val now = System.currentTimeMillis()
+    val session = if (example) 754_000L else now - sessionStart
+    val hours = session / 3_600_000.0
+    val killsHr = if (example) 1_412 else if (hours > 0.003) (kills / hours).toInt() else 0
+    val label = if (example) "Waiting" else stateLabel()
+    val breakText = when {
+        example -> "21m 4s"
+        ! longBreaks.value -> "off"
+        state == FishingState.BREAK -> "now " + clock(breakUntil - now)
+        nextBreakAt > 0 -> clock(nextBreakAt - now)
+        else -> "-"
+    }
+    st.drawShadow(ctx, 0f, 0f, w, h, 6f, 0.6f)
+    st.roundRect(ctx, 0f, 0f, w, h, 6f, java.awt.Color(15, 11, 23, 225))
+    st.roundRect(ctx, 10f, 1f, w - 20f, 0.75f, 0.4f, java.awt.Color(255, 255, 255, 22))
+    // icon in an accent ring
+    st.roundRect(ctx, 7f, 7f, 18f, 18f, 9f, st.accentColor)
+    st.roundRect(ctx, 8.5f, 8.5f, 15f, 15f, 7.5f, java.awt.Color(15, 11, 23))
+    ctx.pose().pushMatrix()
+    ctx.pose().translate(10.5f, 10.5f)
+    ctx.pose().scale(11f / 64f, 11f / 64f)
+    with(com.github.noamm9.utils.render.Render2D) { ctx.drawTexture(fishIcon, 0, 0, 64, 64, st.accentColor) }
+    ctx.pose().popMatrix()
+    ctx.drawString("§lAuto Fishing", 30f, 8f, st.mix(st.accentColor, java.awt.Color.WHITE, 0.35f), shadow = false)
+    ctx.drawString(label, 30f, 17.5f, java.awt.Color(150, 140, 175), shadow = false, scale = 0.9f)
+
+    ctx.drawString("KILLS / HR", 8f, 32f, java.awt.Color(110, 100, 135), shadow = false, scale = 0.75f)
+    // the headline number, a size up
+    ctx.pose().pushMatrix()
+    ctx.pose().translate(8f, 39.5f)
+    ctx.pose().scale(1.55f, 1.55f)
+    st.drawTabular(ctx, "%,d".format(killsHr), 0f, 0f, java.awt.Color(230, 224, 245))
+    ctx.pose().popMatrix()
+    fun cell(title: String, value: String, x: Float, y: Float, right: Boolean) {
+        val tw = with(com.github.noamm9.utils.render.RenderHelper) { title.width() } * 0.7f
+        val vw = with(com.github.noamm9.utils.render.RenderHelper) { value.width() } * 0.9f
+        ctx.drawString(title, if (right) x - tw else x, y, java.awt.Color(110, 100, 135), shadow = false, scale = 0.7f)
+        ctx.drawString(value, if (right) x - vw else x, y + 7.5f, java.awt.Color(214, 206, 232), shadow = false, scale = 0.9f)
+    }
+    cell("SEA CREATURES", if (example) "38" else "$creaturesCaught", 8f, 55f, false)
+    cell("SESSION TIME", clock(session), w - 8f, 55f, true)
+    cell("KILLS", if (example) "36" else "$kills", 8f, 73f, false)
+    cell("NEXT BREAK", breakText, w - 8f, 73f, true)
+    if (stats.isNotEmpty()) {
+        st.roundRect(ctx, 8f, 91f, w - 16f, 0.5f, 0.25f, java.awt.Color(255, 255, 255, 18))
+        ctx.drawString(stats, 8f, 94f, java.awt.Color(150, 140, 175), shadow = false, scale = 0.7f)
+    }
+    return w to h
+}
+
+
+/** Sea Creature Chance / Double Hook Chance / Fishing Speed from the tab list's stat lines, if it shows them. */
+internal fun AutoFishing.readTabStats(): String = runCatching {
+    val lines = com.github.noamm9.utils.TabListUtils.getTabList().map { it.first.string.replace(Regex("§."), "").trim() }
+    fun stat(key: String) = lines.firstNotNullOfOrNull { Regex("$key:?\\s*([\\d.,]+%?)").find(it)?.groupValues?.get(1) }
+    listOfNotNull(stat("Sea Creature Chance")?.let { "SCC $it" }, stat("Double Hook Chance")?.let { "DHC $it" }, stat("Fishing Speed")?.let { "Speed $it" })
+        .joinToString("  ")
+}.getOrDefault("")
+
 //#endif

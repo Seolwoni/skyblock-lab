@@ -122,7 +122,7 @@ internal fun AutoFishing.sellDone(p: LocalPlayer, ok: Boolean, why: String?) {
     }
     expectedSlot = - 1
     rod()?.let { hold(it) }
-    state = AutoFishing.State.CAST
+    state = FishingState.CAST
     returning = true
     wait = castWait()
     status = if (ok) "sold junk ($sold so far)" else "couldn't sell"

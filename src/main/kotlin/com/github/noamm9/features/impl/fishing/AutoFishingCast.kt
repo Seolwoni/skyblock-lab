@@ -36,6 +36,7 @@ import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.entity.projectile.FishingHook
 import net.minecraft.world.item.Items
 import net.minecraft.world.phys.Vec3
+import com.github.noamm9.config.types.TextInputSetting
 
 // The cast: the throw solver (where the hook comes down), aiming at a Hotspot, and reading the hook (fluid, ground, bite).
 
@@ -222,6 +223,160 @@ internal fun AutoFishing.landedIn(p: LocalPlayer, hook: FishingHook, hs: Entity)
     returning = true
     status = "hook landed beside the hotspot, re-aiming ($aimTries)"
     return false
+}
+
+
+
+// ------------------------------------------------------------------ timing
+
+internal fun AutoFishing.rand(min: Int, max: Int) = if (max <= min) min else min + RANDOM.nextInt(max - min + 1)
+
+
+/** Reel Assist's delay: mostly the lower third of [min, max], 8% of the time a slow reaction. */
+internal fun AutoFishing.delay(min: Int, max: Int): Int {
+    val lo = minOf(min, max)
+    val hi = maxOf(min, max)
+    if (hi <= lo) return lo
+    if (timingModel.value == 0) return rand(lo, hi)
+    if (timingModel.value == 2) {
+        timing.slipChance = slipChance.value / 100.0
+        timing.drift = drift.value / 100.0
+        timing.fatiguePerHour = fatigue.value / 100.0
+        return timing.next(lo, hi)
+    }
+    val span = (hi - lo).toDouble()
+    val v = if (RANDOM.nextDouble() < 0.08) lo + span * (0.6 + 0.4 * RANDOM.nextDouble())
+    else lo + span * 0.3 + RANDOM.nextGaussian() * span * 0.15
+    return Math.round(v).toInt().coerceIn(lo, hi)
+}
+
+
+/** Reel delay: the Human model gets its own timing with the heavier Reel Spread tail. */
+internal fun AutoFishing.reelDelay(): Int {
+    if (timingModel.value != 2) return delay(reelMin.value, reelMax.value)
+    reelTiming.spread = reelSpread.value
+    reelTiming.slipChance = slipChance.value / 100.0
+    reelTiming.drift = drift.value / 100.0
+    reelTiming.fatiguePerHour = fatigue.value / 100.0
+    reelTiming.tick()
+    return reelTiming.next(reelMin.value, reelMax.value)
+}
+
+
+/** Ticks to the next attack click: log-normal around [median] (Click Spread), never the same gap twice in a row. */
+internal fun AutoFishing.clickGap(median: Int): Int {
+    lastClickGap = com.github.noamm9.utils.HumanMotion.clickInterval(median.toDouble(), com.github.noamm9.features.impl.general.HumanBehaviour.clickSpread.value, RANDOM, lastClickGap)
+    return lastClickGap
+}
+
+
+/** The profile for attack clicks: Human Behaviour's, with Click Miss as its failure rate. */
+internal fun AutoFishing.clickProfile() = com.github.noamm9.utils.Humanize.profile().copy(failRate = com.github.noamm9.features.impl.general.HumanBehaviour.clickMiss.value / 100.0)
+
+
+/** True when this attack click doesn't go through ([profile]'s failure rate); tried again after a short gap. */
+internal fun AutoFishing.clickMissed(profile: com.github.noamm9.utils.HumanProfile = clickProfile()): Boolean {
+    if (! com.github.noamm9.utils.HumanMotion.chance(profile.failRate * 100, RANDOM)) return false
+    hitCooldown = com.github.noamm9.utils.HumanMotion.between(1, 3, RANDOM)
+    journal.log("click miss")
+    return true
+}
+
+
+/** Wait before the next cast: the timing model, plus reading the catch and the odd short break. */
+internal fun AutoFishing.castWait(): Int {
+    var t = delay(castMin.value, castMax.value)
+    if (lookAtCatch.value && justCaughtSomething) t += timing.uniform(8, 25)
+    justCaughtSomething = false
+    t += timing.maybeBreak(breakChance.value, 40, 120)
+    if (RANDOM.nextInt(100) < hesitate.value) t += timing.uniform(6, 20)
+    if (com.github.noamm9.utils.HumanMotion.chance(zoneOut.value, RANDOM)) {
+        val z = com.github.noamm9.utils.HumanMotion.between((zoneOutMin.value * 20).toInt(), (zoneOutMax.value * 20).toInt(), RANDOM)
+        t += z
+        journal.log("zone out ${z / 20.0}s")
+    }
+    return t
+}
+
+
+internal fun AutoFishing.nextMoveDelay() = (jitterEvery.value * 20 * (0.8 + 0.4 * RANDOM.nextDouble())).toInt()
+
+
+// ------------------------------------------------------------------ turning
+
+internal fun AutoFishing.wrap(d: Float): Float {
+    var x = d % 360f
+    if (x > 180f) x -= 360f
+    if (x < - 180f) x += 360f
+    return x
+}
+
+
+/** Eased turn towards yaw / pitch. True once within [tol] degrees. */
+internal fun AutoFishing.turn(p: LocalPlayer, yaw: Float, pitch: Float, tol: Float = 1.5f): Boolean {
+    val dy = wrap(yaw - p.yRot)
+    val dp = pitch - p.xRot
+    if (abs(dy) <= tol && abs(dp) <= tol) return true
+    if (! smoothTurns.value) {
+        com.github.noamm9.utils.Humanize.setView(p, yaw, pitch)
+        return true
+    }
+    // no overshoot while fighting: a creature on the move needs the aim to stay on it
+    return com.github.noamm9.utils.Humanize.turnTo(p, yaw, pitch, tol, overshoot = state != FishingState.FIGHT)
+}
+
+
+/** The small eased head movements around the bobber while waiting. Also follows the player's own camera moves. */
+internal fun AutoFishing.lookMovement(p: LocalPlayer) {
+    if (! lookJitter.value) return
+    val expYaw = anchorYaw + offYaw + wobYaw
+    val expPitch = anchorPitch + offPitch + wobPitch
+    if (abs(wrap(p.yRot - expYaw)) > 0.3f || abs(p.xRot - expPitch) > 0.3f) {
+        // the player turned the camera: fish where they look now
+        anchorYaw = p.yRot - offYaw - wobYaw
+        anchorPitch = p.xRot - offPitch - wobPitch
+    }
+    if (moveLen > 0) {
+        moveTick++
+        val t = (moveTick / moveLen.toFloat()).coerceAtMost(1f)
+        val ease = t * t * (3 - 2 * t)
+        offYaw = fromYaw + (toYaw - fromYaw) * ease
+        offPitch = fromPitch + (toPitch - fromPitch) * ease
+        com.github.noamm9.utils.Humanize.glide(p, anchorYaw + offYaw + wobYaw, (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f))
+        if (t >= 1f) moveLen = 0
+        return
+    }
+    if (--nextMoveIn > 0) return
+    // a bounded random walk around the spot: each move is a small step from the last, never past Drift Range
+    val step = jitterDegrees.value.toFloat()
+    val bound = driftRange.value.toFloat()
+    fromYaw = offYaw; fromPitch = offPitch
+    toYaw = com.github.noamm9.utils.HumanMotion.walk(offYaw, step, bound, RANDOM)
+    toPitch = com.github.noamm9.utils.HumanMotion.walk(offPitch, step * 0.6f, bound * 0.6f, RANDOM)
+    moveTick = 0
+    moveLen = rand(6, 14)
+    nextMoveIn = nextMoveDelay()
+}
+
+
+// ------------------------------------------------------------------ main loop
+
+internal fun AutoFishing.rod(): Int? {
+    if (rodSlot.value in 1 .. 9) return rodSlot.value - 1
+    return PlayerUtils.findHotbarSlot { it.item == Items.FISHING_ROD }
+}
+
+
+internal fun AutoFishing.hold(slot: Int) {
+    val p = mc.player ?: return
+    if (p.inventory.selectedSlot != slot) p.inventory.selectedSlot = slot
+    expectedSlot = slot
+}
+
+
+internal fun AutoFishing.use(p: LocalPlayer) {
+    mc.gameMode?.useItem(p, InteractionHand.MAIN_HAND)
+    p.swing(InteractionHand.MAIN_HAND)
 }
 
 //#endif
