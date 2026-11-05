@@ -62,6 +62,8 @@ internal fun AutoRoutes.aimThen(target: Vec3, use: Boolean): Boolean {
 /** Snaps, or with Smooth Turning turns like Assist Core does. True once looking within [tolerance] degrees. */
 internal fun AutoRoutes.turn(yaw: Float, pitch: Float, tolerance: Float = 2f, settle: Boolean = true): Boolean {
     val p = mc.player ?: return false
+    lastTurnTick = moveTick
+    lastDriveTick = moveTick
     val arrived = if (smoothTurning.value) com.github.noamm9.utils.Humanize.turnTo(p, yaw, pitch, tolerance)
     else {
         com.github.noamm9.utils.Humanize.setView(p, yaw, pitch)

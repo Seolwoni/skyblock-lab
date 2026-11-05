@@ -91,7 +91,11 @@ internal fun AutoRoutes.move(s: AutoRoutes.Step, pos: Vec3) {
         return
     }
 
-    resync(s, pos)
+    // re-path check on a spread interval (Re-path Every / Spread), not every tick
+    if (--repathIn <= 0) {
+        resync(s, pos)
+        repathIn = com.github.noamm9.utils.HumanMotion.jittered(com.github.noamm9.features.impl.general.HumanBehaviour.repathEvery.value, com.github.noamm9.features.impl.general.HumanBehaviour.repathSpread.value / 100.0, moveRnd)
+    }
     val target = s.path[pathIndex]
     val ether = if (target in s.ethers) target else target.below().takeIf { it in s.ethers }
     if (ether != null && pos.distanceTo(standOn(ether)) > 1.2) {
@@ -119,7 +123,7 @@ internal fun AutoRoutes.move(s: AutoRoutes.Step, pos: Vec3) {
     }
 
     val goal = if (ether != null) standOn(ether) else Vec3(target.x + 0.5, target.y.toDouble(), target.z + 0.5)
-    if (horizontal(pos, goal) < 0.55 && abs(pos.y - goal.y) < 1.6) {
+    if (arrivedAt(goal, pos, 0.55, key = s to pathIndex) && abs(pos.y - goal.y) < 1.6) {
         pathIndex++
         stuckTicks = 0
         climbTries = 0
@@ -138,10 +142,11 @@ internal fun AutoRoutes.move(s: AutoRoutes.Step, pos: Vec3) {
     walkTowards(pos, goal)
 }
 
-internal fun AutoRoutes.walkTowards(pos: Vec3, goal: Vec3) {
+internal fun AutoRoutes.walkTowards(pos: Vec3, goal: Vec3, profile: com.github.noamm9.utils.HumanProfile = com.github.noamm9.utils.Humanize.profile()) {
     val p = mc.player!!
+    lastDriveTick = moveTick
     val goalBlock = BlockPos.containing(goal.x, goal.y, goal.z)
-    if (useAssistPath.value && AssistBridge.pathLoaded && goalBlock != assistFailedGoal && (AssistBridge.walking || stuckTicks > 8 || horizontal(pos, goal) > 14.0)) {
+    if (useAssistPath.value && AssistBridge.pathLoaded && goalBlock != assistFailedGoal && (AssistBridge.walking || stuckTicks > assistAfter || horizontal(pos, goal) > 14.0)) {
         when (AssistBridge.walkTo(mc, p, goalBlock)) {
             AssistBridge.RUN -> {
                 stuckTicks = 0
@@ -161,17 +166,26 @@ internal fun AutoRoutes.walkTowards(pos: Vec3, goal: Vec3) {
             }
         }
     }
+    val hb = com.github.noamm9.features.impl.general.HumanBehaviour
+    startWalking(profile)
     val yaw = Math.toDegrees(atan2(goal.z - pos.z, goal.x - pos.x)).toFloat() - 90f
-    turn(yaw, if (speed.value == 3) p.xRot else 10f, 6f, settle = false)
+    // the walking pitch wanders (Idle Drift) instead of sitting on one value
+    walkPitchOff = com.github.noamm9.utils.HumanMotion.walk(walkPitchOff, hb.idleStep.value.toFloat(), hb.idleDrift.value.toFloat(), moveRnd)
+    turn(yaw + startOffset(), if (speed.value == 3) p.xRot else 10f + walkPitchOff, 6f, settle = false)
     mc.options.keyUp.isDown = true
-    mc.options.keySprint.isDown = sprint.value
+    sprintKey(sprint.value)
     val needJump = autoJump.value && p.onGround() && ((goal.y - pos.y > 0.6 && horizontal(pos, goal) < 2.5) || p.horizontalCollision)
-    mc.options.keyJump.isDown = needJump
+    jumpKey(needJump)
 
     val moved = lastPos?.distanceTo(pos) ?: 1.0
     lastPos = pos
     stuckTicks = if (moved < 0.02) stuckTicks + 1 else 0
-    if (stuckTicks in 12 .. 30 && p.onGround()) mc.options.keyJump.isDown = true
+    if (stuckTicks == 1) { // a new stuck spell: its own jump and Assist Path thresholds
+        val spread = hb.repathSpread.value / 100.0
+        stuckJumpAt = com.github.noamm9.utils.HumanMotion.jittered(12, spread, moveRnd)
+        assistAfter = com.github.noamm9.utils.HumanMotion.jittered(8, spread, moveRnd)
+    }
+    if (stuckTicks in stuckJumpAt .. stuckJumpAt + 18 && p.onGround()) mc.options.keyJump.isDown = true
     if (stuckTicks > 40 && ! running) {
         travelStuck = true
         stuckTicks = 0
@@ -320,6 +334,86 @@ internal fun AutoRoutes.etherAim(target: BlockPos, stack: ItemStack): MathUtils.
     }
     lastEtherCheck = false
     return fallback
+}
+
+// ---- human movement (Human Behaviour › Movement). Every view change goes through turn() / Humanize.
+
+/**
+ * Arrived at [goal] (within [radius] blocks, flat) with a fresh offset per waypoint ([key]): the offset centre's
+ * circle shrinks by the offset, so arrival positions are a subset of the plain check's.
+ */
+internal fun AutoRoutes.arrivedAt(goal: Vec3, pos: Vec3, radius: Double, key: Any): Boolean {
+    val hb = com.github.noamm9.features.impl.general.HumanBehaviour
+    if (key != arrivalKey) {
+        arrivalKey = key
+        val cap = if (hb.enabled) minOf(hb.waypointOffset.value, com.github.noamm9.utils.HumanMotion.offsetCap(radius)) else 0.0
+        arrivalOff = com.github.noamm9.utils.HumanMotion.waypointOffset(cap, arrivalOff, moveRnd)
+    }
+    val o = arrivalOff ?: doubleArrayOf(0.0, 0.0)
+    return com.github.noamm9.utils.HumanMotion.arrived(pos.x - goal.x, pos.z - goal.z, o[0], o[1], radius)
+}
+
+/** Going from standing to walking: with the profile's slip chance, the first steps head a little off (Start Wobble). */
+internal fun AutoRoutes.startWalking(profile: com.github.noamm9.utils.HumanProfile) {
+    if (walking) return
+    walking = true
+    val hb = com.github.noamm9.features.impl.general.HumanBehaviour
+    startWobbleLeft = 6
+    startYawOff = if (hb.enabled && com.github.noamm9.utils.HumanMotion.chance(profile.slipChance * 100, moveRnd))
+        (moveRnd.nextFloat() * 2 - 1) * hb.startWobble.value.toFloat() else 0f
+}
+
+/** This tick's share of the start wobble (fades out over 6 ticks). */
+internal fun AutoRoutes.startOffset(): Float {
+    if (startWobbleLeft <= 0) return 0f
+    return startYawOff * (startWobbleLeft-- / 6f)
+}
+
+/** Sprint key with a delay after each change of mind (Sprint Delay Min / Max). */
+internal fun AutoRoutes.sprintKey(want: Boolean) {
+    val hb = com.github.noamm9.features.impl.general.HumanBehaviour
+    if (want != sprintWant) {
+        sprintWant = want
+        sprintWait = if (hb.enabled) com.github.noamm9.utils.HumanMotion.between(hb.sprintDelayMin.value, hb.sprintDelayMax.value, moveRnd) else 0
+    }
+    if (sprintWait > 0) sprintWait-- else sprintNow = sprintWant
+    mc.options.keySprint.isDown = sprintNow
+}
+
+/** Jump key: when a jump is needed, waits a log-normal number of ticks first (Jump Delay / Spread / Max), then holds it. */
+internal fun AutoRoutes.jumpKey(want: Boolean) {
+    val hb = com.github.noamm9.features.impl.general.HumanBehaviour
+    if (! want) {
+        jumpWait = - 1
+        mc.options.keyJump.isDown = false
+        return
+    }
+    if (jumpWait < 0) jumpWait = if (hb.enabled) com.github.noamm9.utils.HumanMotion.lognormalTicks(hb.jumpDelay.value, hb.jumpSpread.value, 0, hb.jumpMax.value, moveRnd) else 0
+    if (jumpWait > 0) {
+        jumpWait--
+        mc.options.keyJump.isDown = false
+    }
+    else mc.options.keyJump.isDown = true
+}
+
+/**
+ * End of tick: while a route feature is active but standing still and not aiming, the view wanders in a bounded
+ * random walk (Idle Drift) instead of holding one exact direction. Any turn() moves the anchor (offsets reset).
+ */
+internal fun AutoRoutes.idleLook() {
+    val p = mc.player ?: return
+    val hb = com.github.noamm9.features.impl.general.HumanBehaviour
+    if (! hb.enabled || moveTick - lastDriveTick > 40 || mc.gui.screen() != null) { idleYaw = 0f; idlePitch = 0f; return }
+    if (lastTurnTick == moveTick || mc.options.keyUp.isDown) { idleYaw = 0f; idlePitch = 0f; return }
+    // never while an aim is being held for a click / etherwarp / pearl / mining
+    if (running && phase in setOf(AutoRoutes.Phase.ETHER_AIM, AutoRoutes.Phase.ACTION_AIM, AutoRoutes.Phase.PEARL_WAIT, AutoRoutes.Phase.MINING)) return
+    val bound = hb.idleDrift.value.toFloat()
+    if (bound <= 0f) return
+    val step = hb.idleStep.value.toFloat()
+    val ny = com.github.noamm9.utils.HumanMotion.walk(idleYaw, step, bound, moveRnd)
+    val np = com.github.noamm9.utils.HumanMotion.walk(idlePitch, step * 0.6f, bound * 0.6f, moveRnd)
+    com.github.noamm9.utils.Humanize.glide(p, p.yRot + (ny - idleYaw), (p.xRot + (np - idlePitch)).coerceIn(- 90f, 90f))
+    idleYaw = ny; idlePitch = np
 }
 
 //#endif

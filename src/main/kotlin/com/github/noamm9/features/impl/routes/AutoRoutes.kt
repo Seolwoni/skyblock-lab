@@ -161,6 +161,27 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     internal var targetHealth = - 1f
     internal var targetId = - 1
 
+    // human movement (Human Behaviour › Movement); maths in HumanMotion
+    internal val moveRnd = java.util.Random()
+    internal var moveTick = 0L          // counted at the end of each tick
+    internal var lastTurnTick = - 1L    // a turn() this tick: the idle drift leaves the view alone
+    internal var lastDriveTick = - 100L // any of the route features moved / turned recently
+    internal var walking = false
+    internal var startYawOff = 0f
+    internal var startWobbleLeft = 0
+    internal var walkPitchOff = 0f
+    internal var idleYaw = 0f
+    internal var idlePitch = 0f
+    internal var jumpWait = - 1
+    internal var sprintNow = false
+    internal var sprintWant = false
+    internal var sprintWait = 0
+    internal var repathIn = 0
+    internal var stuckJumpAt = 12
+    internal var assistAfter = 8
+    internal var arrivalKey: Any? = null
+    internal var arrivalOff: DoubleArray? = null
+
     /** Set by Auto Dungeon in Blood: blood mobs are players too, so anything that isn't a teammate or the Watcher counts. */
     @JvmField var campMode = false
 
@@ -180,6 +201,7 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             if (running) runCatching(::tick).onFailure { com.github.noamm9.utils.Safely.report("AutoRoutes tick", it); stop("error: ${it.message}") }
         }
         register<WorldChangeEvent> { if (running) stop("world changed") }
+        register<TickEvent.End> { runCatching { idleLook() }; moveTick++ }
 
         register<RenderWorldEvent> {
             if (! showPlan.value) return@register
@@ -432,9 +454,10 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
     fun travelTick(goal: Vec3, tolerance: Double = 1.5, hopWait: (() -> Int)? = null, allowHop: Boolean = true): Travel {
         val p = mc.player ?: return Travel.STUCK
         val pos = p.position()
-        if (horizontal(pos, goal) < tolerance && abs(pos.y - goal.y) < 3.0) {
+        if (arrivedAt(goal, pos, tolerance, key = goal) && abs(pos.y - goal.y) < 3.0) {
             releaseMovement()
             AssistBridge.reset()
+            arrivalKey = null // the next trip draws a new offset, even to the same spot
             return Travel.ARRIVED
         }
         if (hitCooldown > 0) hitCooldown--
@@ -479,6 +502,9 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         mc.options.keyUp.isDown = false
         mc.options.keyJump.isDown = false
         mc.options.keySprint.isDown = false
+        walking = false
+        jumpWait = - 1
+        sprintNow = false; sprintWant = false; sprintWait = 0
     }
 
     internal fun releaseKeys() {

@@ -119,15 +119,15 @@ object AutoPuzzles: Feature("Solves puzzles by itself using the Puzzle Solvers' 
             return
         }
         val goal = Vec3(b.x + 0.5, b.y + 1.0, b.z + 0.5)
-        val dx = p.x - goal.x
-        val dz = p.z - goal.z
-        if (dx * dx + dz * dz < 0.12 && abs(p.y - goal.y) < 1.2) {
+        // fresh offset per step; offset capped so the arrival stays inside the same block (offsetCap)
+        if (AutoRoutes.arrivedAt(goal, p.position(), kotlin.math.sqrt(0.12), key = a.key to walkIndex) && abs(p.y - goal.y) < 1.2) {
             walkIndex++
             return
         }
-        // careful steps: no sprint, straight at the block centre
-        mc.options.keySprint.isDown = false
+        // careful steps: no sprint (with the human sprint delay), straight at the block centre
+        AutoRoutes.sprintKey(false)
         val yaw = Math.toDegrees(kotlin.math.atan2(goal.z - p.z, goal.x - p.x)).toFloat() - 90f
+        AutoRoutes.lastTurnTick = AutoRoutes.moveTick; AutoRoutes.lastDriveTick = AutoRoutes.moveTick
         com.github.noamm9.utils.Humanize.turnTo(p, yaw, p.xRot, 4f)
         mc.options.keyUp.isDown = true
         walkingNow = true
