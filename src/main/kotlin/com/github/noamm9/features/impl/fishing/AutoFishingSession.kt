@@ -241,6 +241,10 @@ internal fun AutoFishing.writeReport(reason: String) {
     lastReport = lines
     sessionStart = 0L
     sendDiscord(reason, lines, ms, coins, hours)
+    if (autoSaveLogs.value) java.util.concurrent.CompletableFuture.runAsync {
+        Thread.sleep(2000) // the journal writes in the background: let the last lines land first
+        mc.execute { saveLogsToDownloads(false) }
+    }
 }
 /**
  * The end-of-session Discord message: "goal reached" when it was, otherwise why it stopped - in both cases
@@ -280,6 +284,22 @@ internal fun AutoFishing.sendDiscord(reason: String, lines: List<String>, ms: Lo
     }
 }
 /** fishing.log (last ~1.5 MB) and the 3 newest session reports, to the Discord webhook. */
+/** fishing.log and the latest 3 session reports. */
+internal fun AutoFishing.logFiles(): List<java.nio.file.Path> {
+    val dir = java.nio.file.Path.of(journal.path).parent
+    val out = ArrayList<java.nio.file.Path>()
+    out += dir.resolve("fishing.log")
+    runCatching { java.nio.file.Files.list(dir.resolve("sessions")).use { st -> st.sorted(Comparator.reverseOrder()).limit(3).forEach { out += it } } }
+    return out
+}
+
+/** Copies the logs into Downloads/Riftwalk; [loud] says so in chat either way. */
+internal fun AutoFishing.saveLogsToDownloads(loud: Boolean) {
+    com.github.noamm9.utils.LogExport.copy(logFiles())
+        .onSuccess { if (loud) info("&aLogs saved to &f$it") else journal.log("logs copied to $it") }
+        .onFailure { info("&cCouldn't save to Downloads: ${it.message}") }
+}
+
 internal fun AutoFishing.sendLogs() {
     if (discordUrl.value.isBlank()) return info("&cPut your Discord webhook URL in first (Discord section).")
     val dir = java.nio.file.Path.of(journal.path).parent

@@ -206,6 +206,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         .withDescription("Uploads fishing.log and the latest session reports to your Discord webhook - handy on a phone, where the files are hard to reach (needs the Webhook URL above)")
     internal val checkButton by com.github.noamm9.config.types.ButtonSetting("Fishing Check") { runCatching { fishingCheck() }.onFailure { info("&cCheck failed: ${it.message}") } }
         .section("Server Check").withDescription("Prints what the mod can see right now: hotbar item IDs, floating texts nearby (hotspot / bite / name tags), the hook, tab stats, mana and bait. Stand by the water with the rod out")
+    internal val saveLogsButton by com.github.noamm9.config.types.ButtonSetting("Save Logs To Downloads") { saveLogsToDownloads(true) }
+        .withDescription("Copies fishing.log and the latest session reports into Downloads/Riftwalk, where a file manager can open them (phone or PC)")
+    internal val autoSaveLogs by ToggleSetting("Save Logs After Each Session", com.github.noamm9.utils.Platform.isMobile)
+        .withDescription("Does the same on its own whenever a session ends (on by default on phones)")
     internal val copyLogButton by com.github.noamm9.config.types.ButtonSetting("Copy Log Path") {
         mc.keyboardHandler.clipboard = journal.path
         info("&7Fishing log: &f${journal.path} &8(copied)")
