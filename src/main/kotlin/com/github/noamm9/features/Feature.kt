@@ -79,9 +79,26 @@ open class Feature(
         override fun draw(ctx: GuiGraphicsExtractor, example: Boolean) = render(ctx, example)
     }.also(hudElements::add)
 
-    private fun initCategory(): CategoryType {
+    /** Sub-heading inside the tab ("Core", "Floor 7", "Routes" in Dungeons); blank where a tab has one group. */
+    val group: String get() = groupOf(packagePart())
+
+    private fun packagePart(): String {
         val parts = this::class.java.`package` !!.name.split(".")
-        val categoryName = parts[parts.indexOf("impl") + 1].uppercase()
-        return catch { CategoryType.valueOf(categoryName) } ?: error("Category does not exist: $categoryName")
+        return parts[parts.indexOf("impl") + 1].lowercase()
+    }
+
+    private fun initCategory(): CategoryType {
+        val name = when (val p = packagePart()) { "floor7", "routes" -> "dungeon"; else -> p }.uppercase()
+        return catch { CategoryType.valueOf(name) } ?: error("Category does not exist: $name")
+    }
+
+    companion object {
+        /** Package name -> the heading it sits under in its tab. */
+        @JvmStatic fun groupOf(pkg: String) = when (pkg) {
+            "dungeon" -> "Core"
+            "floor7" -> "Floor 7"
+            "routes" -> "Routes"
+            else -> ""
+        }
     }
 }

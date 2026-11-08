@@ -45,7 +45,7 @@ class ClickGuiScreen: Screen(Component.literal("ClickGUI")) {
     )
 
     init {
-        CategoryType.entries.forEachIndexed { index, category ->
+        CategoryType.entries.filter { com.github.noamm9.features.FeatureManager.getFeaturesByCategory(it).isNotEmpty() }.forEachIndexed { index, category ->
             categoryPanels.add(CategoryPanel(category, 20 + (index * 120), 20, this))
         }
     }

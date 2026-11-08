@@ -44,12 +44,12 @@ public class SmokeTest implements FabricClientGameTest {
 			int total = context.computeOnClient(mc -> FeatureManager.INSTANCE.getFeatures().size());
 			log.add("features registered: " + total);
 			if (total < 100) failures.add("only " + total + " features registered (expected 100+)");
-			int routes = context.computeOnClient(mc -> FeatureManager.INSTANCE.getFeaturesByCategory(CategoryType.ROUTES).size());
+			int routes = context.computeOnClient(mc -> (int) FeatureManager.INSTANCE.getFeaturesByCategory(CategoryType.DUNGEON).stream().filter(f -> "Routes".equals(f.getGroup())).count());
 			log.add("routes features: " + routes);
 			java.util.List<String> broken = com.github.noamm9.init.ClassGraphInitializer.failedFeatures;
 			log.add("features that failed to load: " + broken);
 			if (!broken.isEmpty()) failures.add("features failed to load: " + broken);
-			if (routes < 2) failures.add("Routes panel has " + routes + " features (expected Secret Routes + Auto Routes)");
+			if (routes < 2) failures.add("Dungeons > Routes has " + routes + " features (expected Secret Routes + Auto Routes)");
 
 			// 2. Secret Routes started
 			boolean srLoaded = context.computeOnClient(mc -> xyz.yourboykyle.secretroutes.Main.instance != null);

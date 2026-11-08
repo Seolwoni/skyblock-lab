@@ -89,6 +89,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
 
         /** Remembered between openings, like SkyHanni does. */
         @JvmField var lastCategory: CategoryType = CategoryType.DUNGEON
+        private val GROUP_ORDER = listOf("", "Core", "Floor 7", "Routes")
         @JvmField var lastFeature: Feature? = null
     }
 
@@ -233,7 +234,11 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         feature.configSettings.mapNotNull(WidgetFactory::fromSetting)
     }
 
-    private fun featuresIn(cat: CategoryType) = FeatureManager.getFeaturesByCategory(cat).sortedBy { it.name.lowercase() }
+    private fun featuresIn(cat: CategoryType) = FeatureManager.getFeaturesByCategory(cat)
+        .sortedWith(compareBy<Feature>({ GROUP_ORDER.indexOf(it.group) }, { it.name.lowercase() }))
+
+    /** Tabs that have something in them; Mining / Farming stay hidden until features land there. */
+    private fun shownCategories() = CategoryType.entries.filter { it == category || featuresIn(it).isNotEmpty() }
 
     // ------------------------------------------------------------------ render
 
@@ -356,7 +361,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         Style.roundRect(ctx, x, top, SIDEBAR_W, h, 4f, panel)
 
         val rows = ArrayList<Pair<Any, String>>()
-        for (cat in CategoryType.entries) {
+        for (cat in shownCategories()) {
             rows += cat to titleOf(cat)
             if (cat == category && query.isBlank()) featuresIn(cat).forEach { rows += it to it.name }
         }
@@ -380,7 +385,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                         ctx.drawRect(x, y + (ROW_H * (1 - sel)) / 2f, 2f, ROW_H * sel, Style.accentColor)
                     }
                     if (hov > 0.01f) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Color(255, 255, 255, (12 * hov).toInt()))
-                    if (key != CategoryType.entries.first()) ctx.drawRect(x + 6f, y, SIDEBAR_W - 12f, 1f, line)
+                    if (key != rows.first().first) ctx.drawRect(x + 6f, y, SIDEBAR_W - 12f, 1f, line)
                     drawIcon(ctx, key, x + 8f, y + 3.5f, if (open) 1f else 0.55f + 0.45f * hov)
                     ctx.drawString(label, x + 21f, y + 4f, if (open) accentLight() else textMain)
                     val all = featuresIn(key)
@@ -432,7 +437,11 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val feature = selected
         if (feature == null) {
             add(Entry.Header(titleOf(category)))
-            featuresIn(category).forEach { add(Entry.FeatureCard(it)) }
+            val byGroup = featuresIn(category).groupBy { it.group }
+            for ((group, list) in byGroup) {
+                if (byGroup.size > 1 && group.isNotBlank()) add(Entry.Header(group))
+                list.forEach { add(Entry.FeatureCard(it)) }
+            }
             return@buildList
         }
 
@@ -645,7 +654,9 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     /** "3 on" next to a category header (only for the category list view). */
     private fun headerOnCount(text: String): String? {
         if (selected != null || query.isNotBlank()) return null
-        val n = featuresIn(category).count { it.enabled }
+        val inTab = featuresIn(category)
+        val list = if (text in GROUP_ORDER && text.isNotBlank()) inTab.filter { it.group == text } else inTab
+        val n = list.count { it.enabled }
         return if (n > 0) "$n on" else null
     }
 

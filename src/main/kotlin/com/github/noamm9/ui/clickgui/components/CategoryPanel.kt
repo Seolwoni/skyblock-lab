@@ -64,7 +64,7 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
         Style.roundRect(context, x.toFloat(), y.toFloat(), WIDTH.toFloat(), HEADER_HEIGHT.toFloat(), 4f, headerBg)
         context.drawRect(x, y + HEADER_HEIGHT - 4, WIDTH, 4, headerBg)
         Style.gradientPill(context, x.toFloat(), (y + HEADER_HEIGHT - 1).toFloat(), WIDTH.toFloat(), 1f, Style.accentColor, Style.accent2)
-        val title = "§l${if (category != CategoryType.FLOOR7) category.name.lowercase().replaceFirstChar { it.uppercase() } else "Floor 7"}"
+        val title = "§l${category.title}"
         val iconColor = Style.mix(Style.accentColor, Style.accent2, category.ordinal / (CategoryType.entries.size - 1f))
         val tw = title.width()
         val left = x + WIDTH / 2f - (tw + 13f) / 2f

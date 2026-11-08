@@ -85,7 +85,7 @@ internal object SkyHanniTheme {
         ctx.pose().popMatrix()
     }
 
-    fun titleOf(cat: CategoryType) = if (cat == CategoryType.FLOOR7) "Floor 7" else cat.name.lowercase().replaceFirstChar { it.uppercase() }
+    fun titleOf(cat: CategoryType) = cat.title
 
 
     // ------------------------------------------------------------------ text helpers
