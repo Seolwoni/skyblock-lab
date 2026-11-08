@@ -120,8 +120,9 @@ jobs:
             for j in $MCJ; do
               unzip -l "$j" | grep -E "shaders/(core|include)/" >> /tmp/probe/shader-list.txt || true
               mkdir -p /tmp/probe/sh && (cd /tmp/probe/sh && unzip -o -q "$j" "assets/minecraft/shaders/core/gui*" "assets/minecraft/shaders/core/position_color*" "assets/minecraft/shaders/core/position_tex_color*" "assets/minecraft/shaders/include/*" 2>/dev/null) || true
-              for c in com.mojang.blaze3d.pipeline.RenderPipeline 'com.mojang.blaze3d.pipeline.RenderPipeline$Builder' 'com.mojang.blaze3d.pipeline.RenderPipeline$Snippet' net.minecraft.client.renderer.RenderPipelines com.mojang.blaze3d.vertex.DefaultVertexFormat net.minecraft.client.gui.render.TextureSetup net.minecraft.client.renderer.state.gui.GuiElementRenderState net.minecraft.client.gui.GuiGraphicsExtractor; do
-                javap -cp "$j" "$c" >> /tmp/probe/javap.txt 2>&1 || true
+              CLASSES=$( [ -f .github/probe-classes.txt ] && cat .github/probe-classes.txt || echo com.mojang.blaze3d.pipeline.RenderPipeline net.minecraft.client.gui.GuiGraphicsExtractor )
+              for c in $CLASSES; do
+                javap -p -cp "$j" "$c" >> /tmp/probe/javap.txt 2>&1 || true
               done
             done
           fi
