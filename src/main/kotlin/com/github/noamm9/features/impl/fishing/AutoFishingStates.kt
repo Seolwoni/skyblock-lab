@@ -185,7 +185,8 @@ internal fun AutoFishing.tick() {
     if (stallSeconds.value > 0) {
         val nums = FishingTracker.numbers()
         val sig = "$state|${p.fishing != null}|${nums["casts"]}|${nums["reels"]}|$kills|${p.blockPosition().toShortString()}"
-        if (sig != stallSig || state == FishingState.BREAK) { stallSig = sig; stallSince = tickCount }
+        // waiting for a bite (it has its own recast timeout) and breaks are quiet on purpose
+        if (sig != stallSig || state == FishingState.BREAK || (state == FishingState.WAIT_BITE && p.fishing != null)) { stallSig = sig; stallSince = tickCount }
         else if (tickCount - stallSince > stallSeconds.value * 20) {
             statStalls++
             val mf = com.github.noamm9.utils.ManaGuard.mana
