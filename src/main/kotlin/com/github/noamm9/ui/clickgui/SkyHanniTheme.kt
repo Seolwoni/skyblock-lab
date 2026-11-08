@@ -87,6 +87,20 @@ internal object SkyHanniTheme {
 
     fun titleOf(cat: CategoryType) = cat.title
 
+    /** The Riftwalk mark (hexagon + rift), white so it can be tinted. 64 px and 256 px versions. */
+    val logoSmall = net.minecraft.resources.Identifier.fromNamespaceAndPath(com.github.noamm9.NoammAddons.MOD_ID, "textures/gui/logo_small.png")
+    val logoBig = net.minecraft.resources.Identifier.fromNamespaceAndPath(com.github.noamm9.NoammAddons.MOD_ID, "textures/gui/logo.png")
+
+    /** Draws the mark [size] GUI pixels wide at x, y. */
+    fun drawLogoMark(ctx: GuiGraphicsExtractor, x: Float, y: Float, size: Float, color: Color, big: Boolean = false) {
+        val px = if (big) 256 else 64
+        ctx.pose().pushMatrix()
+        ctx.pose().translate(x, y)
+        ctx.pose().scale(size / px, size / px)
+        ctx.drawTexture(if (big) logoBig else logoSmall, 0, 0, px, px, color)
+        ctx.pose().popMatrix()
+    }
+
 
     // ------------------------------------------------------------------ text helpers
 

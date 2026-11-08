@@ -163,6 +163,12 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
     }
 
     private var entries = emptyList<Entry>()
+
+    /** A group heading in the sidebar (Dungeons: Core / Floor 7 / Routes); clicking scrolls to it. */
+    private data class GroupRow(val name: String)
+
+    /** Group heading to scroll to on the next frame. */
+    private var jumpTo: String? = null
     private val drawnFeatureCards = ArrayList<Pair<Feature, FloatArray>>() // feature -> x, y, w, h
     private val drawnSideRows = ArrayList<Pair<Any, FloatArray>>()
     private val drawnOptionCards = ArrayList<FloatArray>()
@@ -309,7 +315,8 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         ctx.drawVerticalGradient(x, y + 5f, winW(), TITLE_H - 5f, panelTop, panel)
         ctx.drawHorizontalGradient(x, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accentColor.withAlpha(0), Style.accentColor)
         ctx.drawHorizontalGradient(x + winW() / 2f, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accent2, Style.accent2.withAlpha(0))
-        val logoEnd = drawLogo(ctx, x + 10f, y + 9f)
+        SkyHanniTheme.drawLogoMark(ctx, x + 9f, y + 6.5f, 13f, Style.mix(logoFrom, logoTo, 0.35f))
+        val logoEnd = drawLogo(ctx, x + 26f, y + 9f)
         ctx.drawString(com.github.noamm9.NoammAddons.MOD_VERSION, logoEnd + 6f, y + 9f, textFaint, shadow = false)
 
         val sw = 240f
@@ -363,7 +370,11 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
         val rows = ArrayList<Pair<Any, String>>()
         for (cat in shownCategories()) {
             rows += cat to titleOf(cat)
-            if (cat == category && query.isBlank()) featuresIn(cat).forEach { rows += it to it.name }
+            // the open tab shows its groups (Dungeons: Core / Floor 7 / Routes), not every feature again
+            if (cat == category && query.isBlank()) {
+                val groups = featuresIn(cat).map { it.group }.distinct().filter { it.isNotBlank() }
+                if (groups.size > 1) groups.forEach { rows += GroupRow(it) to it }
+            }
         }
 
         sideScroll.update(rows.size * ROW_H + 6f, h)
@@ -392,6 +403,16 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     val count = if (open) "${all.count { it.enabled }}/${all.size}" else "${all.size}"
                     if (open) Style.drawTabular(ctx, count, x + SIDEBAR_W - 8f - Style.tabWidth(count), y + 4f, accentLight())
                     else ctx.drawString(count, x + SIDEBAR_W - 8f - uiWidth(count), y + 4f, textFaint, shadow = false)
+                }
+
+                is GroupRow -> {
+                    val list = featuresIn(category).filter { it.group == key.name }
+                    val hov = anim(key to "side", 140).also { it.update(if (hovered) 1f else 0f) }.value
+                    if (hov > 0.01f) ctx.drawRect(x + 6f, y, SIDEBAR_W - 6f, ROW_H, Color(255, 255, 255, (10 * hov).toInt()))
+                    ctx.drawRect(x + 14f, y + 3f, 1f, ROW_H - 6f, Style.accentColor.withAlpha(110))
+                    ctx.drawString(fit(label, SIDEBAR_W - 50f), x + 21f, y + 4f, if (hov > 0.5f) textMain else textSoft, shadow = false)
+                    val count = "${list.count { it.enabled }}/${list.size}"
+                    ctx.drawString(count, x + SIDEBAR_W - 8f - uiWidth(count), y + 4f, textFaint, shadow = false)
                 }
 
                 is Feature -> {
@@ -622,6 +643,10 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
                     }
                 }
             }
+            if (entry is Entry.Header && entry.text == jumpTo) {
+                scroll.scrollTo(y - (top - scroll.value + slide))
+                jumpTo = null
+            }
             y += eh + CARD_GAP
         }
         if (contentAnim.value < 0.999f) ctx.drawRect(x, top, w, h, Color(15, 11, 23, (230 * (1f - contentAnim.value)).toInt()))
@@ -707,6 +732,7 @@ class SkyHanniScreen: Screen(Component.literal("Riftwalk")) {
             when (key) {
                 is CategoryType -> { category = key; selected = null; query = "" }
                 is Feature -> { category = key.category; selected = key; query = "" }
+                is GroupRow -> { selected = null; query = ""; jumpTo = key.name; remember(); return true }
             }
             scroll.reset()
             remember()
