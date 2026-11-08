@@ -1,6 +1,6 @@
 package config
 
-import com.github.noamm9.config.types.MapSetting
+import dev.riftwalk.config.types.MapSetting
 import com.google.gson.JsonParser
 import kotlin.test.*
 

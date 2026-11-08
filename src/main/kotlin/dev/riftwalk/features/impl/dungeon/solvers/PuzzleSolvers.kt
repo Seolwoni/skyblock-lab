@@ -1,0 +1,93 @@
+package dev.riftwalk.features.impl.dungeon.solvers
+
+import dev.riftwalk.config.types.*
+import dev.riftwalk.event.impl.*
+import dev.riftwalk.features.Feature
+import dev.riftwalk.features.IFeatureWindow
+import dev.riftwalk.features.impl.dungeon.solvers.puzzles.*
+import dev.riftwalk.utils.ColorUtils.withAlpha
+import dev.riftwalk.utils.location.LocationUtils.inBoss
+import dev.riftwalk.utils.render.Render2D.drawCenteredString
+import dev.riftwalk.utils.render.RenderHelper.width
+import java.awt.Color
+
+object PuzzleSolvers: Feature(), IFeatureWindow {
+    val blaze by ToggleSetting("Enabled").section("Blaze")
+    val blazeDoneMessage by ToggleSetting("Blaze Done Message", true).withDescription("Sends a party message when you finish the Blaze puzzle.").showIf { blaze.value }
+    val blazeCount by SliderSetting("Blazes to Highlight", 3, 1, 10, 1).showIf { blaze.value }
+    val firstBlazeColor by ColorSetting("First Blaze", Color.GREEN).showIf { blaze.value }
+    val secondBlazeColor by ColorSetting("Second Blaze", Color.YELLOW).showIf { blaze.value }
+    val thirdBlazeColor by ColorSetting("Other Blazes", Color.RED).showIf { blaze.value }
+    val lineColor by ColorSetting("Line Color", Color.WHITE).showIf { blaze.value }
+
+    val boulder by ToggleSetting("Enabled ").section("Boulder")
+    val showAll by ToggleSetting("Show All Moves", false).showIf { boulder.value }
+    val boxColor by ColorSetting("Boulder Box Color", Color.BLUE.withAlpha(100)).showIf { boulder.value }
+    val clickColor by ColorSetting("Click Color", Color.RED.withAlpha(100)).showIf { boulder.value }.jsonName("Boulder Click color")
+
+    val creeper by ToggleSetting("Enabled  ").section("Creeper Beam")
+    val renderLines by ToggleSetting("Render Lines", true).showIf { creeper.value }
+    val phase by ToggleSetting("Phase Through Walls", true).showIf { creeper.value }
+
+    val quiz by ToggleSetting("Enabled   ").section("Quiz")
+    val answerColor by ColorSetting("Answer Color", Color.CYAN.withAlpha(128)).showIf { quiz.value }
+    val quizTimer by ToggleSetting("Quiz Timer", true).showIf { quiz.value }
+    val quizBlockWrongClicks by ToggleSetting("Block Wrong Clicks", true)
+        .withDescription("Prevents clicking a wrong Quiz answer. &eSneak to override.")
+        .showIf { quiz.value }
+
+    val tpmaze by ToggleSetting("Enabled    ").section("Teleport Maze")
+    val correctTpPadColor by ColorSetting("Correct Pad Color", Color.GREEN).showIf { tpmaze.value }
+    val wrongTpPadColor by ColorSetting("Wrong Pad Color", Color.RED).showIf { tpmaze.value }
+
+    val weirdos by ToggleSetting("Enabled     ").section("Three Weirdos")
+    val removeChests by ToggleSetting("Hide Wrong Chests", true).showIf { weirdos.value }
+    val colorCorrect by ColorSetting("Correct Chest Color", Color.GREEN).showIf { weirdos.value }
+    val colorWrong by ColorSetting("Wrong Chest Color", Color.RED).showIf { weirdos.value }
+
+    val ttt by ToggleSetting("Enabled      ").section("TicTacToe")
+    val preventMissClick by ToggleSetting("Prevent Miss Click", true).showIf { ttt.value }
+    val color by ColorSetting("Highlight Color", Color.GREEN).showIf { ttt.value }
+    val prediction by ToggleSetting("Prediction").showIf { ttt.value }
+    val predictionColor by ColorSetting("Prediction Color", Color.ORANGE).showIf { ttt.value && prediction.value }
+
+    val water by ToggleSetting("Enabled       ").section("Water Board")
+    val currentClickColor by ColorSetting("Click Color", Color.GREEN).showIf { water.value }.jsonName("Water Board Click Color")
+    val nextColor by ColorSetting("Next Click Color", Color.YELLOW).showIf { water.value }
+
+    val icefill by ToggleSetting("Enabled        ").section("Ice Fill")
+    val icefillColor by ColorSetting("Line Color", Color.GREEN).showIf { icefill.value }.jsonName("Ice Fill Line Color")
+
+    val icepath by ToggleSetting("Enabled         ").section("Ice Path")
+    val icePathFirstColor by ColorSetting("Next Segment Color", Color.GREEN).showIf { icepath.value }
+    val icePathColor by ColorSetting("Segments Color", Color.RED).showIf { icepath.value }
+
+    override fun init() {
+        val puzzles = PuzzleSolver::class.sealedSubclasses.mapNotNull { it.objectInstance }
+
+        hudElement(
+            name = "Quiz Timer",
+            enabled = { quiz.value && quizTimer.value },
+            shouldDraw = { QuizSolver.shouldShowTimer },
+            centered = { true }
+        ) { ctx, example ->
+            val text = QuizSolver.timerText(example)
+            ctx.drawCenteredString(text, 0f, 0f)
+            return@hudElement text.width().toFloat() to 9f
+        } defaults {
+            scale = 3f
+        }
+
+        register<DungeonEvent.RoomEvent.onStateChange> { puzzles.forEach { if (it.enabled) it.onStateChange(event) } }
+        register<PlayerInteractEvent.RIGHT_CLICK.BLOCK> { puzzles.forEach { if (it.enabled) it.onInteract(event) } }
+        register<MainThreadPacketReceivedEvent.Pre> { puzzles.forEach { if (it.enabled) it.onPacket(event) } }
+        register<DungeonEvent.RoomEvent.onEnter> { puzzles.forEach { if (it.enabled && ! inBoss) it.onRoomEnter(event) } }
+        register<RenderWorldEvent> { puzzles.forEach { if (it.enabled) it.onRenderWorld(event.ctx) } }
+        register<CheckEntityGlowEvent> { if (BlazeSolver.enabled) BlazeSolver.onEntityGlow(event) }
+        register<DungeonEvent.RoomEvent.onExit> { puzzles.forEach { if (it.enabled) it.onRoomExit() } }
+        register<ChatMessageEvent> { puzzles.forEach { if (it.enabled) it.onChat(event) } }
+        register<TickEvent.Server> { puzzles.forEach { if (it.enabled) it.onTick() } }
+        register<WorldChangeEvent> { puzzles.forEach { if (it.enabled) it.reset() } }
+        register<DungeonEvent.BossEnterEvent> { puzzles.forEach { if (it.enabled) it.reset() } }
+    }
+}

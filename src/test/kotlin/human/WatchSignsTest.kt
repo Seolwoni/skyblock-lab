@@ -1,6 +1,6 @@
 package human
 
-import com.github.noamm9.utils.WatchSigns
+import dev.riftwalk.utils.WatchSigns
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

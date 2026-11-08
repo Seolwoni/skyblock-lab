@@ -1,7 +1,7 @@
 package human
 
-import com.github.noamm9.utils.HudLayout
-import com.github.noamm9.utils.HudLayout.R
+import dev.riftwalk.utils.HudLayout
+import dev.riftwalk.utils.HudLayout.R
 import java.util.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

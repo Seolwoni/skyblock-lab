@@ -1,6 +1,6 @@
 package fishing
 
-import com.github.noamm9.utils.LogExport
+import dev.riftwalk.utils.LogExport
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

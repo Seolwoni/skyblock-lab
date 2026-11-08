@@ -44,7 +44,7 @@ import java.util.Map;
 
 public class SRMConfig {
     /**
-     * Riftwalk: settings live in the NoammAddons config (ClickGUI, "Routes" panel).
+     * Riftwalk: settings live in the Riftwalk config (ClickGUI, "Routes" panel).
      * This stand-in keeps the old HANDLER.load/save/instance calls working.
      */
     public static final Handler HANDLER = new Handler();
@@ -62,7 +62,7 @@ public class SRMConfig {
         /** Something inside Secret Routes changed the config (color profile, command): show it in the ClickGUI. */
         public void save() {
             try {
-                com.github.noamm9.features.impl.routes.SecretRoutes.INSTANCE.pullFromSrm();
+                dev.riftwalk.features.impl.routes.SecretRoutes.INSTANCE.pullFromSrm();
             } catch (Throwable ignored) {
             }
         }
@@ -272,7 +272,7 @@ public class SRMConfig {
     }
 
     public static Screen getScreen(Screen parent) {
-        return com.github.noamm9.features.impl.dev.ClickGui.createScreen();
+        return dev.riftwalk.features.impl.dev.ClickGui.createScreen();
     }
 
     public enum LineType {

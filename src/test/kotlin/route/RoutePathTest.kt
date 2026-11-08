@@ -1,8 +1,8 @@
 package route
 
-import com.github.noamm9.utils.HumanMotion
-import com.github.noamm9.utils.PathMath
-import com.github.noamm9.utils.PathMath.P
+import dev.riftwalk.utils.HumanMotion
+import dev.riftwalk.utils.PathMath
+import dev.riftwalk.utils.PathMath.P
 import java.util.Random
 import kotlin.math.abs
 import kotlin.test.Test

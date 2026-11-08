@@ -1,12 +1,12 @@
 package route
 
-import com.github.noamm9.features.impl.fishing.TravelFail
-import com.github.noamm9.features.impl.fishing.TravelFail.Reason
-import com.github.noamm9.features.impl.fishing.TravelMath
-import com.github.noamm9.features.impl.fishing.TravelMath.Move
-import com.github.noamm9.features.impl.fishing.TravelPlanner
-import com.github.noamm9.utils.PathMath
-import com.github.noamm9.utils.PathMath.P
+import dev.riftwalk.features.impl.fishing.TravelFail
+import dev.riftwalk.features.impl.fishing.TravelFail.Reason
+import dev.riftwalk.features.impl.fishing.TravelMath
+import dev.riftwalk.features.impl.fishing.TravelMath.Move
+import dev.riftwalk.features.impl.fishing.TravelPlanner
+import dev.riftwalk.utils.PathMath
+import dev.riftwalk.utils.PathMath.P
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

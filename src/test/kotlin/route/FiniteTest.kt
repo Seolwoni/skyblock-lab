@@ -1,6 +1,6 @@
 package route
 
-import com.github.noamm9.utils.HumanMotion
+import dev.riftwalk.utils.HumanMotion
 import java.util.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue

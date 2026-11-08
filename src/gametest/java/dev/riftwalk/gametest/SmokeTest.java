@@ -7,12 +7,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import com.github.noamm9.features.Feature;
-import com.github.noamm9.features.FeatureManager;
-import com.github.noamm9.features.impl.dev.ClickGui;
-import com.github.noamm9.ui.clickgui.ClickGuiScreen;
-import com.github.noamm9.ui.clickgui.SkyHanniScreen;
-import com.github.noamm9.ui.clickgui.enums.CategoryType;
+import dev.riftwalk.features.Feature;
+import dev.riftwalk.features.FeatureManager;
+import dev.riftwalk.features.impl.dev.ClickGui;
+import dev.riftwalk.ui.clickgui.ClickGuiScreen;
+import dev.riftwalk.ui.clickgui.SkyHanniScreen;
+import dev.riftwalk.ui.clickgui.enums.CategoryType;
 
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -46,7 +46,7 @@ public class SmokeTest implements FabricClientGameTest {
 			if (total < 100) failures.add("only " + total + " features registered (expected 100+)");
 			int routes = context.computeOnClient(mc -> (int) FeatureManager.INSTANCE.getFeaturesByCategory(CategoryType.DUNGEON).stream().filter(f -> "Routes".equals(f.getGroup())).count());
 			log.add("routes features: " + routes);
-			java.util.List<String> broken = com.github.noamm9.init.ClassGraphInitializer.failedFeatures;
+			java.util.List<String> broken = dev.riftwalk.init.ClassGraphInitializer.failedFeatures;
 			log.add("features that failed to load: " + broken);
 			if (!broken.isEmpty()) failures.add("features failed to load: " + broken);
 			if (routes < 2) failures.add("Dungeons > Routes has " + routes + " features (expected Secret Routes + Auto Routes)");
@@ -69,8 +69,8 @@ public class SmokeTest implements FabricClientGameTest {
 				failures.add("intro: " + t);
 			}
 			context.runOnClient(mc -> {
-				com.github.noamm9.ui.notification.NotificationManager.INSTANCE.push("Auto Fishing stopped", "&fThe server moved or turned you.", 60000L);
-				com.github.noamm9.ui.notification.NotificationManager.INSTANCE.push("Riftwalk", "&fReset &d38 &fcolours to the Void Rift defaults", 60000L);
+				dev.riftwalk.ui.notification.NotificationManager.INSTANCE.push("Auto Fishing stopped", "&fThe server moved or turned you.", 60000L);
+				dev.riftwalk.ui.notification.NotificationManager.INSTANCE.push("Riftwalk", "&fReset &d38 &fcolours to the Void Rift defaults", 60000L);
 			});
 			checkScreen(context, "rw-01-skyhanni", true);
 			checkScreen(context, "rw-02-classic", false);
@@ -100,9 +100,9 @@ public class SmokeTest implements FabricClientGameTest {
 			});
 			log.add("switched on: " + toggled.size());
 			context.runOnClient(mc -> {
-				com.github.noamm9.utils.ChatUtils.INSTANCE.modMessage("&aAuto Routes &fstarted in &bBlaze Room&f.");
-				com.github.noamm9.utils.ChatUtils.INSTANCE.modMessage("&7Etherwarp landed, &e3 &7secrets left.");
-				com.github.noamm9.utils.ChatUtils.INSTANCE.modMessage("&cCould not reach the next point, stopping.");
+				dev.riftwalk.utils.ChatUtils.INSTANCE.modMessage("&aAuto Routes &fstarted in &bBlaze Room&f.");
+				dev.riftwalk.utils.ChatUtils.INSTANCE.modMessage("&7Etherwarp landed, &e3 &7secrets left.");
+				dev.riftwalk.utils.ChatUtils.INSTANCE.modMessage("&cCould not reach the next point, stopping.");
 			});
 			// a sidebar so the custom scoreboard shows in the shot
 			try {
@@ -120,7 +120,7 @@ public class SmokeTest implements FabricClientGameTest {
 			context.waitTicks(100);
 			context.takeScreenshot("rw-03-everything-on");
 			try {
-				context.runOnClient(mc -> mc.gui.setScreen(new com.github.noamm9.ui.hud.HudEditorScreen()));
+				context.runOnClient(mc -> mc.gui.setScreen(new dev.riftwalk.ui.hud.HudEditorScreen()));
 				context.waitTicks(20);
 				context.takeScreenshot("rw-05-hud-editor");
 				context.runOnClient(mc -> mc.gui.setScreen(null));
@@ -157,11 +157,11 @@ public class SmokeTest implements FabricClientGameTest {
 			String master = context.computeOnClient(mc -> {
 				java.util.Set<String> before = new java.util.HashSet<>();
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled) before.add(f.getJsonName());
-				com.github.noamm9.features.MasterSwitch.INSTANCE.toggle();
+				dev.riftwalk.features.MasterSwitch.INSTANCE.toggle();
 				int stillOn = 0;
 				java.util.Set<String> fixed = java.util.Set.of("ClickGui", "WebSocketFeature", "DoorFix", "ClassColors", "ModHider");
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled && !fixed.contains(f.getClass().getSimpleName())) stillOn++;
-				com.github.noamm9.features.MasterSwitch.INSTANCE.toggle();
+				dev.riftwalk.features.MasterSwitch.INSTANCE.toggle();
 				java.util.Set<String> after = new java.util.HashSet<>();
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled) after.add(f.getJsonName());
 				return "on before " + before.size() + ", on while off " + stillOn + ", restored " + before.equals(after);

@@ -1,7 +1,7 @@
 package human
 
-import com.github.noamm9.utils.HumanProfile
-import com.github.noamm9.utils.HumanTiming
+import dev.riftwalk.utils.HumanProfile
+import dev.riftwalk.utils.HumanTiming
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue

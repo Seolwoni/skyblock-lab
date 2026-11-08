@@ -21,11 +21,11 @@
   "environment": "*",
   "entrypoints": {
     "modmenu": [
-      "com.github.noamm9.ui.clickgui.ModMenuIntegration"
+      "dev.riftwalk.ui.clickgui.ModMenuIntegration"
     ],
     "client": [
       {
-        "value": "com.github.noamm9.NoammAddons",
+        "value": "dev.riftwalk.Riftwalk",
         "adapter": "kotlin"
       },
       "xyz.yourboykyle.secretroutes.Main"

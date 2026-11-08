@@ -1,9 +1,9 @@
 package route
 
-import com.github.noamm9.features.impl.fishing.TravelMath
-import com.github.noamm9.features.impl.fishing.TravelMath.Candidate
-import com.github.noamm9.features.impl.fishing.TravelMath.Why
-import com.github.noamm9.utils.PathMath.P
+import dev.riftwalk.features.impl.fishing.TravelMath
+import dev.riftwalk.features.impl.fishing.TravelMath.Candidate
+import dev.riftwalk.features.impl.fishing.TravelMath.Why
+import dev.riftwalk.utils.PathMath.P
 import java.util.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

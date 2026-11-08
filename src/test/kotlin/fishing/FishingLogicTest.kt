@@ -1,7 +1,7 @@
 package fishing
 
-import com.github.noamm9.features.impl.fishing.FishingMath
-import com.github.noamm9.utils.SkyblockText
+import dev.riftwalk.features.impl.fishing.FishingMath
+import dev.riftwalk.utils.SkyblockText
 import kotlin.math.hypot
 import kotlin.test.Test
 import kotlin.test.assertEquals

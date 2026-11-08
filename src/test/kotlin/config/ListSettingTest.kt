@@ -1,6 +1,6 @@
 package config
 
-import com.github.noamm9.config.types.ListSetting
+import dev.riftwalk.config.types.ListSetting
 import com.google.gson.JsonParser
 import kotlin.test.*
 

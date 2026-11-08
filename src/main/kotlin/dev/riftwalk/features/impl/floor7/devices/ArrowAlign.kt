@@ -1,0 +1,187 @@
+package dev.riftwalk.features.impl.floor7.devices
+
+import dev.riftwalk.config.types.ColorSetting
+import dev.riftwalk.config.types.DropdownSetting
+import dev.riftwalk.config.types.ToggleSetting
+import dev.riftwalk.event.impl.PlayerInteractEvent
+import dev.riftwalk.event.impl.RenderWorldEvent
+import dev.riftwalk.event.impl.TickEvent
+import dev.riftwalk.features.Feature
+import dev.riftwalk.utils.MathUtils.aabb
+import dev.riftwalk.utils.MathUtils.add
+import dev.riftwalk.utils.MathUtils.toVec
+import dev.riftwalk.utils.location.LocationUtils
+import dev.riftwalk.utils.render.world.Render3D.renderString
+import net.minecraft.core.BlockPos
+import net.minecraft.world.entity.decoration.ItemFrame
+import net.minecraft.world.item.Items
+import java.awt.Color
+
+object ArrowAlign: Feature("Arrow Align Solver") {
+    private val colorStyle by DropdownSetting("Color Style", 0, listOf("Dynamic", "Custom")).withDescription("Dynamic: Colors the text based on the clicks needed.")
+    private val textColor by ColorSetting("Text Color", Color.WHITE, false).showIf { colorStyle.value == 1 }
+    private val blockWrongClicks by ToggleSetting("Block Wrong Clicks").withDescription("Sneak to disable.")
+    private val invertSneak by ToggleSetting("Invert Sneak").showIf { blockWrongClicks.value }
+
+    //#if CHEAT
+    private val autoAlign by dev.riftwalk.config.types.ToggleSetting("Auto Arrow Align", false).section("Auto").withDescription("Turns the frames to the solution by itself while you stand at the device (looks at each frame, then clicks)")
+    private val alignDelay by dev.riftwalk.config.types.SliderSetting("Click Delay", 3, 1, 10, 1, " ticks").withDescription("Ticks between clicks (each frame turns one step per click)").showIf { autoAlign.value }
+    private var alignCooldown = 0
+    private var alignPending: Int? = null
+    //#endif
+
+    private val gridCorner = BlockPos(- 2, 120, 75)
+    private val gridBox = aabb(
+        gridCorner.x, gridCorner.y, gridCorner.z,
+        gridCorner.x + 1, gridCorner.y + 5, gridCorner.z + 5
+    )
+
+    private val clickTimestamps = mutableMapOf<Int, Long>()
+    private val clicksRemaining = mutableMapOf<Int, Int>()
+
+    private var frameRotations = IntArray(25) { - 1 }
+    private var solution: List<Int>? = null
+
+    override fun init() {
+        register<TickEvent.Start> {
+            if (LocationUtils.F7Phase != 3) return@register reset()
+            if (player.distanceToSqr(gridCorner.toVec()) > 200) return@register reset()
+
+            val frames = level.getEntitiesOfClass(ItemFrame::class.java, gridBox) { it.item.item == Items.ARROW }
+
+            frames.forEach { frame ->
+                val pos = frame.blockPosition()
+                val index = (pos.y - gridCorner.y) + (pos.z - gridCorner.z) * 5
+
+                if (index in 0 .. 24) {
+                    val lastClick = clickTimestamps[index] ?: 0L
+                    if (System.currentTimeMillis() - lastClick > 1000) {
+                        frameRotations[index] = frame.rotation
+                    }
+                }
+            }
+
+            solution = null
+            clicksRemaining.clear()
+
+            possibleSolutions.forEach { arr ->
+                for (i in arr.indices) {
+                    val curr = frameRotations[i]
+                    val target = arr[i]
+
+                    if ((target == - 1 || curr == - 1) && target != curr) return@forEach
+                }
+
+                solution = arr
+
+                for (i in arr.indices) {
+                    val curr = frameRotations[i]
+                    if (curr == - 1) continue
+
+                    val needed = getClicks(curr, arr[i])
+                    if (needed != 0) clicksRemaining[i] = needed
+                }
+
+                return@register
+            }
+        }
+
+        //#if CHEAT
+        register<TickEvent.Start> {
+            if (! autoAlign.value || LocationUtils.F7Phase != 3 || mc.gui.screen() != null) return@register
+            if (alignCooldown > 0) { alignCooldown--; return@register }
+            val sol = solution ?: return@register
+            // the closest frame that still needs clicks, within reach
+            val index = clicksRemaining.keys.minByOrNull { i -> player.eyePosition.distanceToSqr(frameCentre(i)) } ?: return@register
+            if (player.eyePosition.distanceTo(frameCentre(index)) > 4.5) return@register
+            val rot = dev.riftwalk.utils.MathUtils.calcYawPitch(dev.riftwalk.utils.Humanize.aimPoint(frameCentre(index), 0.12))
+            if (! dev.riftwalk.utils.Humanize.turnTo(player, rot.yaw, rot.pitch, 1f)) { alignPending = null; return@register }
+            // click on the tick after the aim arrived, so the crosshair is really on the frame
+            if (alignPending != index) { alignPending = index; alignCooldown = dev.riftwalk.utils.Humanize.reaction() / 2; return@register }
+            val hit = mc.hitResult as? net.minecraft.world.phys.EntityHitResult ?: return@register
+            val frame = hit.entity as? ItemFrame ?: return@register
+            val pos = frame.blockPosition()
+            if ((pos.y - gridCorner.y) + (pos.z - gridCorner.z) * 5 != index) return@register
+            dev.riftwalk.utils.PlayerUtils.rightClick()
+            alignCooldown = dev.riftwalk.utils.Humanize.around(alignDelay.value)
+            if (sol.getOrNull(index) == null) alignPending = null
+        }
+        //#endif
+
+        register<PlayerInteractEvent.RIGHT_CLICK.ENTITY> {
+            if (LocationUtils.F7Phase != 3) return@register
+            val entity = event.entity as? ItemFrame ?: return@register
+            if (entity.item.item != Items.ARROW) return@register
+            val pos = entity.blockPosition().takeIf { it.x == gridCorner.x } ?: return@register
+
+            val frameY = pos.y - gridCorner.y
+            val frameZ = (pos.z - gridCorner.z) * 5
+            val index = frameY + frameZ
+
+            if (index !in 0 .. 24) return@register
+            if (frameRotations[index] == - 1) return@register
+
+            val shouldBlock = blockWrongClicks.value && (player.isCrouching == invertSneak.value)
+            if (! clicksRemaining.containsKey(index) && shouldBlock) {
+                event.isCanceled = true
+                return@register
+            }
+
+            clickTimestamps[index] = System.currentTimeMillis()
+            frameRotations[index] = (frameRotations[index] + 1) % 8
+
+            val target = solution?.get(index) ?: return@register
+            if (getClicks(frameRotations[index], target) == 0) {
+                clicksRemaining.remove(index)
+            }
+        }
+
+        register<RenderWorldEvent> {
+            if (clicksRemaining.isEmpty() || LocationUtils.F7Phase != 3) return@register
+
+            clicksRemaining.toList().forEach { (index, count) ->
+                val pos = gridCorner.add(0.5, (index % 5) + 0.5, (index / 5) + 0.5)
+                val color = if (colorStyle.value == 0) when {
+                    count < 3 -> Color.GREEN
+                    count < 5 -> Color.ORANGE
+                    else -> Color.RED
+                }
+                else textColor.value
+
+
+                event.ctx.renderString(
+                    "$count",
+                    pos.x, pos.y + 0.55, pos.z + 0.5,
+                    color = color,
+                    phase = true
+                )
+            }
+        }
+    }
+
+    private fun frameCentre(index: Int) = net.minecraft.world.phys.Vec3(gridCorner.x + 0.06, gridCorner.y + (index % 5) + 0.5, gridCorner.z + (index / 5) + 0.5)
+
+    private fun reset() {
+        frameRotations.fill(- 1)
+        solution = null
+        clicksRemaining.clear()
+        clickTimestamps.clear()
+    }
+
+    private fun getClicks(currentRotation: Int, targetRotation: Int): Int {
+        if (targetRotation == - 1) return 0
+        return (8 - currentRotation + targetRotation) % 8
+    }
+
+    private val possibleSolutions = listOf(
+        listOf(7, 7, - 1, - 1, - 1, 1, - 1, - 1, - 1, - 1, 1, 3, 3, 3, 3, - 1, - 1, - 1, - 1, 1, - 1, - 1, - 1, 7, 1),
+        listOf(- 1, - 1, 7, 7, 5, - 1, 7, 1, - 1, 5, - 1, - 1, - 1, - 1, - 1, - 1, 7, 5, - 1, 1, - 1, - 1, 7, 7, 1),
+        listOf(7, 7, - 1, - 1, - 1, 1, - 1, - 1, - 1, - 1, 1, 3, - 1, 7, 5, - 1, - 1, - 1, - 1, 5, - 1, - 1, - 1, 3, 3),
+        listOf(5, 3, 3, 3, - 1, 5, - 1, - 1, - 1, - 1, 7, 7, - 1, - 1, - 1, 1, - 1, - 1, - 1, - 1, 1, 3, 3, 3, - 1),
+        listOf(5, 3, 3, 3, 3, 5, - 1, - 1, - 1, 1, 7, 7, - 1, - 1, 1, - 1, - 1, - 1, - 1, 1, - 1, 7, 7, 7, 1),
+        listOf(7, 7, 7, 7, - 1, 1, - 1, - 1, - 1, - 1, 1, 3, 3, 3, 3, - 1, - 1, - 1, - 1, 1, - 1, 7, 7, 7, 1),
+        listOf(- 1, - 1, - 1, - 1, - 1, 1, - 1, 1, - 1, 1, 1, - 1, 1, - 1, 1, 1, - 1, 1, - 1, 1, - 1, - 1, - 1, - 1, - 1),
+        listOf(- 1, - 1, - 1, - 1, - 1, 1, 3, 3, 3, 3, - 1, - 1, - 1, - 1, 1, 7, 7, 7, 7, 1, - 1, - 1, - 1, - 1, - 1),
+        listOf(- 1, - 1, - 1, - 1, - 1, - 1, 1, - 1, 1, - 1, 7, 1, 7, 1, 3, 1, - 1, 1, - 1, 1, - 1, - 1, - 1, - 1, - 1)
+    )
+}

@@ -1,8 +1,8 @@
 package fishing
 
-import com.github.noamm9.features.impl.fishing.FishingState
-import com.github.noamm9.features.impl.fishing.FishingTransitions
-import com.github.noamm9.features.impl.fishing.FishingTransitions.Kind
+import dev.riftwalk.features.impl.fishing.FishingState
+import dev.riftwalk.features.impl.fishing.FishingTransitions
+import dev.riftwalk.features.impl.fishing.FishingTransitions.Kind
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,7 +48,7 @@ class FishingTransitionsTest {
 
     private val dir: File = run {
         var d: File? = File(System.getProperty("user.dir")).absoluteFile
-        val rel = "src/main/kotlin/com/github/noamm9/features/impl/fishing"
+        val rel = "src/main/kotlin/dev/riftwalk/features/impl/fishing"
         while (d != null && ! File(d, rel).isDirectory) d = d.parentFile
         File(d ?: fail("fishing sources not found from ${System.getProperty("user.dir")}"), rel)
     }

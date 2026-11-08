@@ -1,7 +1,7 @@
 package config
 
-import com.github.noamm9.config.ConfigMigrator
-import com.github.noamm9.config.migrators.ConfigMigratorV0ToV1
+import dev.riftwalk.config.ConfigMigrator
+import dev.riftwalk.config.migrators.ConfigMigratorV0ToV1
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
