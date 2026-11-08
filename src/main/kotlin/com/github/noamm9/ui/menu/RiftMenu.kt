@@ -58,6 +58,13 @@ class RiftMenu(private val screen: Screen, private val markSize: Float, private 
         graphics.drawVerticalGradient(0, 0, width, height, Color(12, 6, 28, 120), Color(28, 8, 40, 175))
 
     fun render(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, corners: (GuiGraphicsExtractor, Float) -> Unit) {
+        // the menu's smooth font (Pretendard), like the settings window
+        val prev = com.github.noamm9.utils.render.UiFont.active
+        com.github.noamm9.utils.render.UiFont.active = com.github.noamm9.features.impl.dev.ClickGui.customFont.value
+        try { draw(graphics, mouseX, mouseY, corners) } finally { com.github.noamm9.utils.render.UiFont.active = prev }
+    }
+
+    private fun draw(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, corners: (GuiGraphicsExtractor, Float) -> Unit) {
         val f = fade()
         val cx = width / 2f
         val top = (buttons.firstOrNull()?.y ?: (height / 2f)) - (markSize + 8f + 14f + 10f + 18f)
@@ -72,8 +79,8 @@ class RiftMenu(private val screen: Screen, private val markSize: Float, private 
 
         // RIFTWALK, spaced and blended violet -> pink
         val word = "RIFTWALK"
-        val scale = 1.6f
-        val spacing = 2.2f
+        val scale = 1.8f
+        val spacing = 2.6f
         val widths = word.map { SkyHanniTheme.uiWidth("§l$it") * scale }
         val total = widths.sum() + spacing * (word.length - 1)
         var x = cx - total / 2f
