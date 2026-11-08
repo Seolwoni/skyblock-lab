@@ -41,7 +41,7 @@ import java.util.Random
  */
 object AutoMining: Feature("Mines by itself where you stand: Mithril and Titanium, or gemstones. Picks blocks like a person, turns with Human Behaviour, uses the pickaxe ability.") {
     private val toggleKey by KeybindSetting("Start / Stop Key").withDescription("Stand by the blocks and press it to start, press again to stop")
-    private val mode by DropdownSetting("Mode", 0, listOf("Mithril", "Gemstone")).withDescription("Mithril: Dwarven Mines mithril and titanium. Gemstone: the gem colours ticked below")
+    private val mode by DropdownSetting("Mode", 0, listOf("Mithril", "Gemstone", "Commissions")).withDescription("Mithril: Dwarven Mines mithril and titanium. Gemstone: the gem colours ticked below. Commissions: reads your commissions, walks to the area, mines, claims, repeats")
 
     private val titanium by ToggleSetting("Titanium", true).section("Mithril").showIf { mode.value == 0 }
     private val blue by ToggleSetting("Blue Mithril", true).showIf { mode.value == 0 }.withDescription("Light blue wool, worth the most mithril")
@@ -49,6 +49,15 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
     private val grey by ToggleSetting("Grey Mithril", true).showIf { mode.value == 0 }.withDescription("Grey wool")
 
     private val gems by MultiCheckboxSetting("Gemstones", MiningMath.GEMSTONES.associate { it.name to true }.toMutableMap()).section("Gemstone").showIf { mode.value == 1 }
+
+    private val recordKey by KeybindSetting("Record Route Key").section("Commissions").showIf { mode.value == 2 }.withDescription(
+        "Right after the warp (see Warp Command), press it, walk to a good mining spot in an area and press it again: the route is saved for that area (from the scoreboard). One route per area")
+    private val warpCommand by TextInputSetting("Warp Command", "/warp forge").showIf { mode.value == 2 }.withDescription("Where every route starts")
+    private val claimWith by DropdownSetting("Claim With", 0, listOf("Royal Pigeon", "Command")).showIf { mode.value == 2 }.withDescription("Royal Pigeon: right-clicks it from the hotbar. Command: types the command below")
+    private val claimCommand by TextInputSetting("Claim Command", "/commissions").showIf { mode.value == 2 && claimWith.value == 1 }
+    private val sprint by ToggleSetting("Sprint On Routes", true).showIf { mode.value == 2 }
+    private val listRoutes by dev.riftwalk.config.types.ButtonSetting("List Routes") { showRoutes() }.showIf { mode.value == 2 }
+    private val deleteRoute by dev.riftwalk.config.types.ButtonSetting("Delete Route Of This Area") { deleteHereRoute() }.showIf { mode.value == 2 }
 
     private val reach by SliderSetting("Reach", 4.5, 3.0, 5.5, 0.1, " blocks").section("Mining").withDescription("How far away a block may be (from your eyes)")
     private val switchMin by SliderSetting("Switch Delay Min", 1, 0, 20, 1, " ticks").withDescription("Shortest wait after a block breaks before going for the next")
@@ -102,11 +111,34 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
     private var statContested = 0
     private var fullSince = - 1
 
+    // commissions
+    private enum class C { PICK, WARP, WALK, MINE, CLAIM }
+    private val routes = dev.riftwalk.config.PogObject("mining_routes", mutableMapOf<String, String>())
+    private var recording: MutableList<CommissionMath.Point>? = null
+    private var cState = C.PICK
+    private var cWait = 0
+    private var cName: String? = null
+    private var cTask: CommissionMath.Task? = null
+    private var cArea: String? = null
+    private var route: List<CommissionMath.Point> = emptyList()
+    private var routeIndex = 0
+    private var walkBest = Double.MAX_VALUE
+    private var walkSince = 0
+    private var walkFails = 0
+    private var walkPitch = 10f
+    private var ownMoveUntil = 0
+    private var claimOpenedAt = 0
+    private var claimClicks = 0
+    private var claimed = 0
+    private var claimFails = 0
+
     override fun init() {
         register<TickEvent.Start> {
             if (toggleKey.isPressed() && mc.gui.screen() == null) {
                 if (running) stop("stopped") else start()
             }
+            if (recordKey.isPressed() && mc.gui.screen() == null) toggleRecording()
+            recording?.let { rec -> mc.player?.let { p -> CommissionMath.Point(p.x, p.y, p.z).let { now -> if (CommissionMath.shouldRecord(rec.lastOrNull(), now)) rec += now } } }
             if (running) runCatching(::step).onFailure { dev.riftwalk.utils.Safely.report("AutoMining tick", it); stop("error: ${it.message}") }
         }
         register<ChatMessageEvent> {
@@ -124,9 +156,12 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
                 t.contains("pickaxe ability is on cooldown", ignoreCase = true) -> abilityReady = false
             }
         }
-        register<WorldChangeEvent> { if (running) stop("world changed") }
+        register<WorldChangeEvent> {
+            recording?.let { recording = null; info("&eRoute recording dropped (world changed). Start it again after the warp.") }
+            if (running && tick >= ownMoveUntil) stop("world changed")
+        }
         register<MainThreadPacketReceivedEvent.Pre> {
-            if (! running || ! failsafe.value || ! stopOnMoved.value) return@register
+            if (! running || ! failsafe.value || ! stopOnMoved.value || tick < ownMoveUntil) return@register
             val name = event.packet.javaClass.simpleName
             if (event.packet is ClientboundPlayerPositionPacket || name.contains("PlayerRotation")) mc.execute { if (running) failStop("the server moved or turned you") }
         }
@@ -147,7 +182,8 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
     private fun start() {
         val p = mc.player ?: return
         if (! selectTool()) return info("&cNo pickaxe, drill or gauntlet in the hotbar.")
-        if (kinds().isEmpty()) return info("&cNothing to mine: tick at least one block kind in the settings.")
+        if (mode.value != 2 && kinds().isEmpty()) return info("&cNothing to mine: tick at least one block kind in the settings.")
+        if (mode.value == 2 && routes.get().isEmpty()) return info("&cNo routes yet: record one per area with the Record Route Key (Commissions section).")
         profile = Humanize.profile()
         timing = HumanTiming().apply(profile)
         tick = 0; target = null; targetKind = null; wait = 0; idleSince = - 1
@@ -155,8 +191,10 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         stallSig = ""; stallSince = 0; stalls.clear(); statStalls = 0; statSkips = 0; statContested = 0; fullSince = - 1
         startMs = System.currentTimeMillis()
         abilityReady = true; abilityTriedAt = - 10_000
+        cState = C.PICK; cWait = 0; cName = null; cTask = null; cArea = null; route = emptyList(); routeIndex = 0
+        walkFails = 0; ownMoveUntil = 0; claimed = 0; claimFails = 0
         running = true
-        journal.log("==== start  mode=${listOf("Mithril", "Gemstone")[mode.value]}  kinds=${kinds().joinToString { it.name }}  at ${p.blockPosition().toShortString()}  profile=$profile")
+        journal.log("==== start  mode=${listOf("Mithril", "Gemstone", "Commissions")[mode.value]}  kinds=${kinds().joinToString { it.name }}  at ${p.blockPosition().toShortString()}  profile=$profile")
         info("&aAuto Mining started. Press the key again to stop.")
     }
 
@@ -172,6 +210,7 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         running = false
         target = null
         mc.options.keyAttack.isDown = false
+        stopWalking()
         if (reason != null) info("&eAuto Mining $reason.")
     }
 
@@ -182,6 +221,7 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
             add("&7Time &f${ms / 60_000}m ${(ms / 1000) % 60}s")
             add("&7Blocks &f$total &8(${"%,d".format(MiningMath.perHour(total, ms))}/h)")
             if (broken.isNotEmpty()) add("&7By kind &f" + broken.entries.joinToString(", ") { "${it.key} ${it.value} (${MiningMath.median(breakTicks[it.key]?.toList().orEmpty())}t)" })
+            if (mode.value == 2) add("&7Commissions &f$claimed claimed")
             add("&7Problems &fskipped $statSkips, left to others $statContested, stalls $statStalls")
             add("&7Ended &f$reason")
         }
@@ -200,8 +240,9 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         val p = mc.player ?: return
         val level = mc.level ?: return
         tick++
-        if (mc.gui.screen() != null) { release(); status = "paused (menu open)"; return }
         if (failsafe.value && stopOnStaff.value && tick % 20 == 0) staffNearby()?.let { return failStop("staff nearby: $it") }
+        if (mode.value == 2 && commissionTick(p)) return
+        if (mc.gui.screen() != null) { release(); status = "paused (menu open)"; return }
         if (! holdingTool() && ! selectTool()) return failStop("the pickaxe is gone from the hotbar")
 
         skipped.entries.removeIf { it.value <= tick }
@@ -327,7 +368,12 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
             MiningMath.TITANIUM.takeIf { titanium.value }, MiningMath.MITHRIL_BLUE.takeIf { blue.value },
             MiningMath.MITHRIL_GREEN.takeIf { green.value }, MiningMath.MITHRIL_GREY.takeIf { grey.value },
         )
-        else -> MiningMath.GEMSTONES.filter { gems.value[it.name] == true }
+        1 -> MiningMath.GEMSTONES.filter { gems.value[it.name] == true }
+        else -> when (cTask?.job) {
+            CommissionMath.Job.TITANIUM -> listOf(MiningMath.TITANIUM, MiningMath.MITHRIL_BLUE, MiningMath.MITHRIL_GREEN, MiningMath.MITHRIL_GREY)
+            CommissionMath.Job.MITHRIL -> listOf(MiningMath.MITHRIL_BLUE, MiningMath.MITHRIL_GREEN, MiningMath.MITHRIL_GREY)
+            else -> emptyList()
+        }
     }
 
     private fun kindOf(id: String): MiningMath.Kind? = kinds().firstOrNull { id in it.ids }
@@ -415,10 +461,208 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
     private fun hudLines(): List<String> {
         val ms = System.currentTimeMillis() - startMs
         val total = broken.values.sum()
-        return listOf(
+        return listOfNotNull(
             "§dAuto Mining §7- $status",
+            cName?.takeIf { mode.value == 2 }?.let { "§7Commission §f$it §8($claimed claimed)" },
             "§7Blocks §f$total §8(${"%,d".format(MiningMath.perHour(total, ms))}/h)",
         )
+    }
+
+    // ------------------------------------------------------------------ commissions
+
+    private fun clean(s: String) = s.replace(Regex("§."), "").replace(Regex("[^\\x20-\\x7E]"), "").trim()
+
+    private fun tabLines(): List<String> = runCatching { dev.riftwalk.utils.TabListUtils.getTabList().map { it.first.string.replace(Regex("§."), "") } }.getOrDefault(emptyList())
+
+    /** The area under the island on the scoreboard ("⏣ Royal Mines" -> "Royal Mines"). */
+    private fun hereArea(): String? = runCatching {
+        dev.riftwalk.utils.ScoreboardUtils.getLines().map { it.string.replace(Regex("§."), "") }
+            .firstOrNull { it.contains('⏣') || it.contains('ф') }?.let { clean(it.substringAfter('⏣').substringAfter('ф')) }?.ifEmpty { null }
+    }.getOrNull()
+
+    private fun routeNames() = routes.get().keys.toList()
+
+    private fun toggleRecording() {
+        val p = mc.player ?: return
+        val rec = recording
+        if (rec == null) {
+            recording = mutableListOf(CommissionMath.Point(p.x, p.y, p.z))
+            info("&aRecording a route. Walk to the mining spot, then press the key again.")
+            return
+        }
+        recording = null
+        rec += CommissionMath.Point(p.x, p.y, p.z)
+        if (rec.size < 2) return info("&cToo short, nothing saved.")
+        val area = hereArea() ?: "Route ${routes.get().size + 1}"
+        routes.get()[area] = CommissionMath.format(rec)
+        routes.save()
+        journal.log("route saved: $area, ${rec.size} points, from ${"%.0f %.0f %.0f".format(rec.first().x, rec.first().y, rec.first().z)}")
+        info("&aSaved the route to &f$area &7(${rec.size} points)")
+    }
+
+    private fun showRoutes() {
+        val r = routes.get()
+        if (r.isEmpty()) return info("&7No routes yet.")
+        ChatUtils.modBlock("&dMining routes", r.map { (k, v) -> "&f$k &7(${CommissionMath.parseRoute(v).size} points)" })
+    }
+
+    private fun deleteHereRoute() {
+        val area = hereArea() ?: return info("&cCan't tell which area this is from the scoreboard.")
+        if (routes.get().remove(area) != null) { routes.save(); info("&eDeleted the route of &f$area") } else info("&7No route for &f$area")
+    }
+
+    /** Commission mode. True when this tick was used for commission work (not mining). */
+    private fun commissionTick(p: net.minecraft.client.player.LocalPlayer): Boolean {
+        if (cWait > 0) { cWait--; return cState != C.MINE }
+        when (cState) {
+            C.PICK -> pickCommission(p)
+            C.WARP -> {
+                // after the warp: join the route at its nearest point if we're close to it
+                val at = CommissionMath.Point(p.x, p.y, p.z)
+                val i = CommissionMath.joinAt(route, at)
+                if (route[i].dist(at) > 12) return true.also { failStop("the route to $cArea doesn't start near where ${warpCommand.value} put us") }
+                routeIndex = i; walkBest = Double.MAX_VALUE; walkSince = tick
+                cState = C.WALK
+                status = "walking to $cArea"
+            }
+            C.WALK -> walkRoute(p)
+            C.MINE -> {
+                if (tick % 40 == 0) {
+                    val list = CommissionMath.parse(tabLines())
+                    if (list.any { it.done }) {
+                        journal.log("commission done: ${list.filter { it.done }.joinToString { it.name }}")
+                        release()
+                        cState = C.CLAIM; claimOpenedAt = - 1; claimClicks = 0
+                        cWait = Humanize.reaction()
+                        return true
+                    }
+                }
+                return false // mine
+            }
+            C.CLAIM -> claimTick(p)
+        }
+        return true
+    }
+
+    private fun pickCommission(p: net.minecraft.client.player.LocalPlayer) {
+        val list = CommissionMath.parse(tabLines())
+        if (list.isEmpty()) return failStop("no Commissions in the tab list (turn the Commissions widget on in /tab)")
+        if (list.any { it.done }) { cState = C.CLAIM; claimOpenedAt = - 1; claimClicks = 0; return }
+        val here = hereArea()
+        val next = CommissionMath.pickNext(list, routes.get().keys, here)
+            ?: return failStop("no commission I can do: ${list.joinToString { it.name }} (record routes for their areas)")
+        val task = CommissionMath.taskOf(next.name)
+        val area = CommissionMath.areaFor(task, routeNames(), here) ?: return failStop("no route for ${next.name}")
+        cName = next.name; cTask = task; cArea = area
+        route = CommissionMath.parseRoute(routes.get()[area].orEmpty())
+        if (route.size < 2) return failStop("the route for $area is broken, record it again")
+        target = null
+        journal.log("commission: ${next.name} (${(next.progress * 100).toInt()}%) -> $area, job ${task.job}, here=$here")
+        // already standing at the end of that route: just mine
+        if (route.last().dist(CommissionMath.Point(p.x, p.y, p.z)) < 6) { cState = C.MINE; status = "mining for $cName"; return }
+        p.connection.sendCommand(warpCommand.value.removePrefix("/"))
+        ownMoveUntil = tick + 200
+        journal.log("warp: ${warpCommand.value}")
+        cState = C.WARP
+        cWait = 60 + Humanize.reaction()
+        status = "warping"
+    }
+
+    private fun walkRoute(p: net.minecraft.client.player.LocalPlayer) {
+        ownMoveUntil = tick + 40
+        val goal = route[routeIndex]
+        val at = CommissionMath.Point(p.x, p.y, p.z)
+        val last = routeIndex == route.size - 1
+        if (goal.flat(at) < (if (last) 0.8 else 1.4) && kotlin.math.abs(goal.y - at.y) < 1.6) {
+            if (last) {
+                stopWalking()
+                journal.log("arrived at $cArea")
+                cState = C.MINE
+                cWait = Humanize.reaction()
+                status = "mining for $cName"
+                return
+            }
+            routeIndex++; walkBest = Double.MAX_VALUE; walkSince = tick
+            return
+        }
+        val d = goal.dist(at)
+        if (d < walkBest - 0.3) { walkBest = d; walkSince = tick }
+        if (tick - walkSince > 160) {
+            stopWalking()
+            walkFails++
+            journal.log("stuck on the way to $cArea at ${"%.0f %.0f %.0f".format(at.x, at.y, at.z)} (point ${routeIndex + 1}/${route.size}, ${"%.1f".format(d)} left), fail $walkFails")
+            if (walkFails >= 3) return failStop("stuck 3 times on the route to $cArea")
+            cState = C.PICK
+            cWait = 20 + Humanize.reaction()
+            return
+        }
+        val yaw = Math.toDegrees(kotlin.math.atan2(goal.z - p.z, goal.x - p.x)).toFloat() - 90f
+        if (rnd.nextInt(120) == 0) walkPitch = 6f + rnd.nextFloat() * 10f
+        Humanize.turnTo(p, yaw, walkPitch, tolerance = 3f, overshoot = false)
+        var off = (yaw - p.yRot) % 360f
+        if (off > 180f) off -= 360f
+        if (off < - 180f) off += 360f
+        off = kotlin.math.abs(off)
+        mc.options.keyUp.isDown = off < 35f
+        mc.options.keyJump.isDown = p.onGround() && (goal.y - p.y > 0.6 || (p.horizontalCollision && tick - walkSince > 10))
+        mc.options.keySprint.isDown = sprint.value && off < 12f && route.size - routeIndex > 2
+        status = "walking to $cArea (${routeIndex + 1}/${route.size})"
+    }
+
+    private fun stopWalking() {
+        mc.options.keyUp.isDown = false
+        mc.options.keyJump.isDown = false
+        mc.options.keySprint.isDown = false
+    }
+
+    private fun claimTick(p: net.minecraft.client.player.LocalPlayer) {
+        release()
+        val screen = mc.gui.screen() as? net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<*>
+        if (claimOpenedAt < 0) {
+            // open the commissions menu
+            if (mc.gui.screen() != null) { p.closeContainer(); cWait = 5; return }
+            if (claimWith.value == 0) {
+                val slot = (0 .. 8).firstOrNull { p.inventory.getItem(it).skyblockId == "ROYAL_PIGEON" }
+                    ?: return failStop("no Royal Pigeon in the hotbar (or set Claim With to Command)")
+                p.inventory.selectedSlot = slot
+                cWait = Humanize.reaction().coerceAtLeast(3)
+                claimOpenedAt = tick + cWait
+                mc.execute { PlayerUtils.rightClick() }
+            } else {
+                p.connection.sendCommand(claimCommand.value.removePrefix("/"))
+                claimOpenedAt = tick
+            }
+            status = "claiming"
+            return
+        }
+        if (screen == null || ! clean(screen.title.string).contains("Commission", ignoreCase = true)) {
+            if (claimOpenedAt in 0 until tick - 80) {
+                claimOpenedAt = - 1
+                if (++claimFails >= 3) return failStop("the commissions menu didn't open")
+                journal.log("commissions menu didn't open, trying again")
+            }
+            return
+        }
+        val top = p.containerMenu.slots.filter { it.container !is net.minecraft.world.entity.player.Inventory }
+        if (top.none { ! it.item.isEmpty }) return // contents not here yet
+        val done = top.firstOrNull { s ->
+            val lore = with(dev.riftwalk.utils.items.ItemUtils) { s.item.lore }.joinToString(" ") { clean(it) }
+            lore.contains("COMPLETED", ignoreCase = true) || lore.contains("Click to claim", ignoreCase = true)
+        }
+        if (done != null && claimClicks < 8) {
+            dev.riftwalk.utils.GuiUtils.clickSlot(done.index, dev.riftwalk.utils.GuiUtils.ButtonType.LEFT)
+            claimClicks++
+            claimed++
+            journal.log("claimed: ${clean(done.item.hoverName.string)}")
+            cWait = timing.next(6, 16)
+            return
+        }
+        p.closeContainer()
+        claimFails = 0
+        selectTool()
+        cState = C.PICK
+        cWait = Humanize.reaction() + 10 // let the tab list catch up with the new commissions
+        status = "picking the next commission"
     }
 }
 //#endif
