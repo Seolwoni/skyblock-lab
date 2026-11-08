@@ -144,6 +144,9 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val useRadar by ToggleSetting("Use Hotspot Radar", true).withDescription("No hotspot in sight or remembered: reads a Hotspot Radar in the hotbar, twice from two places, and goes where the two lines cross")
     internal val readShared by ToggleSetting("Hotspots From Chat", true).withDescription("Remembers hotspot positions people share in chat (any message with \"hotspot\" and x y z)")
     internal val spotSearch by SliderSetting("Find Water Within", 48, 16, 96, 4, " blocks").withDescription("With no hotspot (or hotspots off) and not already looking at water / lava: how far to look for the nearest pool to walk to")
+    internal val resumeAfterDeath by ToggleSetting("Come Back After Death", true).withDescription("Dying (\"☠ You ...\" message) doesn't end the session: after the respawn it walks / warps back to the spot and fishes on")
+    internal val maxDeaths by SliderSetting("Max Deaths", 3, 1, 10, 1).showIf { resumeAfterDeath.value }.withDescription("Stops for good after this many deaths within 10 minutes (something keeps killing you there)")
+    internal val stallSeconds by SliderSetting("Stall Recovery After", 45, 0, 300, 5, " s").withDescription("Nothing has happened for this long (same state, no cast, no move, no kill): writes down why in fishing.log and starts over from finding a spot. 0 = off")
     internal val resumeAfterReboot by ToggleSetting("Come Back After Reboot", true).withDescription("Only after the server's own restart warning: if you're moved within 3 minutes, warp back to the island and carry on fishing. Any other move still stops")
     internal val warpCommand by com.github.noamm9.config.types.TextInputSetting("Warp Command", "").withDescription("The command back to your fishing island, without the slash (empty = the usual one, e.g. warp crimson)")
     internal val hotspotRange by SliderSetting("Search Range", 200, 16, 400, 8, " blocks").withDescription("How far it looks for a Hotspot. Hotspots seen earlier are remembered for 3 minutes, even after they're out of sight")
@@ -253,6 +256,22 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
             val t = event.unformattedText
             if (stopOnParty.value) com.github.noamm9.utils.WatchSigns.partyInvite(t)?.let { return@register failStop("party invite from $it") }
             if (stopOnMessage.value) com.github.noamm9.utils.WatchSigns.privateMessage(t)?.let { return@register failStop("private message from $it") }
+        }
+        register<com.github.noamm9.event.impl.ChatMessageEvent> {
+            // SkyBlock deaths: "☠ You were killed by ..." / "☠ You burned to death." - then the server moves you to spawn
+            if (! running || ! resumeAfterDeath.value) return@register
+            val t = event.unformattedText.trim()
+            if (! t.startsWith("☠ You")) return@register
+            ownMoveTicks = 200 // the respawn teleport is not a failsafe
+            deaths10m.addLast(tickCount)
+            while (deaths10m.isNotEmpty() && tickCount - deaths10m.first() > 12_000) deaths10m.removeFirst()
+            journal.log("died: $t  (${deaths10m.size} in 10 min)")
+            if (deaths10m.size >= maxDeaths.value) return@register failStop("died ${deaths10m.size} times in 10 minutes ($t)")
+            statDeaths++
+            armReboot() // remember the spot and island, same as a reboot
+            beginResume()
+            resumeWait = 40 + RANDOM.nextInt(60) // 2-5 s after the respawn
+            resumeWhy = "after dying"
         }
         register<com.github.noamm9.event.impl.ChatMessageEvent> { if (readShared.value) com.github.noamm9.utils.Safely("AutoFishing shared hotspot") { readSharedHotspot(event.unformattedText) } }
         register<com.github.noamm9.event.impl.ChatMessageEvent> {
@@ -428,6 +447,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         lastLookYaw = null
         lastTickPos = null; lastTickLevel = null; lastTickPlayer = null
         TravelBlink.reset()
+        deaths10m.clear(); statDeaths = 0; statStalls = 0; stallSig = ""; stallSince = tickCount; resumeWhy = "after the reboot"
         hypeStage = 0; hypeBeat = 0; castDownPitch = 0f; blastBlocked = false; hypeFrom = null; heightWarned = false; healthWaiting = false
         reelTiming = com.github.noamm9.utils.HumanTiming().apply(com.github.noamm9.utils.Humanize.profile())
         castYawSeries = 0.0; castPitchSeries = 0.0; lastClickGap = - 1

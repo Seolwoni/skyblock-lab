@@ -181,6 +181,27 @@ internal fun AutoFishing.tick() {
         val moved = from.distanceTo(p.position())
         if (moved > 0.6 || p.isInLava) journal.log("hyperion moved ${"%.2f".format(moved)}  to=${"%.2f,%.2f,%.2f".format(p.x, p.y, p.z)}${if (p.isInLava) "  IN LAVA" else ""}")
     }
+    // stall watchdog: same state, hook, counts and block for too long (and not on a break) - say why, start over
+    if (stallSeconds.value > 0) {
+        val nums = FishingTracker.numbers()
+        val sig = "$state|${p.fishing != null}|${nums["casts"]}|${nums["reels"]}|$kills|${p.blockPosition().toShortString()}"
+        if (sig != stallSig || state == FishingState.BREAK) { stallSig = sig; stallSince = tickCount }
+        else if (tickCount - stallSince > stallSeconds.value * 20) {
+            statStalls++
+            val mf = com.github.noamm9.utils.ManaGuard.mana
+            journal.log("STALL ${stallSeconds.value}s  state=$state  status=\"$status\"  wait=$wait  timer=$timer  hook=${p.fishing != null}  " +
+                "mana=${mf ?: "?"}  hp=${(p.health / p.maxHealth * 100).toInt()}%  healthWaiting=$healthWaiting  hypeStage=$hypeStage  blastBlocked=$blastBlocked  " +
+                "path=${path.size}@$pathIndex  hotspot=${hotspot != null}  stand=${stand?.let { BlockPos.containing(it).toShortString() }}  slot=${p.inventory.selectedSlot + 1}/${expectedSlot + 1}")
+            info("&eAuto Fishing was stuck (${state.toString().lowercase()}: $status) - starting over.")
+            stopWalking()
+            if (p.fishing != null) rod()?.let { hold(it); use(p) }
+            hypeStage = 0; blastBlocked = false; healthWaiting = false
+            path = emptyList(); hotspot = null
+            stallSince = tickCount
+            state = FishingState.FIND
+            return
+        }
+    }
     if (p.isInLava) return escapeLava(p)
 
     if (state == FishingState.FIND || state == FishingState.TRAVEL || state == FishingState.SELL) return FishingStates.of(state).tick(p)

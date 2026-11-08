@@ -194,6 +194,12 @@ interface FishingVars {
     var statSplash: Int
     var statDrift: Int
     var statLava: Int
+    var statDeaths: Int
+    var statStalls: Int
+    val deaths10m: ArrayDeque<Int>
+    var resumeWhy: String
+    var stallSig: String
+    var stallSince: Int
     var lastReport: List<String>
     val noticeAt: HashMap<Int, Int>
     var tickCount: Int
@@ -386,6 +392,12 @@ class FishingVarsImpl : FishingVars {
     override var statSplash: Int = 0
     override var statDrift: Int = 0
     override var statLava: Int = 0
+    override var statDeaths: Int = 0
+    override var statStalls: Int = 0 // times the stall watchdog started over
+    override val deaths10m: ArrayDeque<Int> = ArrayDeque() // ticks of deaths in the last 10 minutes
+    override var resumeWhy: String = "after the reboot"
+    override var stallSig: String = "" // what the watchdog last saw (state, hook, counts, block)
+    override var stallSince: Int = 0
     override var lastReport: List<String> = emptyList()     // creature health at our last blast (immunity check)
 
     // noticing sea creatures

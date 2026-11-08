@@ -37,6 +37,7 @@ object FishingTransitions {
         addAll(many(NOT_RESUME, null, Kind.LAYER, "stuck in lava (escapeLava)"))
         addAll(many(FISHING, FishingState.TRAVEL, Kind.LAYER, "pushed away from the spot"))
         addAll(many(FISHING, FishingState.FIGHT, Kind.LAYER, "a sea creature to fight"))
+        addAll(many(NOT_RESUME, FishingState.FIND, Kind.LAYER, "stall watchdog: nothing happened for too long, start over"))
 
         add(e(FishingState.FIND, FishingState.TRAVEL, Kind.STATE, "hotspot / water found (findHotspot, goToFluid)"))
         add(e(FishingState.FIND, FishingState.CAST, Kind.STATE, "already at the water (goToFluid)"))

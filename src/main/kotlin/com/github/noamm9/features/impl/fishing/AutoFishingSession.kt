@@ -206,7 +206,7 @@ internal fun AutoFishing.resumeTick() {
     if (mc.level == null) return
     ownMoveTicks = 20
     lastLookYaw = null
-    status = "coming back after the reboot"
+    status = "coming back $resumeWhy"
     if (resumeWait > 0) { resumeWait--; return }
     val area = currentArea()
     val want = rebootArea
@@ -231,7 +231,7 @@ internal fun AutoFishing.resumeTick() {
     }
     else goToFluid(p)
     rebootAt = 0L
-    info("&aBack after the reboot, fishing again.")
+    info("&aBack $resumeWhy, fishing again.")
 }
 
 // ------------------------------------------------------------------ session report
@@ -256,7 +256,7 @@ internal fun AutoFishing.writeReport(reason: String) {
         add("Coins       %,d  (${perH(coins)}/h)".format(coins) + (FishingTracker.topItem()?.let { "  best: $it" } ?: ""))
         if (d("trophies") > 0) add("Trophy fish ${d("trophies")}")
         add("Ended       $reason")
-        add("Problems    ground recasts $statGround, re-linked hooks $statRelink, splash recasts $statSplash, drift recasts $statDrift, lava escapes $statLava")
+        add("Problems    ground recasts $statGround, re-linked hooks $statRelink, splash recasts $statSplash, drift recasts $statDrift, lava escapes $statLava, deaths $statDeaths, stalls $statStalls")
     }
     info("&d&l--- Session report ---")
     for (l in lines.drop(1)) info("&7" + l.substringBefore("  ") + " &f" + l.substringAfter("  ").trim())
