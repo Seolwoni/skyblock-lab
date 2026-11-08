@@ -25,6 +25,7 @@ object DataAPI {
     private suspend inline fun <reified T> apiRequest(path: String): Result<T> = run {
         if (System.currentTimeMillis() < cooldownUntil) return Result.failure(NoammAPIException.OnCooldown())
         if (ApiAuth.token == null) {
+            ApiAuth.requestToken()
             if (ApiAuth.keyPairUnavailable && ! sessionExpired) {
                 ThreadUtils.scheduledTask(6000) { sessionExpired = false }
                 ThreadUtils.scheduledTask(10) {

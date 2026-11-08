@@ -5,7 +5,6 @@ import dev.riftwalk.config.ConfigManager
 import dev.riftwalk.event.EventBus
 import dev.riftwalk.event.impl.ChatMessageEvent
 import dev.riftwalk.event.impl.DebugFlagEvent
-import dev.riftwalk.features.impl.dev.UpdateChecker
 import dev.riftwalk.features.impl.dungeon.leapmenu.LeapMenu
 import dev.riftwalk.init.types.ICommandProvider
 import dev.riftwalk.ui.clickgui.ClickGuiScreen
@@ -52,11 +51,6 @@ object NaCommand: ICommandProvider {
         literal("hud") {
             description("HUD editor")
             runs { GuiUtils.setScreen(HudEditorScreen()) }
-        }
-
-        literal("update") {
-            description("Checks for an update of the mod")
-            runs { ThreadUtils.async { UpdateChecker.runCheck(true) } }
         }
 
         literal("ping") {

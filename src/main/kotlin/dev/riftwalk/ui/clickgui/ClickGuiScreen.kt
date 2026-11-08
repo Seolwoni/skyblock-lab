@@ -58,7 +58,6 @@ class ClickGuiScreen: Screen(Component.literal("ClickGUI")) {
         context.drawVerticalGradient(0, 0, Resolution.width, Resolution.height, Color(6, 2, 14, 110), Color(12, 4, 24, 170))
         context.drawSearchBar(mX.toFloat(), mY.toFloat())
         context.drawHudButton(mX.toFloat(), mY.toFloat())
-        context.drawDiscordButton(mX.toFloat(), mY.toFloat())
 
         val draggingPanel = categoryPanels.find { it.dragging }
         categoryPanels.forEach { if (it != draggingPanel) it.render(context, mX, mY) }
@@ -180,11 +179,6 @@ class ClickGuiScreen: Screen(Component.literal("ClickGUI")) {
                 onClose()
                 GuiUtils.setScreen(HudEditorScreen())
             }
-            return true
-        }
-
-        if (isOverDiscordButton(mx.toFloat(), my.toFloat())) {
-            if (button == InputConstants.MOUSE_BUTTON_LEFT) Utils.openDiscordLink()
             return true
         }
 

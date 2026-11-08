@@ -51,6 +51,7 @@ object WebSocket: ISelfInit {
 
     suspend fun connect() {
         if (connecting) return
+        if (! dev.riftwalk.features.impl.dev.WebSocketFeature.enabled) return
         connecting = true
 
         try {

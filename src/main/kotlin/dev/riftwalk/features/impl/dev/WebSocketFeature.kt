@@ -24,12 +24,10 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonParser
 import com.mojang.brigadier.arguments.StringArgumentType
 
-object WebSocketFeature: Feature(name = "WebSocket", toggled = true), ICommandProvider {
+object WebSocketFeature: Feature("Shared party chat and dungeon events through the NoammAddons WebSocket server (ws.noamm.org). Off unless you turn it on; takes effect after a restart.", name = "WebSocket"), ICommandProvider {
     private val mutedPartyChat by ToggleSetting("Muted Party Chat", true).withDescription("Sends party messages through the WebSocket when Hypixel chat is muted during a dungeon.")
     private val partyChatPrefixes = listOf("pc ", "party chat ", "p chat ")
     @Volatile private var pendingChatMessage: String? = null
-
-    override fun toggle() = Unit
 
     override fun init() {
         register<WebSocketEvent.Connect> {

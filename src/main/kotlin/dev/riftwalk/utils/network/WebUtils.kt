@@ -27,7 +27,7 @@ object WebUtils: ISelfInit {
     private val sharedRequests = ConcurrentHashMap<String, Deferred<Result<HttpResponse>>>()
 
     val client = HttpClient(CIO) {
-        install(UserAgent) { agent = "$MOD_NAME/$MOD_VERSION (+https://noamm.org)" }
+        install(UserAgent) { agent = "$MOD_NAME/$MOD_VERSION" }
         install(HttpTimeout) {
             connectTimeoutMillis = 30_000
             socketTimeoutMillis = 30_000

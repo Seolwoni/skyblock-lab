@@ -37,10 +37,23 @@ object ApiAuth: ISelfInit {
 
     internal val token get() = tokenInfo?.token
 
+    @Volatile private var started = false
+
+    /**
+     * No sign-in at game start any more: the upstream data server (api.noamm.org) is only contacted
+     * when something actually needs it (a stats lookup, or the WebSocket feature when it's on).
+     */
     override fun init() {
         register<GameStartEvent> {
-            async(::updateToken)
+            if (dev.riftwalk.features.impl.dev.WebSocketFeature.enabled) requestToken()
         }
+    }
+
+    /** Starts signing in once; later calls do nothing while it runs or after it worked. */
+    fun requestToken() {
+        if (started) return
+        started = true
+        async(::updateToken)
     }
 
     private suspend fun updateToken(): Unit = try {
