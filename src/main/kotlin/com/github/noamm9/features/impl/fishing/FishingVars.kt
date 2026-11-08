@@ -194,6 +194,9 @@ interface FishingVars {
     var statSplash: Int
     var statDrift: Int
     var statLava: Int
+    var sellPass: Int
+    var sellClicked: Int
+    var sellWaitClick: Int
     var statDeaths: Int
     var statStalls: Int
     val deaths10m: ArrayDeque<Int>
@@ -392,6 +395,9 @@ class FishingVarsImpl : FishingVars {
     override var statSplash: Int = 0
     override var statDrift: Int = 0
     override var statLava: Int = 0
+    override var sellPass: Int = 0 // passes over the sell menu this time (rescans for what was missed)
+    override var sellClicked: Int = - 1 // the last slot clicked, waiting for it to go
+    override var sellWaitClick: Int = 0
     override var statDeaths: Int = 0
     override var statStalls: Int = 0 // times the stall watchdog started over
     override val deaths10m: ArrayDeque<Int> = ArrayDeque() // ticks of deaths in the last 10 minutes

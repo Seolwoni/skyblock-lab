@@ -86,35 +86,59 @@ internal fun AutoFishing.sell(p: LocalPlayer) {
             sellStep = 3
             sellGap = delay(2, 5)
         }
-        3 -> { // the sell menu: queue up the junk
+        3 -> { // the sell menu: queue up the junk once its contents have arrived
             if (screen == null || screen.title.string == sellTitle) { if (sellTimer > 40) sellDone(p, false, "the sell menu didn't open"); return }
-            sellQueue.clear()
-            for (slot in p.containerMenu.slots) {
-                if (slot.container !is net.minecraft.world.entity.player.Inventory) continue
-                if (slot.containerSlot < 9) continue // never the hotbar
-                if (shouldSell(slot.item)) sellQueue += slot.index
-            }
+            // the window opens a moment before its items do: an empty inventory part means it isn't filled in yet
+            val queue = sellQueueNow(p)
+            if (queue.isEmpty() && sellTimer < 40) return
+            sellQueue.clear(); sellQueue += queue
+            sellPass++
+            journal.log("sell pass $sellPass: ${queue.size} stacks to sell")
             sellStep = 4
             sellGap = delay(5, 14) // look at the menu for a moment first
         }
-        4 -> { // click them one by one at a human pace
-            if (screen == null) return sellDone(p, true, null)
+        4 -> { // click them one by one at a human pace, and check each one went
+            if (screen == null) return sellDone(p, sellQueueNow(p).isEmpty(), if (sellQueueNow(p).isEmpty()) null else "the sell menu closed early")
+            // the last click: wait until that stack is gone before the next (a click sent too early is ignored by the server)
+            if (sellClicked >= 0) {
+                val still = p.containerMenu.slots.getOrNull(sellClicked)?.item?.let { ! it.isEmpty && shouldSell(it) } == true
+                if (still && sellWaitClick++ < 12) return
+                if (still) journal.log("sell: slot $sellClicked didn't go, moving on")
+                else sold++
+                sellClicked = - 1; sellWaitClick = 0
+            }
             val next = sellQueue.removeFirstOrNull()
             if (next == null) {
+                // anything left (missed clicks, items that arrived late)? another pass, at most 3
+                val left = sellQueueNow(p)
+                if (left.isNotEmpty() && sellPass < 3) {
+                    sellQueue += left; sellPass++
+                    journal.log("sell pass $sellPass: ${left.size} stacks left")
+                    sellGap = delay(6, 12)
+                    return
+                }
+                journal.log("sell: done, $sold sold so far${if (left.isNotEmpty()) ", ${left.size} stacks wouldn't sell" else ""}")
                 sellStep = 5
                 sellGap = delay(4, 12)
                 return
             }
-            if (! p.containerMenu.slots.getOrNull(next)?.item.let { it != null && ! it.isEmpty }) return
+            if (! p.containerMenu.slots.getOrNull(next)?.item.let { it != null && ! it.isEmpty && shouldSell(it) }) return
             GuiUtils.clickSlot(next, GuiUtils.ButtonType.LEFT)
-            sold++
+            sellClicked = next
+            sellWaitClick = 0
             sellGap = delay(4, 11) + if (RANDOM.nextInt(100) < 8) timing.uniform(6, 16) else 0
         }
         else -> sellDone(p, true, null)
     }
 }
 
+/** Sell-menu slot indexes of junk in your inventory part (never the hotbar), as the menu shows them now. */
+internal fun AutoFishing.sellQueueNow(p: LocalPlayer): List<Int> = p.containerMenu.slots.filter {
+    it.container is net.minecraft.world.entity.player.Inventory && it.containerSlot >= 9 && shouldSell(it.item)
+}.map { it.index }
+
 internal fun AutoFishing.sellDone(p: LocalPlayer, ok: Boolean, why: String?) {
+    sellPass = 0; sellClicked = - 1; sellWaitClick = 0
     if (mc.gui.screen() != null) p.closeContainer()
     if (ok) sellFails = 0 else {
         sellFails++
