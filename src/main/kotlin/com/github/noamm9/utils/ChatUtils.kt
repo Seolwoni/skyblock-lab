@@ -124,6 +124,12 @@ object ChatUtils: ISelfInit {
         if (runCatching { com.github.noamm9.features.impl.dev.ClickGui.chatFont.value }.getOrDefault(false)) c.withStyle { it.withFont(com.github.noamm9.utils.render.UiFont.regular) } else c
     })
 
+    /** A titled block: [title] with the prefix, then each line indented under it without one. */
+    fun modBlock(title: String, lines: List<String>) {
+        modMessage(title)
+        for (l in lines) chat(if (NoammAddons.isCheat) RiftChat.indented(l.addColor()) else Component.literal("   " + l.addColor()))
+    }
+
     fun debug(flag: String, msg: Any?) {
         if (NoammAddons.debugFlags.contains(flag)) modMessage(msg)
     }

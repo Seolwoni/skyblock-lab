@@ -258,8 +258,7 @@ internal fun AutoFishing.writeReport(reason: String) {
         add("Ended       $reason")
         add("Problems    ground recasts $statGround, re-linked hooks $statRelink, splash recasts $statSplash, drift recasts $statDrift, lava escapes $statLava, deaths $statDeaths, stalls $statStalls")
     }
-    info("&d&l--- Session report ---")
-    for (l in lines.drop(1)) info("&7" + l.substringBefore("  ") + " &f" + l.substringAfter("  ").trim())
+    if (chatInfo.value) com.github.noamm9.utils.ChatUtils.modBlock("&dSession report", lines.drop(1).map { "&7" + it.substringBefore("  ") + " &f" + it.substringAfter("  ").trim() })
     val file = com.github.noamm9.utils.Journal("report")
     file.log("=".repeat(60))
     lines.forEach { file.log(it) }

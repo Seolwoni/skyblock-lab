@@ -5,7 +5,7 @@ import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.Style
 
 /**
- * Void Rift chat look: a purple -> pink [RW] prefix and a softer palette for the message body.
+ * Void Rift chat look: a purple -> pink "Riftwalk ›" prefix and a softer palette for the message body.
  * Legacy § colours are mapped onto theme colours, so "§a" is still green and "§c" still red,
  * just in tones that sit well next to the prefix.
  */
@@ -21,14 +21,21 @@ object RiftChat {
 
     fun colorOf(code: Char): Int? = palette[code.lowercaseChar()]
 
-    /** "[RW] ›" with every letter stepping from violet to pink. */
+    /** "Riftwalk ›": the name stepping from violet to pink, then a quiet arrow. Every message starts with it. */
     val prefix: MutableComponent by lazy {
         Component.empty().apply {
-            append(part("[", 0x6D4AC2, true))
-            append(part("R", 0x8B5CF6, true))
-            append(part("W", 0xEC4899, true))
-            append(part("]", 0xB0397A, true))
+            val word = "Riftwalk"
+            word.forEachIndexed { i, ch -> append(part(ch.toString(), blend(0x8B5CF6, 0xEC4899, i / (word.length - 1f)), true)) }
+            append(part(" ›", 0x6B5F86, false))
         }
+    }
+
+    /** Lines under a titled message (a report): indented, no prefix, so a block reads as one message. */
+    fun indented(text: String): MutableComponent = Component.literal("   ").append(body(text))
+
+    private fun blend(a: Int, b: Int, t: Float): Int {
+        fun ch(shift: Int) = (((a shr shift) and 0xFF) + (((b shr shift) and 0xFF) - ((a shr shift) and 0xFF)) * t).toInt().coerceIn(0, 255)
+        return (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
     }
 
     private fun part(s: String, rgb: Int, bold: Boolean) =
