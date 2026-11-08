@@ -121,6 +121,15 @@ internal fun AutoFishing.surfaceY(at: Vec3): Double? {
     return null
 }
 
+/** Blocks (flat) from [feet] to the closest wanted fluid at or just below foot level, up to [max]; null when none is that close. */
+internal fun AutoFishing.edgeDistance(feet: BlockPos, max: Int): Int? {
+    for (r in 1 .. max) for (dx in - r .. r) for (dz in - r .. r) {
+        if (kotlin.math.abs(dx) != r && kotlin.math.abs(dz) != r) continue // the ring at distance r only
+        for (dy in - 3 .. 0) if (wantedFluid(feet.offset(dx, dy, dz))) return r
+    }
+    return null
+}
+
 internal fun AutoFishing.shoreSpot(p: LocalPlayer, centre: Vec3): Vec3? {
     val level = p.level()
     // stand low over the fluid: our sea creatures come up at the surface and can't climb to a high ledge
@@ -141,12 +150,14 @@ internal fun AutoFishing.shoreSpot(p: LocalPlayer, centre: Vec3): Vec3? {
             if (! level.getBlockState(feet).getCollisionShape(level, feet).isEmpty || ! level.getFluidState(feet).isEmpty) continue
             if (! level.getBlockState(feet.above()).getCollisionShape(level, feet.above()).isEmpty) continue
             if (nearLava(feet, 1)) continue // never stand right at a lava edge
+            val edge = edgeDistance(feet, maxEdge.value) ?: continue // too far back from the fluid
             val eye = Vec3(feet.x + 0.5, feet.y + 1.62, feet.z + 0.5)
             val clip = level.clip(net.minecraft.world.level.ClipContext(eye, centre.add(0.0, 0.3, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p))
             if (clip.type != net.minecraft.world.phys.HitResult.Type.MISS && clip.location.distanceTo(centre) > 1.5) continue
             val pos = Vec3(feet.x + 0.5, feet.y.toDouble(), feet.z + 0.5)
             val height = if (surface != null) (feet.y - surface).coerceAtLeast(0.0) else 0.0
-            val score = pos.distanceTo(p.position()) + abs(flat - 7.0) * 2 + height * 4
+            // close to the edge first (sea creatures reach you, the cast is short), then low, then the cast length, then the walk
+            val score = edge * 5.0 + height * 4 + abs(flat - 7.0) + pos.distanceTo(p.position()) * 0.5
             if (score < bestScore) { bestScore = score; best = pos }
             break
         }
