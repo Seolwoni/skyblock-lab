@@ -44,7 +44,7 @@ object AutoBlazeDagger: Feature("Automatically swaps to the correct dagger for b
             clicked = false
         }
 
-        register<NoammDebugFlagEvent.Add> {
+        register<DebugFlagEvent.Add> {
             if (event.flag != "dagger") return@register
             val dagger = Dagger.fromStack(player.mainHandItem) ?: return@register
 

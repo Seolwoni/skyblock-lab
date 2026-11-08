@@ -23,7 +23,7 @@ public class MixinChannel implements IMonoAudioChannel {
     private void forceMonoPosition(Vec3 pos, CallbackInfo ci) {
         if (!MonoAudio.INSTANCE.enabled) return;
         monoAudio$lastPosition = pos;
-        noammaddons$refreshPosition();
+        riftwalk$refreshPosition();
         ci.cancel();
     }
 
@@ -32,12 +32,12 @@ public class MixinChannel implements IMonoAudioChannel {
         if (!MonoAudio.INSTANCE.enabled) return;
         monoAudio$relative = relative;
         AL10.alSourcei(source, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE);
-        noammaddons$refreshPosition();
+        riftwalk$refreshPosition();
         ci.cancel();
     }
 
     @Override
-    public void noammaddons$refreshPosition() {
+    public void riftwalk$refreshPosition() {
         if (!MonoAudio.INSTANCE.enabled) return;
         MonoAudio.applyCenteredPosition(
             source,

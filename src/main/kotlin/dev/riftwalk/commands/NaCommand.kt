@@ -4,7 +4,7 @@ import dev.riftwalk.Riftwalk
 import dev.riftwalk.config.ConfigManager
 import dev.riftwalk.event.EventBus
 import dev.riftwalk.event.impl.ChatMessageEvent
-import dev.riftwalk.event.impl.NoammDebugFlagEvent
+import dev.riftwalk.event.impl.DebugFlagEvent
 import dev.riftwalk.features.impl.dev.UpdateChecker
 import dev.riftwalk.features.impl.dungeon.leapmenu.LeapMenu
 import dev.riftwalk.init.types.ICommandProvider
@@ -15,7 +15,7 @@ import dev.riftwalk.utils.ChatUtils.addColor
 import dev.riftwalk.utils.dungeons.DungeonListener
 import dev.riftwalk.utils.dungeons.enums.DungeonClass
 import dev.riftwalk.utils.items.ItemUtils.skyblockId
-import dev.riftwalk.utils.network.NoammAPI
+import dev.riftwalk.utils.network.DataAPI
 import com.mojang.brigadier.arguments.IntegerArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.context.CommandContext
@@ -25,7 +25,7 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.minecraft.network.chat.Component
 
 object NaCommand: ICommandProvider {
-    val names = listOf("rw", "riftwalk", "na", "noamm", "noammaddons").toTypedArray()
+    val names = listOf("rw", "riftwalk").toTypedArray()
 
     override fun CommandBuilder.command() {
         setName(*names)
@@ -93,7 +93,7 @@ object NaCommand: ICommandProvider {
                     StringArgumentType.getString(ctx, "flag").split(Regex("\\s+")).forEach { flag ->
                         val added = if (Riftwalk.debugFlags.remove(flag)) false else Riftwalk.debugFlags.add(flag)
                         ChatUtils.modMessage(if (added) "§aAdded debug flag: §b$flag" else "§cRemoved debug flag: §b$flag")
-                        EventBus.post(if (added) NoammDebugFlagEvent.Add(flag) else NoammDebugFlagEvent.Remove(flag))
+                        EventBus.post(if (added) DebugFlagEvent.Add(flag) else DebugFlagEvent.Remove(flag))
                     }
                 }
             }
@@ -101,7 +101,7 @@ object NaCommand: ICommandProvider {
 
         literal("sim") {
             runs {
-                ChatUtils.modMessage("§cInvalid Usage: §f/na sim <message>")
+                ChatUtils.modMessage("§cInvalid Usage: §f/rw sim <message>")
             }
 
             argument("message", StringArgumentType.greedyString()) {
@@ -201,7 +201,7 @@ object NaCommand: ICommandProvider {
         }
 
         literal("swapto") {
-            runs { ChatUtils.modMessage("missing skyblock id argument. /na swapto <ItemID>") }
+            runs { ChatUtils.modMessage("missing skyblock id argument. /rw swapto <ItemID>") }
             argument("skyblock id", StringArgumentType.word()) {
                 description("Automatically equips the item in the EQ menu")
                 runs {
@@ -264,7 +264,7 @@ object NaCommand: ICommandProvider {
     }
 
     private fun sendRtca(name: String = Riftwalk.mc.user.name) = Riftwalk.scope.launch(Dispatchers.IO) {
-        NoammAPI.getRtca(name).onSuccess {
+        DataAPI.getRtca(name).onSuccess {
             ChatUtils.modMessage("${it.name} is ${it.runs} M7 runs away from ca50 (${formatClassRuns(it.classes)})")
         }.onFailure {
             ChatUtils.modMessage("An error occurred meow! (${it.message})")

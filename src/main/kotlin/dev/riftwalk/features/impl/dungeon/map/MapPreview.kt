@@ -25,7 +25,7 @@ object MapPreview {
             built?.takeIf { builtCheater == cheater }?.let { return it }
             builtCheater = cheater
 
-            val json = MapPreview::class.java.getResourceAsStream("/assets/noammaddons/map-preview.json")
+            val json = MapPreview::class.java.getResourceAsStream("/assets/riftwalk/map-preview.json")
                 ?.reader()?.use(Reader::readText) ?: error("Could not find map preview file")
 
             return build(GsonUtils.decode(json)).also { built = it }

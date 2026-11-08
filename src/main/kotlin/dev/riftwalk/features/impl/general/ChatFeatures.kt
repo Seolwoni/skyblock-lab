@@ -41,8 +41,8 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
         setName(*NaCommand.names)
         literal("chathider") {
             description("Manages the custom chat hider regexes")
-            requires("Enable the $name Feature to use /na chathider.") { enabled }
-            runs { ChatUtils.modMessage("&bUsage: /na chathider <add|remove|list>") }
+            requires("Enable the $name Feature to use /rw chathider.") { enabled }
+            runs { ChatUtils.modMessage("&bUsage: /rw chathider <add|remove|list>") }
 
             literal("add") {
                 argument("regex", StringArgumentType.greedyString()) {

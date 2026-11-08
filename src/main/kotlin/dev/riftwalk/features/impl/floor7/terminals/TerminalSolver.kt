@@ -39,7 +39,7 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
     private val _simbtn by ButtonSetting("Terminal Simulator") {
         mc.execute { mc.gui.screen()?.onClose() }
         GuiUtils.setScreen(TerminalSimSelectorScreen())
-    }.withDescription("Opens the Terminal Simulator. can also be open via /na termsim")
+    }.withDescription("Opens the Terminal Simulator. can also be open via /rw termsim")
     val simAutoNext by ToggleSetting("Simulator Auto Next").hidden()
 
     private val soundsEnabled by ToggleSetting("Terminal Sounds", true).section("Sounds")

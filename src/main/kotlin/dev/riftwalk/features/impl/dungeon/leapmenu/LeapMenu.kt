@@ -41,7 +41,7 @@ import net.minecraft.world.item.Items
 object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
     private val customLeapMenu by ToggleSetting("Leap Menu", false).section("Custom Menu")
     private val renderMode by DropdownSetting("Render Mode", 0, listOf("Default", "Map", "Wheel")).withDescription("&nDefault&r is the standard 2x2 grid leap menu.\n&nMap&r lets you click a teammate's head on the dungeon map to leap to them.\n&nWheel&r is a proof of concept menu that on paper should be better than the usual 2x2, it shows all 5 players including yourself, so the order stays the same when you change class.").showIf { customLeapMenu.value }
-    val sorting by DropdownSetting("Leap Order", 0, arrayListOf("A-Z Class", "A-Z Name", "Odin Sorting", "Custom sorting", "No Sorting")).withDescription("How to sort the leap menu. /na leaporder to configure custom sorting.")
+    val sorting by DropdownSetting("Leap Order", 0, arrayListOf("A-Z Class", "A-Z Name", "Odin Sorting", "Custom sorting", "No Sorting")).withDescription("How to sort the leap menu. /rw leaporder to configure custom sorting.")
     private val customLeapOrderSetting by ListSetting<String>("Custom Leap Order").hidden()
     private val customLeapTypeSetting by TextInputSetting("Custom Leap Type", "name").hidden()
     private val leftClickOnly by ToggleSetting("Left Click Only").withDescription("Prevents leaping unless clicked with left mouse button")

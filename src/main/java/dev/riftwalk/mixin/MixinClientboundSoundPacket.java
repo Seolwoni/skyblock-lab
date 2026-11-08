@@ -12,15 +12,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ClientboundSoundPacket.class)
 public class MixinClientboundSoundPacket implements IMutedSoundPacket {
-    @Unique private boolean noammaddons$muted;
+    @Unique private boolean riftwalk$muted;
 
     @Override
-    public void noammaddons$mute() {
-        noammaddons$muted = true;
+    public void riftwalk$mute() {
+        riftwalk$muted = true;
     }
 
     @Inject(method = "handle(Lnet/minecraft/network/protocol/game/ClientGamePacketListener;)V", at = @At("HEAD"), cancellable = true)
     private void skipMutedSound(ClientGamePacketListener listener, CallbackInfo ci) {
-        if (noammaddons$muted && Riftwalk.getMc().packetProcessor().isSameThread()) ci.cancel();
+        if (riftwalk$muted && Riftwalk.getMc().packetProcessor().isSameThread()) ci.cancel();
     }
 }

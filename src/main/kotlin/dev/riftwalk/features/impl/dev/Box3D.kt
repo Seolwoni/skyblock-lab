@@ -27,8 +27,8 @@ object Box3D: Feature("Replaces the Glow ESP with 3D boxes") {
         register<CheckEntityGlowEvent>(EventPriority.LOWEST) {
             if (! event.shouldGlow) return@register
             val glow = event.entity as? IGlowingEntity ?: return@register
-            glow.`noammaddons$isGlowing`(true)
-            glow.`noammaddons$glowColor`(event.color)
+            glow.`riftwalk$isGlowing`(true)
+            glow.`riftwalk$glowColor`(event.color)
             event.isCanceled = true
         }
 
@@ -48,9 +48,9 @@ object Box3D: Feature("Replaces the Glow ESP with 3D boxes") {
 
             while (iterator.hasNext()) {
                 val entity = iterator.next()
-                if (! (entity as IGlowingEntity).`noammaddons$isGlowing`()) continue
+                if (! (entity as IGlowingEntity).`riftwalk$isGlowing`()) continue
                 if (entity == player) continue
-                val color = entity.`noammaddons$glowColor`()
+                val color = entity.`riftwalk$glowColor`()
 
                 event.ctx.renderBoxBounds(
                     entity.renderBoundingBox.inflate(0.1), color.withAlpha(outlineOpacity.value.toFloat() / 100),

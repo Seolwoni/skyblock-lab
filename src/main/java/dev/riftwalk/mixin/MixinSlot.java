@@ -15,24 +15,24 @@ public class MixinSlot implements ICoordRememberingSlot {
     @Unique public int originalY;
 
     @Override
-    public void noammaddons_rememberCoords() {
+    public void riftwalk_rememberCoords() {
         this.originalX = this.x;
         this.originalY = this.y;
     }
 
     @Override
-    public void noammaddons_restoreCoords() {
+    public void riftwalk_restoreCoords() {
         this.x = this.originalX;
         this.y = this.originalY;
     }
 
     @Override
-    public void noammaddons_setX(int x) {
+    public void riftwalk_setX(int x) {
         this.x = x;
     }
 
     @Override
-    public void noammaddons_setY(int y) {
+    public void riftwalk_setY(int y) {
         this.y = y;
     }
 }

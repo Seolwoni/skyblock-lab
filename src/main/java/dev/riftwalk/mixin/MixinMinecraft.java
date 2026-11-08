@@ -113,7 +113,7 @@ public abstract class MixinMinecraft {
         //#if LEGIT
         //! if (this.player ==null) return original;
         //! if (!LegitEntityVisibility.isVisible(this.player, entity)) {
-        //! ((IGlowingEntity) entity).noammaddons$isGlowing(false);
+        //! ((IGlowingEntity) entity).riftwalk$isGlowing(false);
         //! return original;
         //!}
         //#endif
@@ -122,10 +122,10 @@ public abstract class MixinMinecraft {
         if (EventBus.post(event)) return false;
 
         var glow = (IGlowingEntity) entity;
-        glow.noammaddons$isGlowing(event.getShouldGlow());
-        glow.noammaddons$glowColor(event.getColor());
+        glow.riftwalk$isGlowing(event.getShouldGlow());
+        glow.riftwalk$glowColor(event.getColor());
 
-        return original || glow.noammaddons$isGlowing();
+        return original || glow.riftwalk$isGlowing();
     }
 
     @SuppressWarnings("ConstantValue")

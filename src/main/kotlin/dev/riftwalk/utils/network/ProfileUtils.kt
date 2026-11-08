@@ -76,11 +76,11 @@ object ProfileUtils {
         SecretCache.check(name)?.let { return it }
 
         return getUUIDbyName(name).mapCatching { mojangData ->
-            NoammAPI.getSecrets(mojangData.uuid).getOrThrow()
+            DataAPI.getSecrets(mojangData.uuid).getOrThrow()
         }.apply {
             onSuccess { SecretCache.addToCache(name, it) }
             onFailure { error ->
-                if (error is NoammAPI.NoammAPIException) return@onFailure
+                if (error is DataAPI.NoammAPIException) return@onFailure
                 SecretCache.addFailedToCache(name)
             }
         }
@@ -91,11 +91,11 @@ object ProfileUtils {
         ProfileCache.check(name)?.let { return it }
 
         return getUUIDbyName(name).mapCatching { mojangData ->
-            NoammAPI.getDungeonStats(mojangData.uuid).getOrThrow()
+            DataAPI.getDungeonStats(mojangData.uuid).getOrThrow()
         }.apply {
             onSuccess { ProfileCache.addToCache(name, it) }
             onFailure { error ->
-                if (error is NoammAPI.NoammAPIException) return@onFailure
+                if (error is DataAPI.NoammAPIException) return@onFailure
                 ProfileCache.addFailedToCache(name)
             }
         }

@@ -81,7 +81,7 @@ object HubMap: Feature("Replaces the SkyBlock Hub world map with a custom image.
     }
 
     private fun loadDefault() {
-        HubMap::class.java.getResourceAsStream("/assets/noammaddons/hub-map.png")?.readBytes()?.let(::bindTexture)
+        HubMap::class.java.getResourceAsStream("/assets/riftwalk/hub-map.png")?.readBytes()?.let(::bindTexture)
     }
 
     private suspend fun loadFromUrl(url: String, force: Boolean) {

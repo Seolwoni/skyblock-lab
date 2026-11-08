@@ -23,7 +23,7 @@ public class MixinDevonianEventBus {
     private static void deferSoundCancellation(@Coerce Object event, Operation<Void> original, @Local(name = "packet") Packet<?> packet) {
         if (packet instanceof ClientboundSoundPacket) {
             // why the fuck does devonian cancel the whole packet just to mute a sound???
-            ((IMutedSoundPacket) packet).noammaddons$mute();
+            ((IMutedSoundPacket) packet).riftwalk$mute();
         }
         else original.call(event);
     }

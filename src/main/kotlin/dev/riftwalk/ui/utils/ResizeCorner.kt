@@ -11,8 +11,8 @@ enum class ResizeCorner(val cursor: CursorType) {
     RIGHT(CursorTypes.RESIZE_EW),
     TOP(CursorTypes.RESIZE_NS),
     BOTTOM(CursorTypes.RESIZE_NS),
-    TOP_LEFT(CursorType.createStandardCursor(CURSOR_RESIZE_NWSE, "noammaddons:nwse_resize", CursorTypes.RESIZE_ALL)),
-    TOP_RIGHT(CursorType.createStandardCursor(CURSOR_RESIZE_NESW, "noammaddons:nesw_resize", CursorTypes.RESIZE_ALL)),
-    BOTTOM_LEFT(CursorType.createStandardCursor(CURSOR_RESIZE_NESW, "noammaddons:nesw_resize", CursorTypes.RESIZE_ALL)),
-    BOTTOM_RIGHT(CursorType.createStandardCursor(CURSOR_RESIZE_NWSE, "noammaddons:nwse_resize", CursorTypes.RESIZE_ALL));
+    TOP_LEFT(CursorType.createStandardCursor(CURSOR_RESIZE_NWSE, "riftwalk:nwse_resize", CursorTypes.RESIZE_ALL)),
+    TOP_RIGHT(CursorType.createStandardCursor(CURSOR_RESIZE_NESW, "riftwalk:nesw_resize", CursorTypes.RESIZE_ALL)),
+    BOTTOM_LEFT(CursorType.createStandardCursor(CURSOR_RESIZE_NESW, "riftwalk:nesw_resize", CursorTypes.RESIZE_ALL)),
+    BOTTOM_RIGHT(CursorType.createStandardCursor(CURSOR_RESIZE_NWSE, "riftwalk:nwse_resize", CursorTypes.RESIZE_ALL));
 }

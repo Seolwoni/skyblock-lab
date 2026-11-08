@@ -55,16 +55,16 @@ public abstract class MixinCamera {
 
     @Inject(method = "calculateFov", at = @At(value = "RETURN"), cancellable = true)
     private void calculateFovHook(float partialTicks, CallbackInfoReturnable<Float> cir) {
-        cir.setReturnValue(INSTANCE.enabled && getCustomFOV().getValue() ? cir.getReturnValue() * noammaddons$getFOVRatio() : cir.getReturnValue());
+        cir.setReturnValue(INSTANCE.enabled && getCustomFOV().getValue() ? cir.getReturnValue() * riftwalk$getFOVRatio() : cir.getReturnValue());
     }
 
     @ModifyExpressionValue(method = "createProjectionMatrixForCulling", at = @At(value = "INVOKE", target = "Ljava/lang/Math;max(FF)F"))
     private float modifyProjectionFov(float original) {
-        return INSTANCE.enabled && getCustomFOV().getValue() ? original * noammaddons$getFOVRatio() : original;
+        return INSTANCE.enabled && getCustomFOV().getValue() ? original * riftwalk$getFOVRatio() : original;
     }
 
     @Unique
-    private float noammaddons$getFOVRatio() {
+    private float riftwalk$getFOVRatio() {
         // essential zoom changes the fov directly so we divide it to get the scale amount
         return getCustomFOVSlider().getValue().floatValue() / Riftwalk.getMc().options.fov().get().floatValue();
     }

@@ -13,7 +13,14 @@ import java.util.*
 import kotlin.math.roundToInt
 
 object SoundManager: Feature("Adjust volumes for every sound in the game"), IFeatureScreen {
-    private val volumes = PogObject("noammaddons_sounds", mutableMapOf<String, Float>())
+    private val volumes = run {
+        // the file used to be named after the old mod id; carry the saved volumes over once
+        val dir = java.io.File("config/${dev.riftwalk.Riftwalk.MOD_NAME}")
+        val old = java.io.File(dir, "noammaddons_sounds.json")
+        val now = java.io.File(dir, "sounds.json")
+        if (old.exists() && ! now.exists()) old.renameTo(now)
+        PogObject("sounds", mutableMapOf<String, Float>())
+    }
     private val recentSounds = Collections.synchronizedSet<Identifier>(mutableSetOf())
     @Volatile var recentSoundsVersion = 0L
 

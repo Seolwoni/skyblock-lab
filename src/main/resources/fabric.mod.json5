@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "noammaddons",
+  "id": "riftwalk",
   "version": "${version}",
   "name": "Riftwalk",
   //#if CHEAT
@@ -9,15 +9,14 @@
   //!"description": "SkyBlock toolkit for @MINECRAFT_VERSION@: dungeons, fishing helpers and routes in one clean menu (legit build).\nOpen with /rw. Built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
   //#endif
   "authors": [
-    "Noamm"
+    "seolwoni"
   ],
-  "contact": {
-    "homepage": "https://github.com/Noamm9",
-    "sources": "https://github.com/Noamm9/NoammAddons",
-    "issues": "https://github.com/Noamm9/NoammAddons/issues"
-  },
-  "license": "CC0-1.0",
-  "icon": "assets/noammaddons/icon.png",
+  "contributors": [
+    "Noamm - NoammAddons, the base (CC0)",
+    "yourboykyle - Secret Routes (GPL-3.0)"
+  ],
+  "license": ["CC0-1.0", "GPL-3.0-only"],
+  "icon": "assets/riftwalk/icon.png",
   "environment": "*",
   "entrypoints": {
     "modmenu": [
@@ -32,10 +31,10 @@
     ]
   },
   "mixins": [
-    "noammaddons.mixins.json",
+    "riftwalk.mixins.json",
     "secretroutes.mixins.json"
   ],
-  "accessWidener": "noammaddons.accesswidener",
+  "accessWidener": "riftwalk.accesswidener",
   "depends": {
     "fabricloader": ">=0.19.5",
     "minecraft": "@MINECRAFT_VERSION@",
@@ -46,12 +45,5 @@
   "suggests": {
     "assistcore": "*",
     "assistpath": "*"
-  },
-  "custom": {
-    "modmenu": {
-      "links": {
-        "Discord": "https://discord.com/invite/pj9mQGxMxB"
-      }
-    }
   }
 }

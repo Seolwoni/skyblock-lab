@@ -30,7 +30,7 @@ import kotlin.io.encoding.Base64
 import kotlin.jvm.optionals.getOrNull
 
 object ApiAuth: ISelfInit {
-    private const val AUTH_URL = "${NoammAPI.URL}/hypixel/auth"
+    private const val AUTH_URL = "${DataAPI.URL}/hypixel/auth"
     @Volatile private var tokenInfo: TokenResponse? = null
     @Volatile var keyPairUnavailable = false
         private set

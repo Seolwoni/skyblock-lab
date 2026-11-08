@@ -10,7 +10,7 @@ enum class OitMode {
 private object OitPipelines {
     val FILLED_THROUGH_WALLS = net.minecraft.client.renderer.RenderPipelines.register(
         net.minecraft.client.renderer.oit.OitPipelineSet.builder(
-            "noammaddons_filled_through_walls",
+            "riftwalk_filled_through_walls",
             RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.OIT_DEBUG_FILLED_SNIPPET).apply {
                 withVertexBinding(0, com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR)
                 withPrimitiveTopology(PrimitiveTopology.QUADS)
@@ -21,7 +21,7 @@ private object OitPipelines {
 
     val CIRCLE_FILLED_THROUGH_WALLS = net.minecraft.client.renderer.RenderPipelines.register(
         net.minecraft.client.renderer.oit.OitPipelineSet.builder(
-            "noammaddons_circle_filled_through_walls",
+            "riftwalk_circle_filled_through_walls",
             RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.OIT_DEBUG_FILLED_SNIPPET).apply {
                 withVertexBinding(0, com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR)
                 withPrimitiveTopology(PrimitiveTopology.QUADS)
@@ -32,7 +32,7 @@ private object OitPipelines {
 
     val LINES_THROUGH_WALLS = net.minecraft.client.renderer.RenderPipelines.register(
         net.minecraft.client.renderer.oit.OitPipelineSet.builder(
-            "noammaddons_lines_through_walls",
+            "riftwalk_lines_through_walls",
             RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.OIT_LINES_SNIPPET)
         ).withoutDepthTest().build()
     )

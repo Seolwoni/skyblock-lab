@@ -3,11 +3,11 @@ package dev.riftwalk.interfaces;
 import java.awt.*;
 
 public interface IGlowingEntity {
-    Color noammaddons$glowColor();
+    Color riftwalk$glowColor();
 
-    void noammaddons$glowColor(Color color);
+    void riftwalk$glowColor(Color color);
 
-    boolean noammaddons$isGlowing();
+    boolean riftwalk$isGlowing();
 
-    void noammaddons$isGlowing(boolean value);
+    void riftwalk$isGlowing(boolean value);
 }

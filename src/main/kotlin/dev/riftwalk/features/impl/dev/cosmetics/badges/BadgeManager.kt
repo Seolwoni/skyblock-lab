@@ -3,7 +3,7 @@ package dev.riftwalk.features.impl.dev.cosmetics.badges
 import dev.riftwalk.Riftwalk
 import dev.riftwalk.Riftwalk.mc
 import dev.riftwalk.utils.catch
-import dev.riftwalk.utils.network.NoammAPI
+import dev.riftwalk.utils.network.DataAPI
 import dev.riftwalk.utils.network.WebUtils
 import com.mojang.blaze3d.platform.NativeImage
 import kotlinx.serialization.Serializable
@@ -11,7 +11,7 @@ import java.nio.file.Files
 import kotlin.io.encoding.Base64
 
 object BadgeManager {
-    const val URL = "${NoammAPI.URL}/badges.json"
+    const val URL = "${DataAPI.URL}/badges.json"
     @Volatile private var chars = emptyMap<String, Char>()
     fun charOf(id: String) = chars[id]
     const val SEPARATOR = '\uE100'

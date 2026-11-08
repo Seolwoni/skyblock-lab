@@ -13,13 +13,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = ContainerScreen.class, priority = 2000)
 public class MixinContainerScreenBackground {
     @Unique
-    private StorageOverlayScreen noammaddons$overlay() {
+    private StorageOverlayScreen riftwalk$overlay() {
         return StorageOverlay.activeFor((ContainerScreen) (Object) this);
     }
 
     @Inject(method = "extractBackground", at = @At("HEAD"), cancellable = true)
     private void renderBgHook(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a, CallbackInfo ci) {
-        StorageOverlayScreen overlay = noammaddons$overlay();
+        StorageOverlayScreen overlay = riftwalk$overlay();
         if (overlay != null) {
             overlay.renderContainerOverlay(graphics, mouseX, mouseY);
             ci.cancel();

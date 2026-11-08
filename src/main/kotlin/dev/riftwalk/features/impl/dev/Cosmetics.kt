@@ -48,7 +48,7 @@ object Cosmetics: Feature(toggled = true) {
             Riftwalk.logger.info("fetching cosmeticPeople")
 
             launch { BadgeManager.load() }
-            WebUtils.getAs<Map<String, CosmeticData>>("${NoammAPI.URL}/cosmeticPeople.json").onSuccess { data ->
+            WebUtils.getAs<Map<String, CosmeticData>>("${DataAPI.URL}/cosmeticPeople.json").onSuccess { data ->
                 TextReplacer.ready = false
                 cosmeticPeople = data.mapKeys { UUID.fromString(it.key) }
                 BadgeText.init(cosmeticPeople)

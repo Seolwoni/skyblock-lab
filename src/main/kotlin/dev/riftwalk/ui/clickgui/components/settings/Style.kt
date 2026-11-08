@@ -176,7 +176,7 @@ object Style {
         ctx.drawRect(x + (w * end) - (kSize / 2f), y + (h / 2f) - (kSize / 2f), kSize, kSize)
     }
 
-    /** Riftwalk's own "du-geok" keyboard clack (assets/noammaddons/sounds/click.ogg). */
+    /** Riftwalk's own "du-geok" keyboard clack (assets/riftwalk/sounds/click.ogg). */
     private val riftClick by lazy {
         net.minecraft.sounds.SoundEvent.createVariableRangeEvent(net.minecraft.resources.Identifier.fromNamespaceAndPath(dev.riftwalk.Riftwalk.MOD_ID, "ui.click"))
     }

@@ -2,7 +2,7 @@ package dev.riftwalk.debug
 
 import dev.riftwalk.Riftwalk
 import dev.riftwalk.event.EventBus
-import dev.riftwalk.event.impl.NoammDebugFlagEvent
+import dev.riftwalk.event.impl.DebugFlagEvent
 import dev.riftwalk.event.impl.RenderWorldEvent
 import dev.riftwalk.init.types.ISelfInit
 import dev.riftwalk.utils.render.world.Render3D.renderBillboardedCircle
@@ -104,6 +104,6 @@ object RenderTest: ISelfInit {
             event.ctx.renderString("renderTracer()", tracerTarget.add(0.0, 1.0, 0.0), Color.YELLOW, 0.8f)
         }
 
-        EventBus.register<NoammDebugFlagEvent.Remove> { if (event.flag == "render") pos = null }
+        EventBus.register<DebugFlagEvent.Remove> { if (event.flag == "render") pos = null }
     }
 }

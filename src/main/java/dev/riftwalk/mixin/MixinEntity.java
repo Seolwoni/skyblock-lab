@@ -45,8 +45,8 @@ public abstract class MixinEntity implements IGlowingEntity {
 
     @Inject(method = "getTeamColor", at = @At("HEAD"), cancellable = true)
     private void onGetTeamColorValue(CallbackInfoReturnable<Integer> cir) {
-        if (noammaddons$isGlowing() && !Box3D.INSTANCE.enabled) {
-            cir.setReturnValue(noammaddons$glowColor().getRGB());
+        if (riftwalk$isGlowing() && !Box3D.INSTANCE.enabled) {
+            cir.setReturnValue(riftwalk$glowColor().getRGB());
         }
     }
 
@@ -70,22 +70,22 @@ public abstract class MixinEntity implements IGlowingEntity {
     }
 
     @Override
-    public Color noammaddons$glowColor() {
+    public Color riftwalk$glowColor() {
         return glowColor;
     }
 
     @Override
-    public void noammaddons$glowColor(@NonNull Color color) {
+    public void riftwalk$glowColor(@NonNull Color color) {
         glowColor = color;
     }
 
     @Override
-    public boolean noammaddons$isGlowing() {
+    public boolean riftwalk$isGlowing() {
         return glowForced;
     }
 
     @Override
-    public void noammaddons$isGlowing(boolean value) {
+    public void riftwalk$isGlowing(boolean value) {
         glowForced = value;
     }
 }

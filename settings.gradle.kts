@@ -1,4 +1,4 @@
-rootProject.name = "NoammAddons"
+rootProject.name = "Riftwalk"
 
 pluginManagement {
     repositories {

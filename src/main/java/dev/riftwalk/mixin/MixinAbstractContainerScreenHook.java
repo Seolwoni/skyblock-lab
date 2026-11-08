@@ -84,13 +84,13 @@ public class MixinAbstractContainerScreenHook<T extends AbstractContainerMenu> e
         StorageOverlayScreen overlay = storageOverlay();
         if (overlay != null) {
             for (Slot slot : menu.slots) {
-                if (! hasRememberedSlots) ((ICoordRememberingSlot) slot).noammaddons_rememberCoords();
-                ((ICoordRememberingSlot) slot).noammaddons_setX(- 100000);
-                ((ICoordRememberingSlot) slot).noammaddons_setY(- 100000);
+                if (! hasRememberedSlots) ((ICoordRememberingSlot) slot).riftwalk_rememberCoords();
+                ((ICoordRememberingSlot) slot).riftwalk_setX(- 100000);
+                ((ICoordRememberingSlot) slot).riftwalk_setY(- 100000);
             }
             hasRememberedSlots = true;
         } else if (hasRememberedSlots) {
-            for (Slot slot : menu.slots) ((ICoordRememberingSlot) slot).noammaddons_restoreCoords();
+            for (Slot slot : menu.slots) ((ICoordRememberingSlot) slot).riftwalk_restoreCoords();
             hasRememberedSlots = false;
         }
     }

@@ -12,7 +12,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import kotlinx.io.IOException
 
-object NoammAPI {
+object DataAPI {
     const val URL = "https://api.noamm.org"
     @Volatile private var sessionExpired = false
     @Volatile private var cooldownUntil = 0L

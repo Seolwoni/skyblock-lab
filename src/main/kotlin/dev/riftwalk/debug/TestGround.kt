@@ -120,7 +120,7 @@ object TestGround: ISelfInit, ICommandProvider {
             ChatUtils.modMessage("name: $name, pitch: $pitch, volume: $volume")
         }
 
-        EventBus.register<NoammDebugFlagEvent.Add> {
+        EventBus.register<DebugFlagEvent.Add> {
             if (event.flag != "skull") return@register
             event.cancel()
 

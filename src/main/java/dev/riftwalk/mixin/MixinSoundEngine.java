@@ -21,7 +21,7 @@ public class MixinSoundEngine {
         if (!MonoAudio.INSTANCE.enabled) return;
 
         channelAccess.executeOnChannels(stream ->
-            stream.forEach(channel -> ((IMonoAudioChannel) channel).noammaddons$refreshPosition())
+            stream.forEach(channel -> ((IMonoAudioChannel) channel).riftwalk$refreshPosition())
         );
     }
 }

@@ -11,10 +11,10 @@ plugins {
     `maven-publish`
     kotlin("jvm")
     kotlin("plugin.serialization")
-    id("noammaddons.variants")
-    id("noammaddons.preprocessing")
-    id("noammaddons.publishing")
-    id("noammaddons.loom")
+    id("riftwalk.variants")
+    id("riftwalk.preprocessing")
+    id("riftwalk.publishing")
+    id("riftwalk.loom")
     idea
 }
 
@@ -206,7 +206,7 @@ tasks.named<Jar>("jar") {
 
 listOf("jarCheat", "jarLegit").forEach { taskName ->
     tasks.named<ShadowJar>(taskName) {
-        // NoammAddons-<mod_version>-<minecraft_version>-<cheat|legit>.jar
+        // Riftwalk-<mod_version>-<minecraft_version>-<cheat|legit>.jar
         archiveVersion.set("$mod_version-$minecraft_version")
         // Assist Core / Assist Path API stubs are only for compiling; the real classes come from those mods.
         exclude("com/seolwoni/**")

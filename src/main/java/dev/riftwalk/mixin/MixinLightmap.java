@@ -15,7 +15,7 @@ public abstract class MixinLightmap {
     @Unique private static final Vector3fc NOAMMADDONS$WHITE = new Vector3f(1f, 1f, 1f);
 
     @ModifyVariable(method = "render", at = @At("HEAD"), argsOnly = true)
-    private LightmapRenderState noammaddons$fullbright(LightmapRenderState renderState) {
+    private LightmapRenderState riftwalk$fullbright(LightmapRenderState renderState) {
         if (!Camera.INSTANCE.enabled || !Camera.getFullBright().getValue()) return renderState;
 
         renderState.needsUpdate = Camera.flashFullFright;

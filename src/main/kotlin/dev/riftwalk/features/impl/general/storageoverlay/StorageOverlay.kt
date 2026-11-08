@@ -11,7 +11,7 @@ import dev.riftwalk.utils.ChatUtils.unformattedText
 import dev.riftwalk.utils.ThreadUtils
 import dev.riftwalk.utils.catch
 import dev.riftwalk.utils.location.LocationUtils
-import dev.riftwalk.utils.network.NoammAPI
+import dev.riftwalk.utils.network.DataAPI
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.minecraft.client.gui.screens.Screen
@@ -235,7 +235,7 @@ object StorageOverlay: Feature("Shows all storage pages in an overlay when openi
         if (loaded) return
         loaded = true
         val profile = dataProfile
-        NoammAPI.getStorage(mc.user.profileId.toString()).onSuccess {
+        DataAPI.getStorage(mc.user.profileId.toString()).onSuccess {
             if (profile != dataProfile) return@onSuccess
             val data = TreeMap<StoragePage, NBTInventory?>()
             it.enderchest.forEach { (i, stacks) -> data[StoragePage(i)] = NBTInventory(stacks) }
