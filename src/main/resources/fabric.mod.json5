@@ -4,9 +4,9 @@
   "version": "${version}",
   "name": "Riftwalk",
   //#if CHEAT
-  "description": "Riftwalk for @MINECRAFT_VERSION@ - dungeon toolkit built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
+  "description": "SkyBlock toolkit for @MINECRAFT_VERSION@: fishing, dungeons and routes in one clean menu.\nOpen with /rw. Built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
   //#else
-  //!"description": "Riftwalk for @MINECRAFT_VERSION@ - dungeon toolkit built on NoammAddons (CC0) and Secret Routes (GPL-3.0). Legit build.",
+  //!"description": "SkyBlock toolkit for @MINECRAFT_VERSION@: dungeons, fishing helpers and routes in one clean menu (legit build).\nOpen with /rw. Built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
   //#endif
   "authors": [
     "Noamm"

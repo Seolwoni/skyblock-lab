@@ -8,7 +8,6 @@ import com.github.noamm9.event.impl.TickEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.init.NetworkLoop
 import com.github.noamm9.utils.ChatUtils.removeFormatting
-import com.github.noamm9.utils.NumbersUtils
 import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.github.noamm9.utils.render.Render2D.drawString
 import net.minecraft.world.entity.decoration.ArmorStand
@@ -20,13 +19,7 @@ import net.minecraft.world.phys.Vec3
  * Sea creatures are read from the name tags that come up at the hook, items from what lands in the inventory
  * right after reeling in, so it also works on servers with their own creatures and items.
  */
-object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and fished-up items with their coin value, per hour (water and lava).") {
-    private val showCreatures by ToggleSetting("Sea Creatures", true).section("Display")
-    private val showItems by ToggleSetting("Items", true)
-    private val showProfit by ToggleSetting("Coin Value", true).withDescription("Adds what the items are worth (bazaar sell / lowest BIN)")
-    private val maxLines by SliderSetting("Lines Per List", 6, 2, 20, 1)
-    private val pauseAfter by SliderSetting("Pause After", 60, 10, 600, 10, " s").withDescription("The per-hour numbers stop the clock when you haven't reeled in for this long")
-    private val showTrophy by ToggleSetting("Trophy Fish", true).withDescription("Counts trophy fish by tier (Bronze / Silver / Gold / Diamond) from the catch message")
+object FishingTracker: Feature("Bobber timer and bait alerts. Also counts catches in the background for the Auto Fishing report (nothing on screen).") {
     private val bobberTimer by ToggleSetting("Bobber Timer", true).section("Bobber").withDescription("Shows how long the hook has been out, above the hook")
     private val timerWarn by SliderSetting("Timer Warn After", 20, 5, 60, 1, " s").withDescription("The timer turns red after this long without a bite")
     private val baitAlert by ToggleSetting("Bait Alerts", true).section("Bait").withDescription("Tells you when the bait in your last hotbar slot (Fishing Bag) changes or runs low")
@@ -35,7 +28,6 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     val resetButton by ButtonSetting("Reset Tracker") { reset() }
 
     private val trophyMsg = com.github.noamm9.utils.SkyblockText.TROPHY_CATCH
-    private val tierColor = mapOf("BRONZE" to "§6", "SILVER" to "§7", "GOLD" to "§e", "DIAMOND" to "§b")
     private val trophies = LinkedHashMap<String, IntArray>() // fish -> bronze, silver, gold, diamond
     private var castAt = 0L
     private var baitName: String? = null
@@ -50,7 +42,6 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     private var doubleHooks = 0
     private val creatures = LinkedHashMap<String, Int>()
     private val items = LinkedHashMap<String, Pair<Int, Long>>() // name -> count, coins
-    private var activeMs = 0L
     private var lastReel = 0L
     private var lastTick = 0L
     private var lavaCasts = 0
@@ -90,13 +81,6 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
             val pos = hook.getPosition(mc.deltaTracker.getGameTimeDeltaPartialTick(true)).add(0.0, 0.9, 0.0)
             with(com.github.noamm9.utils.render.world.Render3D) { event.ctx.renderString(String.format("%.1fs", secs), pos, col, 1.2f, phase = true) }
         }
-
-        hudElement("Fishing Tracker") { ctx, example ->
-            val lines = if (example) exampleLines() else lines()
-            if (lines.isEmpty()) return@hudElement 0f to 0f
-            lines.forEachIndexed { i, l -> ctx.drawString(l, 0, i * 10) }
-            lines.maxOf { with(com.github.noamm9.utils.render.RenderHelper) { it.width() } } to lines.size * 10
-        }
     }
 
     /** Running totals, for the Auto Fishing session report (it takes the difference from the start). */
@@ -111,7 +95,7 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
     fun reset() {
         casts = 0; reels = 0; doubleHooks = 0; lavaCasts = 0
         creatures.clear(); items.clear(); trophies.clear()
-        activeMs = 0; lastReel = 0
+        lastReel = 0
     }
 
     /** The bait in the last hotbar slot: its name and the "Bait Remaining: N" count from the lore. */
@@ -138,7 +122,6 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
         val p = mc.player ?: return
         watchBait(p)
         val now = System.currentTimeMillis()
-        if (lastTick != 0L && lastReel != 0L && now - lastReel < pauseAfter.value * 1000L) activeMs += now - lastTick
         lastTick = now
 
         val hook = p.fishing
@@ -214,54 +197,4 @@ object FishingTracker: Feature("Tracks your fishing: catches, sea creatures and 
         }
         if (seenStands.size > 4000) seenStands.clear()
     }
-
-    private fun perHour(n: Number): String {
-        val h = activeMs / 3_600_000.0
-        if (h < 0.01) return "-"
-        return NumbersUtils.format((n.toDouble() / h).toLong())
-    }
-
-    private fun lines(): List<String> {
-        if (casts == 0 && reels == 0) return emptyList()
-        val out = ArrayList<String>()
-        val mins = activeMs / 60000
-        out += "§dFishing Tracker §8(${mins / 60}h ${mins % 60}m)"
-        out += "§7Catches §f$reels §8(${perHour(reels)}/h)  §7casts §f$casts" + (if (lavaCasts > 0) " §6($lavaCasts lava)" else "")
-        if (doubleHooks > 0) out += "§7Double Hooks §f$doubleHooks"
-        val totalCreatures = creatures.values.sum()
-        if (showCreatures.value && totalCreatures > 0) {
-            out += "§bSea Creatures §f$totalCreatures §8(${perHour(totalCreatures)}/h)"
-            creatures.entries.sortedByDescending { it.value }.take(maxLines.value).forEach { (n, c) -> out += " §7$n §f$c" }
-        }
-        if (showItems.value && items.isNotEmpty()) {
-            out += "§aItems"
-            items.entries.sortedByDescending { if (showProfit.value) it.value.second else it.value.first.toLong() }.take(maxLines.value).forEach { (n, v) ->
-                out += " §7$n §fx${v.first}" + if (showProfit.value && v.second > 0) " §6${NumbersUtils.format(v.second)}" else ""
-            }
-        }
-        if (showTrophy.value && trophies.isNotEmpty()) {
-            out += "§6Trophy Fish §f${trophies.values.sumOf { it.sum() }}"
-            trophies.entries.sortedByDescending { it.value.sum() }.take(maxLines.value).forEach { (n, t) ->
-                out += " §7$n " + listOf("BRONZE", "SILVER", "GOLD", "DIAMOND").mapIndexedNotNull { i, k -> if (t[i] > 0) "${tierColor[k]}${t[i]}" else null }.joinToString("§8/")
-            }
-        }
-        if (showProfit.value) {
-            val total = items.values.sumOf { it.second }
-            out += "§6Total §f${NumbersUtils.format(total)} §8(${perHour(total)}/h)"
-        }
-        return out
-    }
-
-    private fun exampleLines() = listOf(
-        "§dFishing Tracker §8(1h 12m)",
-        "§7Catches §f512 §8(426/h)  §7casts §f530",
-        "§bSea Creatures §f61 §8(50/h)",
-        " §7Sea Walker §f22",
-        " §7Night Squid §f14",
-        "§aItems",
-        " §7Raw Fish §fx210 §6420",
-        "§6Trophy Fish §f9",
-        " §7Sulphur Skitter §66§8/§72§8/§e1",
-        "§6Total §f1.2M §8(1M/h)",
-    )
 }
