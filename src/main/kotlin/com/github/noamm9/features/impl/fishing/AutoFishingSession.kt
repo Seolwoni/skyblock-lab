@@ -236,7 +236,7 @@ internal fun AutoFishing.resumeTick() {
 
 // ------------------------------------------------------------------ session report
 
-/** End of a session: the numbers in chat and in journal/sessions/<date>.txt. */
+/** End of a session: the numbers in chat and in this game's run log. */
 internal fun AutoFishing.writeReport(reason: String) {
     if (sessionStart <= 0L) return
     val ms = System.currentTimeMillis() - sessionStart
@@ -260,10 +260,10 @@ internal fun AutoFishing.writeReport(reason: String) {
     }
     info("&d&l--- Session report ---")
     for (l in lines.drop(1)) info("&7" + l.substringBefore("  ") + " &f" + l.substringAfter("  ").trim())
-    val name = "sessions/" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm"))
-    val file = com.github.noamm9.utils.Journal(name)
+    val file = com.github.noamm9.utils.Journal("report")
+    file.log("=".repeat(60))
     lines.forEach { file.log(it) }
-    journal.log("report saved: $name")
+    file.log("=".repeat(60))
     lastReport = lines
     sessionStart = 0L
     sendDiscord(reason, lines, ms, coins, hours)
@@ -309,14 +309,11 @@ internal fun AutoFishing.sendDiscord(reason: String, lines: List<String>, ms: Lo
         journal.log(if (ok) "discord: sent ($title)" else "discord: failed - $err")
     }
 }
-/** fishing.log (last ~1.5 MB) and the 3 newest session reports, to the Discord webhook. */
-/** fishing.log and the latest 3 session reports. */
+/** This game's run log and the one before it (session reports are inside them). */
 internal fun AutoFishing.logFiles(): List<java.nio.file.Path> {
-    val dir = java.nio.file.Path.of(journal.path).parent
-    val out = ArrayList<java.nio.file.Path>()
-    out.add(dir.resolve("fishing.log"))
-    runCatching { java.nio.file.Files.list(dir.resolve("sessions")).use { st -> st.sorted(Comparator.reverseOrder()).limit(3).forEach { out.add(it) } } }
-    return out
+    val runs = com.github.noamm9.utils.Journal.runs()
+    val cur = com.github.noamm9.utils.Journal.runFile
+    return (listOf(cur).filter { java.nio.file.Files.exists(it) } + runs.filter { it != cur }).take(2)
 }
 
 /** Copies the logs into Downloads/Riftwalk; [loud] says so in chat either way. */
@@ -328,16 +325,10 @@ internal fun AutoFishing.saveLogsToDownloads(loud: Boolean) {
 
 internal fun AutoFishing.sendLogs() {
     if (discordUrl.value.isBlank()) return info("&cPut your Discord webhook URL in first (Discord section).")
-    val dir = java.nio.file.Path.of(journal.path).parent
     val files = ArrayList<Pair<String, ByteArray>>()
-    runCatching {
-        val log = java.nio.file.Files.readAllBytes(dir.resolve("fishing.log"))
-        files += "fishing.log" to (if (log.size > 1_500_000) log.copyOfRange(log.size - 1_500_000, log.size) else log)
-    }
-    runCatching {
-        java.nio.file.Files.list(dir.resolve("sessions")).use { st ->
-            st.sorted(Comparator.reverseOrder()).limit(3).forEach { files += it.fileName.toString() to java.nio.file.Files.readAllBytes(it) }
-        }
+    for (f in logFiles()) runCatching {
+        val log = java.nio.file.Files.readAllBytes(f)
+        files += f.fileName.toString() to (if (log.size > 1_500_000) log.copyOfRange(log.size - 1_500_000, log.size) else log)
     }
     if (files.isEmpty()) return info("&cNo logs yet - fish for a bit first.")
     info("&7Sending ${files.size} file(s) to Discord...")

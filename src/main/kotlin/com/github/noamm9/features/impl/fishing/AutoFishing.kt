@@ -147,7 +147,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val spotSearch by SliderSetting("Find Water Within", 48, 16, 96, 4, " blocks").withDescription("With no hotspot (or hotspots off) and not already looking at water / lava: how far to look for the nearest pool to walk to")
     internal val resumeAfterDeath by ToggleSetting("Come Back After Death", true).withDescription("Dying (\"☠ You ...\" message) doesn't end the session: after the respawn it walks / warps back to the spot and fishes on")
     internal val maxDeaths by SliderSetting("Max Deaths", 3, 1, 10, 1).showIf { resumeAfterDeath.value }.withDescription("Stops for good after this many deaths within 10 minutes (something keeps killing you there)")
-    internal val stallSeconds by SliderSetting("Stall Recovery After", 10, 0, 300, 5, " s").withDescription("Nothing has happened for this long (same state, no cast, no move, no kill): writes down why in fishing.log and starts over from finding a spot. Waiting for a bite and breaks don't count. 0 = off")
+    internal val stallSeconds by SliderSetting("Stall Recovery After", 10, 0, 300, 5, " s").withDescription("Nothing has happened for this long (same state, no cast, no move, no kill): writes down why in the log and starts over from finding a spot. Waiting for a bite and breaks don't count. 0 = off")
     internal val resumeAfterReboot by ToggleSetting("Come Back After Reboot", true).withDescription("Only after the server's own restart warning: if you're moved within 3 minutes, warp back to the island and carry on fishing. Any other move still stops")
     internal val warpCommand by com.github.noamm9.config.types.TextInputSetting("Warp Command", "").withDescription("The command back to your fishing island, without the slash (empty = the usual one, e.g. warp crimson)")
     internal val hotspotRange by SliderSetting("Search Range", 200, 16, 400, 8, " blocks").withDescription("How far it looks for a Hotspot. Hotspots seen earlier are remembered for 3 minutes, even after they're out of sight")
@@ -218,17 +218,17 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         }
     }
     internal val sendLogsButton by com.github.noamm9.config.types.ButtonSetting("Send Logs To Discord") { sendLogs() }
-        .withDescription("Uploads fishing.log and the latest session reports to your Discord webhook - handy on a phone, where the files are hard to reach (needs the Webhook URL above)")
+        .withDescription("Uploads this game's log (session reports included) and the previous one to your Discord webhook - handy on a phone, where the files are hard to reach (needs the Webhook URL above)")
     internal val checkButton by com.github.noamm9.config.types.ButtonSetting("Fishing Check") { runCatching { fishingCheck() }.onFailure { info("&cCheck failed: ${it.message}") } }
         .section("Server Check").withDescription("Prints what the mod can see right now: hotbar item IDs, floating texts nearby (hotspot / bite / name tags), the hook, tab stats, mana and bait. Stand by the water with the rod out")
     internal val saveLogsButton by com.github.noamm9.config.types.ButtonSetting("Save Logs To Downloads") { saveLogsToDownloads(true) }
-        .withDescription("Copies fishing.log and the latest session reports into Downloads/Riftwalk, where a file manager can open them (phone or PC)")
+        .withDescription("Copies this game's log (session reports included) and the previous one into Downloads/Riftwalk, where a file manager can open them (phone or PC)")
     internal val autoSaveLogs by ToggleSetting("Save Logs After Each Session", com.github.noamm9.utils.Platform.isMobile)
         .withDescription("Does the same on its own whenever a session ends (on by default on phones)")
     internal val copyLogButton by com.github.noamm9.config.types.ButtonSetting("Copy Log Path") {
         mc.keyboardHandler.clipboard = journal.path
         info("&7Fishing log: &f${journal.path} &8(copied)")
-    }.withDescription("Copies where fishing.log is, to send it over after a test")
+    }.withDescription("Copies where this game's log is, to send it over after a test")
     internal val stopAfterMin by SliderSetting("Stop After", 0, 0, 600, 10, " min").withDescription("Ends the session on its own after this long (0 = never)")
     internal val stopAfterKills by SliderSetting("Stop After Kills", 0, 0, 5000, 50).withDescription("Ends the session after this many sea creature kills (0 = never)")
     internal val lowHealth by DropdownSetting("On Low Health", 0, listOf("Wait", "Stop")).section("Safety").withDescription("Wait: no new casts until health is back (fights go on, the creatures are what hurts); Stop: end the session")

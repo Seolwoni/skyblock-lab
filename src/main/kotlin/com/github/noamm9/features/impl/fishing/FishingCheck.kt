@@ -11,7 +11,7 @@ import com.github.noamm9.utils.items.ItemUtils.skyblockId
 /**
  * One button that shows what the mod can actually read on this server, so the guesses in [SkyblockText]
  * can be checked in a minute: hotbar IDs, every floating text around, the hook's state, tab stats, mana, bait.
- * Everything also goes to fishing.log.
+ * Everything also goes to the run log.
  */
 internal fun AutoFishing.fishingCheck() {
     val p = mc.player ?: return
@@ -64,6 +64,6 @@ internal fun AutoFishing.fishingCheck() {
         out("&7slot 9: &f${bait.hoverName.string} &8bait count: ${count ?: "no 'Bait Remaining' line"}")
     }
     out("&7catch lines seen: &f${catches.size} &8(messages that named a creature this session show as 'catch line' in the log)")
-    out("&8full output saved to fishing.log")
+    out("&8full output saved to the run log")
 }
 //#endif
