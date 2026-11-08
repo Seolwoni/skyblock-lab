@@ -82,6 +82,30 @@ class MiningMathTest {
     }
 
     @Test
+    fun `give up - the floor until there are samples, then three medians within the cap`() {
+        assertEquals(120, MiningMath.giveUpTicks(listOf(10, 12), 120, 600))
+        assertEquals(120, MiningMath.giveUpTicks(List(9) { 10 }, 120, 600), "fast blocks keep the floor")
+        assertEquals(300, MiningMath.giveUpTicks(List(9) { 100 }, 120, 600), "slow blocks get 3x their median")
+        assertEquals(600, MiningMath.giveUpTicks(List(9) { 400 }, 120, 600), "never past the cap")
+    }
+
+    @Test
+    fun `median of samples`() {
+        assertEquals(- 1, MiningMath.median(emptyList()))
+        assertEquals(5, MiningMath.median(listOf(9, 1, 5)))
+    }
+
+    @Test
+    fun `on ray - in front and close to the line only`() {
+        // looking along +z from the origin
+        assertTrue(MiningMath.onRay(0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.2, 0.1, 3.0, 5.0, 0.6))
+        assertTrue(! MiningMath.onRay(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, - 3.0, 5.0, 0.6), "behind")
+        assertTrue(! MiningMath.onRay(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 7.0, 5.0, 0.6), "too far")
+        assertTrue(! MiningMath.onRay(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.5, 0.0, 3.0, 5.0, 0.6), "off to the side")
+        assertTrue(! MiningMath.onRay(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 5.0, 0.6), "no look vector")
+    }
+
+    @Test
     fun `per hour waits for a minute of data`() {
         assertEquals(0, MiningMath.perHour(10, 30_000))
         assertEquals(600, MiningMath.perHour(10, 60_000))

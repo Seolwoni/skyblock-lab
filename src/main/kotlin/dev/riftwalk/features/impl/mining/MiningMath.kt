@@ -78,6 +78,36 @@ object MiningMath {
 
     private fun sign(d: Double) = if (d < 0) - 1.0 else 1.0
 
+    /**
+     * How long to keep at one block before skipping it: three times the usual break time of that kind
+     * (median of [samples], in ticks), never under [floorTicks] (the setting) nor over [capTicks].
+     * Without five samples yet, just the floor.
+     */
+    fun giveUpTicks(samples: List<Int>, floorTicks: Int, capTicks: Int): Int {
+        if (samples.size < 5) return floorTicks
+        val med = samples.sorted()[samples.size / 2]
+        return (med * 3).coerceIn(floorTicks, maxOf(floorTicks, capTicks))
+    }
+
+    /** Middle value of [samples] (ticks), or -1 when empty. */
+    fun median(samples: List<Int>): Int = if (samples.isEmpty()) - 1 else samples.sorted()[samples.size / 2]
+
+    /**
+     * True when the point (px, py, pz) lies on someone's line of sight: within [maxDist] in front of their eye
+     * and within [radius] of the ray (look vector lx, ly, lz, any length). Used to leave a block to a player who
+     * is already mining it.
+     */
+    fun onRay(ex: Double, ey: Double, ez: Double, lx: Double, ly: Double, lz: Double, px: Double, py: Double, pz: Double, maxDist: Double, radius: Double): Boolean {
+        val len = sqrt(lx * lx + ly * ly + lz * lz)
+        if (len < 1e-9) return false
+        val ux = lx / len; val uy = ly / len; val uz = lz / len
+        val dx = px - ex; val dy = py - ey; val dz = pz - ez
+        val along = dx * ux + dy * uy + dz * uz
+        if (along < 0 || along > maxDist) return false
+        val cx = dx - ux * along; val cy = dy - uy * along; val cz = dz - uz * along
+        return cx * cx + cy * cy + cz * cz <= radius * radius
+    }
+
     /** Blocks per hour, or 0 when too little time has passed to say. */
     fun perHour(count: Int, millis: Long): Long = if (millis < 60_000) 0 else (count * 3_600_000.0 / millis).toLong()
 }

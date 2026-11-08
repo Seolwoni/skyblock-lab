@@ -53,7 +53,10 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
     private val reach by SliderSetting("Reach", 4.5, 3.0, 5.5, 0.1, " blocks").section("Mining").withDescription("How far away a block may be (from your eyes)")
     private val switchMin by SliderSetting("Switch Delay Min", 1, 0, 20, 1, " ticks").withDescription("Shortest wait after a block breaks before going for the next")
     private val switchMax by SliderSetting("Switch Delay Max", 14, 1, 40, 1, " ticks").withDescription("Longest wait (most waits are short, a few are long, like a person)")
-    private val giveUp by SliderSetting("Give Up After", 6, 2, 30, 1, " s").withDescription("A block that hasn't broken by then is skipped for 20 s (someone else's, out of sight, too hard)")
+    private val giveUp by SliderSetting("Give Up After", 6, 2, 30, 1, " s").withDescription("A block that hasn't broken by then is skipped for 20 s. Grows to 3x the usual break time of that block kind once it has been seen (slow titanium isn't given up too early)")
+    private val leaveContested by ToggleSetting("Leave Blocks Others Mine", true).withDescription("Another player looking at our block from close by: take a different one")
+    private val stallSeconds by SliderSetting("Stall Recovery After", 10, 0, 120, 5, " s").withDescription("Nothing has changed for this long (no block broken, same target, same spot) while there were blocks: writes down why in the log and starts over. 3 in 2 minutes stops. 0 = off")
+    private val whenFull by DropdownSetting("When Inventory Full", 0, listOf("Stop", "Keep Going")).withDescription("Stop: stop with a report once no slot is free. Keep Going: for when everything goes to sacks")
     private val ability by ToggleSetting("Use Pickaxe Ability", true).withDescription("Right-clicks the pickaxe when its ability (Mining Speed Boost, Pickobulus...) says it's available")
 
     private val failsafe by ToggleSetting("Stop On Anything Unexpected", true).section("Failsafe")
@@ -89,6 +92,16 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
     private var abilityTriedAt = - 10_000
     private var status = ""
 
+    // robustness bookkeeping
+    private val breakTicks = HashMap<String, ArrayDeque<Int>>()   // kind -> recent break times (ticks)
+    private var stallSig = ""
+    private var stallSince = 0
+    private val stalls = ArrayDeque<Int>()
+    private var statStalls = 0
+    private var statSkips = 0
+    private var statContested = 0
+    private var fullSince = - 1
+
     override fun init() {
         register<TickEvent.Start> {
             if (toggleKey.isPressed() && mc.gui.screen() == null) {
@@ -99,6 +112,7 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         register<ChatMessageEvent> {
             if (! running) return@register
             val t = event.unformattedText.replace(Regex("§."), "").trim()
+            if (whenFull.value == 0 && t.contains("inventory is full", ignoreCase = true) && ! Regex("^(?:\\[[^]]+] )*[A-Za-z0-9_]{2,16}: ").containsMatchIn(t)) return@register stop("the inventory is full")
             if (failsafe.value) {
                 if (stopOnParty.value) WatchSigns.partyInvite(t)?.let { return@register failStop("party invite from $it") }
                 if (stopOnMessage.value) WatchSigns.privateMessage(t)?.let { return@register failStop("private message from $it") }
@@ -137,7 +151,8 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         profile = Humanize.profile()
         timing = HumanTiming().apply(profile)
         tick = 0; target = null; targetKind = null; wait = 0; idleSince = - 1
-        skipped.clear(); broken.clear()
+        skipped.clear(); broken.clear(); breakTicks.clear()
+        stallSig = ""; stallSince = 0; stalls.clear(); statStalls = 0; statSkips = 0; statContested = 0; fullSince = - 1
         startMs = System.currentTimeMillis()
         abilityReady = true; abilityTriedAt = - 10_000
         running = true
@@ -166,7 +181,8 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         val lines = buildList {
             add("&7Time &f${ms / 60_000}m ${(ms / 1000) % 60}s")
             add("&7Blocks &f$total &8(${"%,d".format(MiningMath.perHour(total, ms))}/h)")
-            if (broken.isNotEmpty()) add("&7By kind &f" + broken.entries.joinToString(", ") { "${it.key} ${it.value}" })
+            if (broken.isNotEmpty()) add("&7By kind &f" + broken.entries.joinToString(", ") { "${it.key} ${it.value} (${MiningMath.median(breakTicks[it.key]?.toList().orEmpty())}t)" })
+            add("&7Problems &fskipped $statSkips, left to others $statContested, stalls $statStalls")
             add("&7Ended &f$reason")
         }
         Journal("report").log("Auto Mining  " + lines.joinToString("  |  ") { it.replace(Regex("&."), "") })
@@ -189,6 +205,11 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         if (! holdingTool() && ! selectTool()) return failStop("the pickaxe is gone from the hotbar")
 
         skipped.entries.removeIf { it.value <= tick }
+        if (whenFull.value == 0 && tick % 20 == 0) {
+            val free = (0 until 36).count { p.inventory.getItem(it).isEmpty }
+            if (free > 0) fullSince = - 1 else if (fullSince < 0) fullSince = tick else if (tick - fullSince > 60) return stop("the inventory is full")
+        }
+        if (watchdog()) return
         if (wait > 0) { wait--; release(); return }
 
         // the block we were on broke (it changed into something we don't mine)
@@ -196,15 +217,23 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
             if (kindOf(BuiltInRegistries.BLOCK.getKey(level.getBlockState(t).block).path) == null) {
                 val k = targetKind?.name ?: "?"
                 broken[k] = (broken[k] ?: 0) + 1
+                breakTicks.getOrPut(k) { ArrayDeque() }.apply { addLast(tick - targetSince); while (size > 30) removeFirst() }
                 journal.log("broke $k at ${t.toShortString()} in ${tick - targetSince} ticks")
                 target = null
                 release()
                 wait = timing.next(switchMin.value, maxOf(switchMin.value, switchMax.value))
                 return
             }
-            if (tick - targetSince > giveUp.value * 20) {
-                journal.log("gave up on ${targetKind?.name} at ${t.toShortString()} after ${giveUp.value} s")
+            val limit = MiningMath.giveUpTicks(breakTicks[targetKind?.name]?.toList().orEmpty(), giveUp.value * 20, giveUp.value * 80)
+            if (tick - targetSince > limit) {
+                journal.log("gave up on ${targetKind?.name} at ${t.toShortString()} after ${(tick - targetSince) / 20.0} s (limit ${limit / 20.0} s)")
                 skipped[t.asLong()] = tick + 400
+                statSkips++
+                target = null
+            } else if (leaveContested.value && tick % 10 == 0 && contested(t) != null) {
+                journal.log("left ${t.toShortString()} to ${contested(t)}")
+                skipped[t.asLong()] = tick + 200
+                statContested++
                 target = null
             } else if (! visible(t)) {
                 journal.log("lost sight of ${t.toShortString()}")
@@ -242,6 +271,49 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
             PlayerUtils.rightClick()
             journal.log("ability: right-click")
         }
+    }
+
+    /**
+     * Stall watchdog: the same target, the same block count and the same spot for Stall Recovery After seconds,
+     * while there were blocks to mine, means something is stuck. Log what it looked like and start over.
+     * True when it acted this tick.
+     */
+    private fun watchdog(): Boolean {
+        if (stallSeconds.value <= 0 || idleSince >= 0) { stallSince = tick; return false }
+        val p = mc.player ?: return false
+        val sig = "${target?.toShortString()}|${broken.values.sum()}|${p.blockPosition().toShortString()}"
+        if (sig != stallSig) { stallSig = sig; stallSince = tick; return false }
+        // a slow block that is still within its give-up time is not a stall
+        val limit = if (target != null) MiningMath.giveUpTicks(breakTicks[targetKind?.name]?.toList().orEmpty(), giveUp.value * 20, giveUp.value * 80) + 40 else 0
+        if (tick - stallSince < maxOf(stallSeconds.value * 20, limit)) return false
+        val hit = mc.hitResult
+        journal.log("STALL  ${stallSeconds.value} s without change: target=${target?.toShortString()} kind=${targetKind?.name} " +
+            "attack=${mc.options.keyAttack.isDown} wait=$wait hit=${(hit as? BlockHitResult)?.blockPos?.toShortString() ?: hit?.type} " +
+            "held=${p.mainHandItem.hoverName.string} yaw=${"%.1f".format(p.yRot)} pitch=${"%.1f".format(p.xRot)} status=$status")
+        statStalls++
+        stalls.addLast(tick)
+        while (stalls.isNotEmpty() && tick - stalls.first() > 2400) stalls.removeFirst()
+        if (stalls.size >= 3) { failStop("stuck 3 times in 2 minutes"); return true }
+        target?.let { skipped[it.asLong()] = tick + 400 }
+        target = null
+        wait = Humanize.reaction()
+        release()
+        selectTool()
+        stallSince = tick
+        return true
+    }
+
+    /** "name" of another player close by who is looking at [pos], or null. */
+    private fun contested(pos: BlockPos): String? {
+        val p = mc.player ?: return null
+        val c = Vec3.atCenterOf(pos)
+        for (o in p.level().players()) {
+            if (o === p || o.distanceToSqr(c) > 36.0) continue
+            val e = o.eyePosition
+            val l = o.lookAngle
+            if (MiningMath.onRay(e.x, e.y, e.z, l.x, l.y, l.z, c.x, c.y, c.z, 5.5, 0.75)) return o.name.string
+        }
+        return null
     }
 
     private fun release() {
@@ -295,6 +367,7 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
             val c = Vec3.atCenterOf(pos)
             val dist = e.distanceTo(c)
             if (dist > reach.value + 0.6 || ! visible(pos)) continue
+            if (leaveContested.value && contested(pos) != null) continue
             found[pos.asLong()] = pos.immutable() to kind
             cands += MiningMath.Candidate(pos.asLong(), dist, MiningMath.turnDegrees(p.yRot, p.xRot, c.x - e.x, c.y - e.y, c.z - e.z), kind.priority)
         }
