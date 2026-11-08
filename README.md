@@ -1,32 +1,37 @@
-# NoammAddons 26.3
+<p align="center"><img src="src/main/resources/assets/riftwalk/textures/gui/logo.png" width="96" alt="Riftwalk mark"></p>
 
-[![GitHub Downloads](https://img.shields.io/github/downloads/Noamm9/NoammAddons/total?style=for-the-badge&logo=github)](https://github.com/Noamm9/NoammAddons/releases)
-[![Discord](https://img.shields.io/discord/1281979747605418024?color=5865F2&logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/pj9mQGxMxB)
+# Riftwalk
 
-> 26.3 port of the greatest skyblock mod ever!
+A Hypixel SkyBlock toolkit for Fabric (Minecraft 26.2): fishing, dungeons and routes in one menu.
+Private project, used on a private test server.
 
-----
+## What's in it
 
-## How to install?
+- **Fishing** — Auto Fishing with spot finding, travel, sea creature handling, selling and a session report.
+  Every automatic input goes through `utils/Humanize.kt` (see `AGENTS.md`).
+- **Dungeons** — dungeon helpers, Floor 7 tools and routes (Secret Routes built in).
+- **Menus** — one settings window (`/rw`), a HUD editor, and Riftwalk's own title screen and ESC menu.
+- **Logs** — one file per game run in `config/Riftwalk/journal/`, copyable to Downloads from the Auto Fishing settings.
 
-1. Install **[Fabric for Minecraft 26.3](https://fabricmc.net/use/installer/)**
-2. Install **[Fabric API](https://modrinth.com/mod/fabric-api/versions?g=26.3)** and **[Fabric Kotlin Language](https://modrinth.com/mod/fabric-language-kotlin)**
-3. Download the latest mod file from the [**Releases page**](https://github.com/Noamm9/NoammAddons/releases)
-4. Put the downloaded `.jar` files into your `.minecraft/mods` folder
-5. Launch Minecraft using the **Fabric** profile
+## Install
 
-* Type  `/na` in chat to open the config menu.
+1. Fabric Loader for 26.2, Fabric API and Fabric Language Kotlin.
+2. Put `Riftwalk-<version>-26.2.jar` in `mods`.
+3. In game: `/rw` opens the settings.
 
-## Contributions
+Builds come from CI on every push to `main` (the `ci-log` branch keeps the jar, the test results and screenshots).
 
-Contributions are always welcome! If you have a feature idea or want to fix a bug, feel free to open an issue or submit
-a pull request.
+## Built on
 
-* Open an **Issue** to suggest something
-* Make a **Pull Request** to add/fix stuff
+- **NoammAddons** by Noamm — the base this started from (CC0 1.0).
+- **Secret Routes** by yourboykyle — included under GPL-3.0 (`LICENSE-SECRETROUTES.txt`).
+- **Pretendard** font — SIL Open Font License (`LICENSE-PRETENDARD-OFL.txt`).
+- Parts adapted from Odin (`LICENSE-ODIN.txt`) and others, credited in the files they came from.
 
----
+Some features still use the NoammAddons data server (lowest BIN prices, puzzle data, player stats).
+The WebSocket feature that talks to it is off by default.
 
 ## License
 
-This project is licensed under the [**CC0-1.0 License**](LICENSE).
+The original parts are CC0 1.0 (`LICENSE`). Secret Routes code is GPL-3.0, so a build that includes it
+is shared under GPL-3.0 terms.
