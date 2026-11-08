@@ -128,6 +128,18 @@ public class SmokeTest implements FabricClientGameTest {
 			} catch (Throwable t) {
 				failures.add("hud editor: " + t);
 			}
+			try {
+				context.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true)));
+				context.waitTicks(20);
+				String pause = context.computeOnClient(mc -> mc.gui.screen() == null ? "none" : mc.gui.screen().getClass().getSimpleName());
+				log.add("esc menu open: " + pause);
+				if (!pause.equals("RiftPauseScreen")) failures.add("ESC menu is " + pause + " (expected RiftPauseScreen)");
+				context.takeScreenshot("rw-06-esc-menu");
+				context.runOnClient(mc -> mc.gui.setScreen(null));
+				context.waitTicks(5);
+			} catch (Throwable t) {
+				failures.add("esc menu: " + t);
+			}
 			context.runOnClient(mc -> {
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) {
 					String id = f.getClass().getSimpleName();
@@ -161,6 +173,18 @@ public class SmokeTest implements FabricClientGameTest {
 			if (!alive) failures.add("player or level gone after toggling features");
 		} catch (Throwable t) {
 			failures.add("test crashed: " + t);
+		}
+
+		try {
+			context.waitTicks(20);
+			context.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
+			context.waitTicks(30);
+			String title = context.computeOnClient(mc -> mc.gui.screen() == null ? "none" : mc.gui.screen().getClass().getSimpleName());
+			log.add("title screen open: " + title);
+			if (!title.equals("RiftTitleScreen")) failures.add("title screen is " + title + " (expected RiftTitleScreen)");
+			context.takeScreenshot("rw-07-title");
+		} catch (Throwable t) {
+			failures.add("title screen: " + t);
 		}
 
 		write();

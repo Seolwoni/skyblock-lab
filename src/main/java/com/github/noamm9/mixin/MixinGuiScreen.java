@@ -19,6 +19,11 @@ public abstract class MixinGuiScreen {
 
     @Inject(method = "setScreen", at = @At("HEAD"))
     private void onSetScreen(Screen screen, CallbackInfo ci, @Local(argsOnly = true) LocalRef<Screen> screenRef) {
+        var styled = com.github.noamm9.features.impl.visual.MenuScreens.replace(screen);
+        if (styled != null) {
+            screenRef.set(styled);
+            return;
+        }
         if (! StorageOverlay.INSTANCE.enabled) return;
         var newScreen = StorageOverlay.onScreenChange(this.screen, screen);
         if (newScreen != null) screenRef.set(newScreen);
