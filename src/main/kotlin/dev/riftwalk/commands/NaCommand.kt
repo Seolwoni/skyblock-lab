@@ -41,12 +41,6 @@ object NaCommand: ICommandProvider {
             }
         }
 
-        literal("discord") {
-            description("Opens the link to the Discord server")
-            runs {
-                Utils.openDiscordLink()
-            }
-        }
 
         literal("hud") {
             description("HUD editor")
