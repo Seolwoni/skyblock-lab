@@ -93,7 +93,7 @@ class RiftMenu(private val screen: Screen, private val markSize: Float, private 
         spaced(graphics, subtitle, cx, wy + 9f * scale + 4f, 0.75f, 1.6f, Color(205, 195, 230, (170 * f).toInt()))
 
         for (b in buttons) drawButton(graphics, b, mouseX.toDouble(), mouseY.toDouble(), f)
-        graphics.drawString("Riftwalk ${NoammAddons.MOD_VERSION}", 4f, height - 11f, Color(200, 190, 225, (150 * f).toInt()), scale = 0.85f, shadow = false)
+        graphics.drawString("v${NoammAddons.MOD_VERSION} · Minecraft 26.2", 4f, height - 11f, Color(200, 190, 225, (150 * f).toInt()), scale = 0.85f, shadow = false)
         corners(graphics, f)
     }
 
