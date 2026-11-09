@@ -191,6 +191,18 @@ public class SmokeTest implements FabricClientGameTest {
 			failures.add("title screen: " + t);
 		}
 
+		// the loading screen (a resource reload shows it), then wait for it to finish
+		try {
+			context.runOnClient(mc -> mc.reloadResourcePacks());
+			context.waitTicks(12);
+			String overlay = context.computeOnClient(mc -> mc.overlay() == null ? "none" : mc.overlay().getClass().getSimpleName());
+			log.add("loading overlay: " + overlay);
+			context.takeScreenshot("rw-08-loading");
+			for (int i = 0; i < 60 && context.computeOnClient(mc -> mc.overlay() != null); i++) context.waitTicks(10);
+		} catch (Throwable t) {
+			failures.add("loading screen: " + t);
+		}
+
 		write();
 		if (!failures.isEmpty()) throw new AssertionError("Marceline smoke test failed:\n" + String.join("\n", failures));
 	}
