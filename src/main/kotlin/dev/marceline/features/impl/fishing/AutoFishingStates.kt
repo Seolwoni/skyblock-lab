@@ -132,10 +132,13 @@ internal fun AutoFishing.tick() {
     }
     val p = mc.player ?: return stop("no player")
     val hp = p.health / p.maxHealth * 100f
-    if (lowHealth.value == 1) { if (stopHealth.value > 0 && hp < stopHealth.value) return stop("health is low") }
+    // with Come Back After Death on, low health never ends the session: a death is handled by coming back
+    // (stopping first left you standing there to die with nothing to bring you back)
+    val deathCovers = resumeAfterDeath.value
+    if (lowHealth.value == 1 && ! deathCovers) { if (stopHealth.value > 0 && hp < stopHealth.value) return stop("health is low") }
     else {
         // like the mana wait: stop casting until health is back; only a really low health still ends the session
-        if (criticalHealth.value > 0 && hp < criticalHealth.value) return stop("health critically low (${hp.toInt()}%)")
+        if (! deathCovers && criticalHealth.value > 0 && hp < criticalHealth.value) return stop("health critically low (${hp.toInt()}%)")
         if (! healthWaiting && stopHealth.value > 0 && hp < stopHealth.value) { healthWaiting = true; journal.log("health ${hp.toInt()}% - waiting for it to come back") }
         if (healthWaiting && hp >= resumeHealth.value) { healthWaiting = false; journal.log("health back to ${hp.toInt()}% - fishing again") }
     }
@@ -187,7 +190,8 @@ internal fun AutoFishing.tick() {
         val sig = "$state|${p.fishing != null}|${nums["casts"]}|${nums["reels"]}|$kills|${p.blockPosition().toShortString()}"
         // waiting for a bite (it has its own recast timeout) and breaks are quiet on purpose
         if (sig != stallSig || state == FishingState.BREAK || (state == FishingState.WAIT_BITE && p.fishing != null)) { stallSig = sig; stallSince = tickCount }
-        else if (tickCount - stallSince > stallSeconds.value * 20) {
+        // waiting for mana / health is slow on purpose: give it 30 s before calling it stuck
+        else if (tickCount - stallSince > (if (status.startsWith("waiting for mana") || healthWaiting) maxOf(30, stallSeconds.value.toInt()) else stallSeconds.value.toInt()) * 20) {
             statStalls++
             val mf = dev.marceline.utils.ManaGuard.mana
             journal.log("STALL ${stallSeconds.value}s  state=$state  status=\"$status\"  wait=$wait  timer=$timer  hook=${p.fishing != null}  " +

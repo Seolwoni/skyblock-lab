@@ -231,10 +231,10 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     }.withDescription("Copies where this game's log is, to send it over after a test")
     internal val stopAfterMin by SliderSetting("Stop After", 0, 0, 600, 10, " min").withDescription("Ends the session on its own after this long (0 = never)")
     internal val stopAfterKills by SliderSetting("Stop After Kills", 0, 0, 5000, 50).withDescription("Ends the session after this many sea creature kills (0 = never)")
-    internal val lowHealth by DropdownSetting("On Low Health", 0, listOf("Wait", "Stop")).section("Safety").withDescription("Wait: no new casts until health is back (fights go on, the creatures are what hurts); Stop: end the session")
+    internal val lowHealth by DropdownSetting("On Low Health", 0, listOf("Wait", "Stop")).section("Safety").withDescription("Wait: no new casts until health is back (fights go on, the creatures are what hurts); Stop: end the session. With Come Back After Death on it always waits (a death brings you back)")
     internal val stopHealth by SliderSetting("Low Health", 30, 0, 90, 5, "%").withDescription("Below this, wait (or stop). 0 = never")
     internal val resumeHealth by SliderSetting("Resume At", 70, 10, 100, 5, "%").showIf { lowHealth.value == 0 }.withDescription("Fishing goes on once health is back up to this")
-    internal val criticalHealth by SliderSetting("Stop Below (Always)", 15, 0, 50, 5, "%").showIf { lowHealth.value == 0 }.withDescription("Still stops when it gets this low while waiting (0 = never)")
+    internal val criticalHealth by SliderSetting("Stop Below (Always)", 15, 0, 50, 5, "%").showIf { lowHealth.value == 0 }.withDescription("Still stops when it gets this low while waiting (0 = never). Not with Come Back After Death on")
     internal val chatInfo by ToggleSetting("Chat Messages", true)
     internal val statusHud by ToggleSetting("Status HUD", true)
 
