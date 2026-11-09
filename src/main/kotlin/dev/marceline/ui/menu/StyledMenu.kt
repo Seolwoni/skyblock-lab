@@ -130,17 +130,29 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
             val lw = (b.w - 2 * r - 12f) * h
             g.drawRect(b.x + (b.w - lw) / 2f, b.y + b.h - 3f, lw, 0.75f, (if (b.danger) tint else SkyHanniTheme.gold).withAlpha((220 * h * alpha).toInt()))
         }
-        spaced(g, b.label, b.x + b.w / 2f, b.y + (b.h - 8f * 0.95f) / 2f, 0.95f, 1.5f, Color.WHITE.withAlpha(((200 + 55 * h) * alpha).toInt()))
+        spaced(g, b.label, b.x + b.w / 2f, b.y + (b.h - 8f * 0.95f) / 2f, 0.95f, 1.5f, Color.WHITE.withAlpha(((200 + 55 * h) * alpha).toInt()), maxW = b.w - 2 * r - 4f)
     }
 
-    /** Capitals with extra room between letters, centred on [cx]. */
-    fun spaced(g: GuiGraphicsExtractor, text: String, cx: Float, y: Float, scale: Float, spacing: Float, color: Color) {
-        val widths = text.map { SkyHanniTheme.uiWidth(it.toString()) * scale }
-        val total = widths.sum() + spacing * (text.length - 1).coerceAtLeast(0)
+    /**
+     * Capitals with extra room between letters, centred on [cx]. When they would be wider than [maxW]
+     * the letter spacing gives way first, then the letters shrink, so the word always stays inside.
+     */
+    fun spaced(g: GuiGraphicsExtractor, text: String, cx: Float, y: Float, scale: Float, spacing: Float, color: Color, maxW: Float = Float.MAX_VALUE) {
+        val gaps = (text.length - 1).coerceAtLeast(0)
+        val plain = text.sumOf { SkyHanniTheme.uiWidth(it.toString()).toDouble() }.toFloat() * scale
+        var sp = spacing
+        var sc = scale
+        if (plain + sp * gaps > maxW) {
+            sp = if (gaps > 0) ((maxW - plain) / gaps).coerceIn(0.3f, spacing) else 0f
+            if (plain + sp * gaps > maxW) sc = scale * ((maxW - sp * gaps) / plain).coerceAtLeast(0.5f)
+        }
+        val widths = text.map { SkyHanniTheme.uiWidth(it.toString()) * sc }
+        val total = widths.sum() + sp * gaps
         var x = cx - total / 2f
+        val yy = y + (scale - sc) * 4f // keep the text centred on the same line when it shrinks
         text.forEachIndexed { i, ch ->
-            if (ch != ' ') g.drawString(ch.toString(), x, y, color, scale = scale, shadow = false)
-            x += widths[i] + spacing
+            if (ch != ' ') g.drawString(ch.toString(), x, yy, color, scale = sc, shadow = false)
+            x += widths[i] + sp
         }
     }
 
