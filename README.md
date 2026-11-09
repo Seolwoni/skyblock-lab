@@ -93,10 +93,11 @@ with a release for every version. <code>[gametest]</code> runs the game itself; 
 
 <p align="center"><b>NoammAddons</b> by Noamm, the ground this was built on (CC0 1.0)<br>
 <b>Secret Routes</b> by yourboykyle (GPL-3.0)<br>
+<b>SkyHanni</b> by hannibal2 and contributors, whose trackers these follow (LGPL-2.1); its data repository (MIT)<br>
 <b>Cormorant Garamond</b> and <b>Pretendard</b> (SIL Open Font License)<br>
 Parts adapted from <b>Odin</b> and others, credited where they appear</p>
 
-<p align="center"><sub>Original work CC0 1.0 · Secret Routes GPL-3.0 · licence files in the repository</sub></p>
+<p align="center"><sub>Original work CC0 1.0 · Secret Routes GPL-3.0 · tracker code after SkyHanni LGPL-2.1 · licence files in the repository</sub></p>
 
 <br>
 
