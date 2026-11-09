@@ -1,2 +1,2 @@
-net.minecraft.client.gui.Gui
-net.minecraft.client.Minecraft
+net.minecraft.client.gui.screens.LoadingOverlay
+net.minecraft.client.gui.components.ChatComponent
