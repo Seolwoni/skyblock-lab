@@ -281,7 +281,7 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
             return
         }
 
-        if (intro >= 1f) context.drawRect(0, 0, Resolution.width, Resolution.height, Color(6, 2, 14, (130 * a).toInt()))
+        if (intro >= 1f) context.drawRect(0, 0, Resolution.width, Resolution.height, Color(12, 4, 7, (130 * a).toInt()))
 
         // opens by growing from 96% while fading in, closes the other way
         val cx = winX() + winW() / 2f
@@ -313,11 +313,13 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
         val y = winY()
         Style.roundRect(ctx, x, y, winW(), TITLE_H, 5f, panelTop)
         ctx.drawVerticalGradient(x, y + 5f, winW(), TITLE_H - 5f, panelTop, panel)
-        ctx.drawHorizontalGradient(x, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accentColor.withAlpha(0), Style.accentColor)
-        ctx.drawHorizontalGradient(x + winW() / 2f, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accent2, Style.accent2.withAlpha(0))
+        // the menus' gold hairline under the title bar, a faint wine line under it for depth
+        ctx.drawHorizontalGradient(x, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accentColor.withAlpha(0), Style.accentColor.withAlpha(90))
+        ctx.drawHorizontalGradient(x + winW() / 2f, y + TITLE_H - 1f, winW() / 2f, 1f, Style.accent2.withAlpha(90), Style.accent2.withAlpha(0))
+        Style.goldHairline(ctx, x + 6f, y + TITLE_H - 1.6f, winW() - 12f)
         SkyHanniTheme.drawLogoMark(ctx, x + 8f, y + 5.5f, 15f, Color.WHITE)
-        val logoEnd = drawLogo(ctx, x + 26f, y + 9f)
-        ctx.drawString(dev.marceline.Marceline.MOD_VERSION, logoEnd + 6f, y + 9f, textFaint, shadow = false)
+        val logoEnd = drawLogo(ctx, x + 28f, y + 9f)
+        ctx.drawString(dev.marceline.Marceline.MOD_VERSION, logoEnd + 7f, y + 9.5f, Style.gold.withAlpha(170), scale = 0.85f, shadow = false)
 
         val sw = 240f
         val sx = x + (winW() - sw) / 2f
@@ -343,9 +345,10 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
         titleButtons().forEach { (label, rect) ->
             val hovered = inside(mx, my, rect)
             val warn = label == "All On" // everything is off right now
+            val hov = anim("btnHover:$label", 140).also { it.update(if (hovered) 1f else 0f) }.value
             pressPush(ctx, "btn:$label", rect, 0.06f)
-            Style.roundRect(ctx, rect[0], rect[1], rect[2], rect[3], 3f, if (warn) Color(120, 40, 50) else if (hovered) cardHover else Color(42, 38, 52, glassA(255, 80)))
-            ctx.drawCenteredString(label, rect[0] + rect[2] / 2f, rect[1] + 5f, if (warn) Color.WHITE else if (hovered) Style.accentColor else textSoft)
+            Style.glassButton(ctx, rect[0], rect[1], rect[2], rect[3], hov, warn = warn)
+            ctx.drawCenteredString(label, rect[0] + rect[2] / 2f, rect[1] + 4.5f, if (warn) textMain else Style.mix(textSoft, textMain, hov), shadow = false)
             ctx.pose().popMatrix()
         }
     }
@@ -550,12 +553,20 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
                         tx += 13f
                     }
                     val big = cat != null
-                    val hs = if (big) 1.15f else 1f
-                    ctx.drawString("§l${entry.text}", tx, y + (if (big) 3f else 4f), accentLight(), scale = hs, shadow = false)
+                    val hs = if (big) 1.2f else 1f
+                    // tab titles in the menus' serif, group headings in gold
+                    val headW = if (big) UiFont.displayed { ctx.drawString("§l${entry.text}", tx, y + 2f, Style.mix(textMain, Style.accent2, 0.18f), scale = hs, shadow = false); uiWidth("§l${entry.text}") * hs }
+                        else { ctx.drawString("§l${entry.text}", tx, y + 4f, Style.gold, shadow = false); uiWidth("§l${entry.text}") }
                     val on = headerOnCount(entry.text)
-                    if (on != null) ctx.drawString(on, tx + 6f + uiWidth("§l${entry.text}") * hs, y + 5f, textFaint, shadow = false)
-                    ctx.drawHorizontalGradient(x + 2f, y + 15f, (w - 4f) * 0.35f, 1f, Style.accentColor.withAlpha(140), line)
-                    ctx.drawRect(x + 2f + (w - 4f) * 0.35f, y + 15f, (w - 4f) * 0.65f, 1f, line)
+                    if (on != null) ctx.drawString(on, tx + 6f + headW, y + 5f, textFaint, shadow = false)
+                    if (big) {
+                        ctx.drawRect(x + 2f, y + 15f, w - 4f, 1f, line)
+                        Style.goldHairline(ctx, x + 2f, y + 15f, (w - 4f) * 0.6f, 1f, 0.8f)
+                    }
+                    else {
+                        ctx.drawHorizontalGradient(x + 2f, y + 15f, (w - 4f) * 0.35f, 1f, Style.gold.withAlpha(110), line)
+                        ctx.drawRect(x + 2f + (w - 4f) * 0.35f, y + 15f, (w - 4f) * 0.65f, 1f, line)
+                    }
                 }
 
                 is Entry.FeatureCard -> {
@@ -851,7 +862,7 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
     private fun drawIntro(ctx: GuiGraphicsExtractor, t: Float) {
         val fadeOut = if (t > 0.7f) 1f - (t - 0.7f) / 0.3f else 1f
         val dim = (minOf(1f, t / 0.15f) * 130).toInt()
-        ctx.drawRect(0, 0, Resolution.width, Resolution.height, Color(6, 2, 14, dim))
+        ctx.drawRect(0, 0, Resolution.width, Resolution.height, Color(12, 4, 7, dim))
         if (fadeOut <= 0.01f) return
         val word = "Marceline"
         val scale = 3.2f
@@ -892,15 +903,18 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
             ctx.drawString(word, x, y, Color.WHITE)
             return x + mc.font.width(word)
         }
+        // MARCELINE in the menus' serif: spaced capitals, ivory warmed by wine -> rose, no shadow
         var cx = x
+        val caps = word.uppercase()
+        val ivory = Color(243, 234, 222)
         UiFont.displayed {
-            word.forEachIndexed { i, ch ->
-                val t = i / (word.length - 1f)
-                ctx.drawString("§l$ch", cx, y - 0.5f, Style.mix(logoFrom, logoTo, t))
-                cx += UiFont.width("§l$ch") + 0.3f
+            caps.forEachIndexed { i, ch ->
+                val c = Style.mix(ivory, Style.mix(logoFrom, logoTo, i / (caps.length - 1f)), 0.3f)
+                ctx.drawString("§l$ch", cx, y - 0.5f, c, shadow = false)
+                cx += UiFont.width("§l$ch") + 1.4f
             }
         }
-        return cx
+        return cx - 1.4f
     }
 
 }

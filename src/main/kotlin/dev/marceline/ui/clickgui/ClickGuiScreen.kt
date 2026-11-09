@@ -55,7 +55,7 @@ class ClickGuiScreen: Screen(Component.literal("ClickGUI")) {
         val mY = Resolution.getMouseY(mouseY.toDouble())
         Resolution.push(context)
 
-        context.drawVerticalGradient(0, 0, Resolution.width, Resolution.height, Color(6, 2, 14, 110), Color(12, 4, 24, 170))
+        context.drawVerticalGradient(0, 0, Resolution.width, Resolution.height, Color(12, 4, 7, 110), Color(28, 8, 14, 170))
         context.drawSearchBar(mX.toFloat(), mY.toFloat())
         context.drawHudButton(mX.toFloat(), mY.toFloat())
 

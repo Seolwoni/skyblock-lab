@@ -90,6 +90,92 @@ object Style {
         }
     }
 
+    /** Antique gold of the menus (hairlines, subtitles). */
+    val gold = Color(201, 164, 106)
+
+    /** A thin gold line that fades out at both ends, like the one under the menu title. */
+    fun goldHairline(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, alpha: Float = 1f, thickness: Float = 0.6f) {
+        if (w <= 0f || alpha <= 0.01f) return
+        val steps = 24
+        for (k in 0 until steps) {
+            val t = (k + 0.5f) / steps
+            val a = (1f - kotlin.math.abs(t * 2f - 1f)).let { it * it }
+            ctx.drawRect(x + w * k / steps, y, w / steps + 0.4f, thickness, gold.withAlpha((210 * a * alpha).toInt().coerceIn(0, 255)))
+        }
+    }
+
+    /**
+     * The menu button look: a light rim, dark glass inside it, a wine wash and a gold underline on hover.
+     * [hover] 0..1 (animated by the caller), [warn] tints it wine for a state that needs attention.
+     */
+    fun glassButton(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, hover: Float, warn: Boolean = false, alpha: Float = 1f, radius: Float = 4f) {
+        val tint = if (warn) accent2 else accentColor
+        val rim = mix(Color(255, 236, 220), tint, if (warn) 1f else hover).withAlpha(((48 + 92 * maxOf(hover, if (warn) 0.6f else 0f)) * alpha).toInt().coerceIn(0, 255))
+        roundRect(ctx, x, y, w, h, radius, rim)
+        roundRect(ctx, x + 1f, y + 1f, w - 2f, h - 2f, radius - 1f, Color(14, 10, 12, ((150 - 25 * hover) * alpha).toInt().coerceIn(0, 255)))
+        val wash = if (warn) 0.55f else hover
+        if (wash > 0.02f) roundRect(ctx, x + 1f, y + 1f, w - 2f, h - 2f, radius - 1f, tint.withAlpha((40 * wash * alpha).toInt().coerceIn(0, 255)))
+        if (hover > 0.02f) {
+            val lw = (w - 2 * radius - 6f).coerceAtLeast(0f) * hover
+            ctx.drawRect(x + (w - lw) / 2f, y + h - 2.5f, lw, 0.6f, gold.withAlpha((220 * hover * alpha).toInt().coerceIn(0, 255)))
+        }
+    }
+
+    /**
+     * Minecraft's bright magenta, aqua, yellow and gold codes swapped for the Marceline palette, the rest kept.
+     * Returns the colour to draw a run of text in after the code [c] (null = keep the game's own colour).
+     */
+    fun paletteColor(c: Char): Color? = when (c.lowercaseChar()) {
+        'd', '5' -> accent2                      // magenta / purple -> rose
+        '6', 'e' -> gold                         // gold / yellow -> antique gold
+        'b', '3', '9' -> Color(222, 196, 184)    // aqua / blue -> warm ivory
+        'f' -> Color(243, 234, 222)              // white -> ivory
+        '7' -> Color(186, 170, 160)              // grey -> warm grey
+        '8' -> Color(128, 110, 106)
+        'c' -> Color(240, 104, 120)              // red -> soft rose-red
+        else -> null
+    }
+
+    /**
+     * Draws [text] with its colour codes mapped through [paletteColor]; bold carries. [base] is used before the
+     * first code and for codes left as they are mapped to the game's colour. Returns the width drawn.
+     */
+    fun drawPaletteString(ctx: GuiGraphicsExtractor, text: String, x: Float, y: Float, base: Color, width: (String) -> Float, alpha: Int = 255): Float {
+        var cx = x
+        var color = base
+        var bold = false
+        var i = 0
+        val run = StringBuilder()
+        fun flush() {
+            if (run.isEmpty()) return
+            val s = (if (bold) "§l" else "") + run
+            ctx.drawString(s, cx, y, color.withAlpha(alpha * color.alpha / 255), shadow = false)
+            cx += width(s)
+            run.setLength(0)
+        }
+        while (i < text.length) {
+            val ch = text[i]
+            if (ch == '§' && i + 1 < text.length) {
+                flush()
+                val code = text[i + 1].lowercaseChar()
+                when {
+                    code == 'l' -> bold = true
+                    code == 'r' -> { bold = false; color = base }
+                    code in "0123456789abcdef" -> {
+                        bold = false
+                        color = paletteColor(code) ?: Color(net.minecraft.ChatFormatting.getByCode(code)?.color ?: base.rgb and 0xFFFFFF)
+                    }
+                }
+                i += 2
+                continue
+            }
+            run.append(ch)
+            i++
+        }
+        flush()
+        return cx - x
+    }
+
     /** Linear mix of two colours, alpha included. */
     fun mix(a: Color, b: Color, t: Float): Color = a.lerpTo(b, t)
 

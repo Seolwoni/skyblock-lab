@@ -41,8 +41,8 @@ class DropdownWidget(config: DropdownSetting): Widget<Int>(config) {
         val pw = valStr.width() + 20f
         val px = x + width - pw - 6f
         Style.roundRect(ctx, px, y + 3f, pw, 14f, 7f, Style.mix(Color(255, 255, 255, 12), Style.accentColor.withAlpha(70), maxOf(open, hoverAnim.value * 0.5f)))
-        ctx.drawString(valStr, px + 6f, y + 6f, Style.mix(Color(196, 184, 224), Color.WHITE, hoverAnim.value), shadow = false)
-        ctx.drawString(if (open > 0.5f) "▴" else "▾", px + pw - 11f, y + 5.5f, Style.mix(Color(138, 127, 163), Style.accent2, open), shadow = false)
+        ctx.drawString(valStr, px + 6f, y + 6f, Style.mix(Color(214, 198, 186), Color.WHITE, hoverAnim.value), shadow = false)
+        ctx.drawString(if (open > 0.5f) "▴" else "▾", px + pw - 11f, y + 5.5f, Style.mix(Color(170, 150, 142), Style.accent2, open), shadow = false)
 
         if (open > 0.01f) {
             ctx.scissor(x, y, width, height)
@@ -61,7 +61,7 @@ class DropdownWidget(config: DropdownSetting): Widget<Int>(config) {
                 }
                 else if (hv > 0.01f) ctx.drawRect(x + 4f, oy, width - 8f, 16f, Color(255, 255, 255, (16 * hv).toInt()))
 
-                val base = if (index == value) Color.WHITE else Style.mix(Color(138, 127, 163), Color(237, 231, 255), hv)
+                val base = if (index == value) Color.WHITE else Style.mix(Color(170, 150, 142), Color(243, 234, 222), hv)
                 ctx.drawString(opt, x + 13f + slide + 2f * hv, oy + 4f, base.withAlpha((255 * stagger).toInt().coerceAtLeast(8)), shadow = false)
                 oy += 16
             }

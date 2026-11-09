@@ -64,8 +64,8 @@ internal object SkyHanniTheme {
     val line = Color(56, 40, 44, 255)
     val textMain = Color(243, 234, 222)
     val textSoft = Color(214, 198, 186)
-    val textDim = Color(160, 140, 132)
-    val textFaint = Color(108, 92, 90)
+    val textDim = Color(184, 166, 156)
+    val textFaint = Color(132, 114, 110)
     val onDot = Color(232, 80, 106)
     val offDot = Color(64, 46, 48)
     /** Antique gold for small details (hairlines, the chat arrow, subtitles). */

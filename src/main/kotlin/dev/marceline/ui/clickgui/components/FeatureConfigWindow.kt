@@ -143,7 +143,7 @@ open class FeatureConfigWindow(val feature: Feature) {
         drawBackground(context, x, y, width, height, Color(22, 17, 19, 240))
         if (useSidebar) context.drawRect(x, y + titleBarHeight, categoryWidth, height - titleBarHeight, Color(11, 8, 18, 170))
         if (previewWidth > 0f) drawBackground(context, previewX, previewY, previewWidth, previewHeight, Color(11, 8, 18, 170))
-        context.drawRect(x, y, width, titleBarHeight, Color(32, 22, 50, 245))
+        context.drawRect(x, y, width, titleBarHeight, Color(34, 22, 26, 245))
         context.drawRect(x, y, width, 2f, Style.accentColor.withAlpha(if (focused) 255 else 180))
         context.drawBorder(x, y, width, height, frameColor)
 

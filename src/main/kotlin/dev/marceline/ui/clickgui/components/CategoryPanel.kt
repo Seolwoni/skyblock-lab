@@ -31,7 +31,7 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
         const val BUTTON_HEIGHT = 16
         const val MAX_DISPLAY_HEIGHT = 350
 
-        private val headerBg = Color(32, 22, 50, 240)
+        private val headerBg = Color(34, 22, 26, 240)
         private val bodyBg = Color(15, 12, 13, 215)
         private val hoverColor = Color(255, 255, 255, 18)
     }
@@ -69,7 +69,7 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
         val tw = title.width()
         val left = x + WIDTH / 2f - (tw + 13f) / 2f
         dev.marceline.ui.clickgui.SkyHanniScreen.drawCategoryIcon(context, category, left, y + 6.5f, 9f, iconColor)
-        context.drawString(title, left + 13f, y + 7, Color(237, 231, 255))
+        context.drawString(title, left + 13f, y + 7, Color(243, 234, 222))
 
         if (openAnim.value > 0.01f || features.size != filteredFeatures.size) {
             val totalContentHeight = filteredFeatures.size * BUTTON_HEIGHT
@@ -100,7 +100,7 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
                         context.drawRect(x, currentY, WIDTH, BUTTON_HEIGHT, hoverColor)
                     }
 
-                    context.drawCenteredString(feature.name, x + WIDTH / 2, currentY + 4, if (feature.enabled) Color.WHITE else Color(196, 184, 224))
+                    context.drawCenteredString(feature.name, x + WIDTH / 2, currentY + 4, if (feature.enabled) Color.WHITE else Color(214, 198, 186))
 
                     if (isHovered && ! screen.isMouseOverConfigWindow(mouseX, mouseY)) {
                         TooltipManager.hover(feature.description, mouseX, mouseY)

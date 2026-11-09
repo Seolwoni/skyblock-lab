@@ -91,7 +91,7 @@ class ColorWidget(config: ColorSetting): Widget<Color>(config) {
         if (cfg.withAlpha) drawCheckerboard(ctx, previewX, y + 6f, 8f, 8f, 2)
         Style.roundRect(ctx, previewX, y + 6f, 8f, 8f, 4f, value)
         val hex = "#" + hexText.take(6)
-        ctx.drawString(hex, previewX - 6f - hex.width(), y + 6f, Color(138, 127, 163).withAlpha((90 + 165 * ring).toInt()), shadow = false)
+        ctx.drawString(hex, previewX - 6f - hex.width(), y + 6f, Color(170, 150, 142).withAlpha((90 + 165 * ring).toInt()), shadow = false)
 
         ctx.scissor(x, y, width, height)
 

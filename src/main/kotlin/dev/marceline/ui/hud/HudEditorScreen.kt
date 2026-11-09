@@ -36,9 +36,9 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
     private val gridAnim = Animation(180, 0f)
     private val hoverAnims = HashMap<String, Animation>()
 
-    private val textMain = Color(237, 231, 255)
-    private val textSoft = Color(196, 184, 224)
-    private val textFaint = Color(138, 127, 163)
+    private val textMain = Color(243, 234, 222)
+    private val textSoft = Color(214, 198, 186)
+    private val textFaint = Color(170, 150, 142)
 
     private data class Btn(val id: String, val label: String, val x: Float, val y: Float, val w: Float, val h: Float)
 
@@ -104,9 +104,9 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
         val o = openAnim.value
 
         // dim the world, a little darker at the edges
-        graphics.drawRect(0, 0, Resolution.width, Resolution.height, Color(6, 2, 14, (110 * o).toInt()))
-        graphics.drawVerticalGradient(0, 0, Resolution.width, 40, Color(6, 2, 14, (90 * o).toInt()), Color(6, 2, 14, 0))
-        graphics.drawVerticalGradient(0, Resolution.height - 60, Resolution.width, 60, Color(6, 2, 14, 0), Color(6, 2, 14, (120 * o).toInt()))
+        graphics.drawRect(0, 0, Resolution.width, Resolution.height, Color(12, 4, 7, (110 * o).toInt()))
+        graphics.drawVerticalGradient(0, 0, Resolution.width, 40, Color(12, 4, 7, (90 * o).toInt()), Color(12, 4, 7, 0))
+        graphics.drawVerticalGradient(0, Resolution.height - 60, Resolution.width, 60, Color(12, 4, 7, 0), Color(12, 4, 7, (120 * o).toInt()))
 
         drawGrid(graphics, gridAnim.value * o)
 
@@ -175,8 +175,8 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
             when {
                 b.id == "reset" && resetConfirmed -> Style.roundRect(ctx, b.x, b.y, b.w, b.h, 4f, Color(150, 40, 70))
                 b.id == "done" -> Style.gradientPill(ctx, b.x, b.y, b.w, b.h, Style.accentColor.withAlpha(200 + (55 * hv).toInt()), Style.accent2.withAlpha(200 + (55 * hv).toInt()))
-                active -> Style.roundRect(ctx, b.x, b.y, b.w, b.h, 4f, Style.mix(Color(52, 36, 84), Color(70, 48, 110), hv))
-                else -> Style.roundRect(ctx, b.x, b.y, b.w, b.h, 4f, Style.mix(Color(32, 24, 46), Color(45, 33, 66), hv))
+                active -> Style.roundRect(ctx, b.x, b.y, b.w, b.h, 4f, Style.mix(Color(72, 30, 40), Color(96, 36, 50), hv))
+                else -> Style.roundRect(ctx, b.x, b.y, b.w, b.h, 4f, Style.mix(Color(32, 24, 46), Color(52, 30, 36), hv))
             }
             val color = when {
                 b.id == "done" || (b.id == "reset" && resetConfirmed) -> Color.WHITE

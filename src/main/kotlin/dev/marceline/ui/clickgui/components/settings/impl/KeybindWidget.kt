@@ -36,7 +36,7 @@ class KeybindWidget(config: KeybindSetting): Widget<Int>(config) {
         else Style.valuePill(ctx, bx, y + 3f, bw, 13f, listening, hoverAnim.value)
         ctx.drawString(bindText, bx + 5f, y + 6f, when {
             listening -> Style.accentColor
-            unset -> java.awt.Color(138, 127, 163)
+            unset -> java.awt.Color(170, 150, 142)
             else -> java.awt.Color.WHITE
         }, shadow = false)
     }
