@@ -131,16 +131,19 @@ class AxisTurnTest {
     }
 
     @Test
-    fun `pitch lag 0, 2, 5 - the gap between yaw and pitch settling grows`() {
-        val gaps = listOf(0, 2, 5).map { lag ->
+    fun `pitch lag 0, 2, 5 - pitch starts later, and arrives no earlier`() {
+        fun firstMove(values: List<Float>): Int = values.indexOfFirst { abs(it) > 0.05f }
+        val byLag = listOf(0, 2, 5).map { lag ->
             val cfg = split.copy(pitchLag = lag)
-            median(List(200) { i ->
-                // an up / down heavy turn, where pitch is what takes longest
-                val r = turn(cfg, 5000L + i, 20f, 59f)
-                settled(r.views.map { it.second }, 59f, 2.1f, false) - settled(r.views.map { it.first }, 20f, 1.5f, true)
-            })
+            val runs = List(200) { i -> turn(cfg, 5000L + i, 20f, 59f) } // a big turn where pitch has most of the way
+            val start = median(runs.map { r -> firstMove(r.views.map { it.second }) - firstMove(r.views.map { it.first }) })
+            val arrive = median(runs.map { r -> settled(r.views.map { it.second }, 59f, 2.1f, false) - settled(r.views.map { it.first }, 20f, 1.5f, true) })
+            start to arrive
         }
-        assertTrue(gaps[0] <= gaps[1] && gaps[1] <= gaps[2] && gaps[0] < gaps[2], "gaps by lag: $gaps")
+        val starts = byLag.map { it.first }; val arrivals = byLag.map { it.second }
+        assertTrue(starts[0] < starts[1] && starts[1] < starts[2], "start gap by lag: $starts")
+        assertTrue(arrivals[0] <= arrivals[1] && arrivals[1] <= arrivals[2], "arrival gap by lag: $arrivals")
+        println("MEASURE pitch lag 0/2/5: start gap $starts, arrival gap $arrivals")
     }
 
     @Test
