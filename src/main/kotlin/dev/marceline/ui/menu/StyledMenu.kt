@@ -20,15 +20,18 @@ import java.awt.Color
  * the Marceline mark and word in the middle, flat see-through buttons with spaced capitals.
  * The screens extend the game's TitleScreen / PauseScreen, so anything that checks for those still works.
  */
-class StyledMenu(private val screen: Screen, private val markSize: Float, private val subtitle: String, private val rows: () -> List<List<MenuButton>>) {
+class StyledMenu(private val screen: Screen, private val markSize: Float, private val subtitle: String, private val ambient: Boolean = false, private val rows: () -> List<List<MenuButton>>) {
     class MenuButton(val label: String, val danger: Boolean = false, val action: () -> Unit) {
         var x = 0f; var y = 0f; var w = 0f; var h = BUTTON_H
         var hover = 0f
         var enabled = true
+        /** Place in the layout, for the one-after-another fade in. */
+        var order = 0
         fun inside(mx: Double, my: Double) = mx >= x && mx <= x + w && my >= y && my <= y + h
     }
 
     private val buttons = ArrayList<MenuButton>()
+    private val bats = Bats()
     private val openedAt = System.currentTimeMillis()
     private val width get() = screen.width
     private val height get() = screen.height
@@ -45,6 +48,7 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
             val w = (MENU_W - GAP * (row.size - 1)) / row.size
             row.forEachIndexed { i, b ->
                 b.x = left + i * (w + GAP); b.y = y; b.w = w
+                b.order = buttons.size
                 buttons += b
             }
             y += BUTTON_H + GAP
@@ -75,10 +79,12 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
         val top = (buttons.firstOrNull()?.y ?: (height / 2f)) - (markSize + 8f + 14f + 10f + 18f)
         val rise = (1f - f) * 6f
 
-        // mark with a soft glow behind it
+        if (ambient) bats.draw(graphics, width.toFloat(), height.toFloat(), f)
+        // mark with a soft glow behind it; on the title screen it breathes, very slowly
+        val breath = if (ambient) 0.78f + 0.22f * kotlin.math.sin((System.currentTimeMillis() - openedAt) / 1000.0 * (2 * Math.PI / 4.2)).toFloat() else 1f
         for (i in 6 downTo 1) {
-            val d = i * 3f
-            Style.roundRect(graphics, cx - markSize / 2f - d, top - d + rise, markSize + d * 2, markSize + d * 2, markSize / 2f + d, SkyHanniTheme.logoFrom.withAlpha((6 * f).toInt()))
+            val d = i * 3f * (if (ambient) 0.92f + 0.08f * breath else 1f)
+            Style.roundRect(graphics, cx - markSize / 2f - d, top - d + rise, markSize + d * 2, markSize + d * 2, markSize / 2f + d, SkyHanniTheme.logoFrom.withAlpha((6 * f * breath).toInt()))
         }
         SkyHanniTheme.drawLogoMark(graphics, cx - markSize / 2f, top + rise, markSize, Color.WHITE.withAlpha((255 * f).toInt()), big = true)
 
@@ -108,7 +114,17 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
         }
         spaced(graphics, subtitle, cx, ly + 4f, 0.72f, 2.2f, SkyHanniTheme.gold.withAlpha((210 * f).toInt()))
 
-        for (b in buttons) drawButton(graphics, b, mouseX.toDouble(), mouseY.toDouble(), f)
+        // buttons come in one after another from the top, rising a little
+        val since = System.currentTimeMillis() - openedAt
+        val step = if (ambient) 70L else 35L
+        for (b in buttons) {
+            val bf = ((since - 120L - b.order * step) / 260f).coerceIn(0f, 1f).let { 1f - (1f - it) * (1f - it) }
+            if (bf <= 0.01f) continue
+            graphics.pose().pushMatrix()
+            graphics.pose().translate(0f, (1f - bf) * 5f)
+            drawButton(graphics, b, mouseX.toDouble(), mouseY.toDouble(), f * bf)
+            graphics.pose().popMatrix()
+        }
         dev.marceline.utils.render.UiFont.display = false
         graphics.drawString("v${Marceline.MOD_VERSION} · Minecraft 26.2", 4f, height - 11f, Color(225, 200, 202, (150 * f).toInt()), scale = 0.85f, shadow = false)
         corners(graphics, f)
@@ -178,7 +194,7 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
 }
 
 class MarcelineTitleScreen: net.minecraft.client.gui.screens.TitleScreen(false) {
-    private val menu = StyledMenu(this, 46f, "SLOW DANCE WITH YOU") {
+    private val menu = StyledMenu(this, 46f, "SLOW DANCE WITH YOU", ambient = true) {
         buildList {
             add(listOf(StyledMenu.MenuButton("SINGLEPLAYER") { StyledMenu.open(net.minecraft.client.gui.screens.worldselection.SelectWorldScreen(this@MarcelineTitleScreen)) }))
             add(listOf(StyledMenu.MenuButton("MULTIPLAYER") { StyledMenu.open(net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen(this@MarcelineTitleScreen)) }))
@@ -250,4 +266,55 @@ class MarcelinePauseScreen: net.minecraft.client.gui.screens.PauseScreen(true) {
         menu.render(graphics, mouseX, mouseY) { _, _ -> }
 
     override fun mouseClicked(event: MouseButtonEvent, isDoubleClick: Boolean) = menu.click(event)
+}
+
+/**
+ * A few small bats drifting across the upper part of the title screen, slow and faint, wings beating.
+ * Sprites are pre-sized (textures/gui/bat/up_<w>.png / down_<w>.png) and drawn one pixel for one pixel.
+ */
+class Bats(private val count: Int = 5) {
+    private class Bat(var x: Float, var y: Float, val speed: Float, val size: Float, val bob: Float, val phase: Float, val flap: Float, val alpha: Float)
+
+    private val random = java.util.Random()
+    private val list = ArrayList<Bat>()
+    private var last = 0L
+    private val sprites = HashMap<String, net.minecraft.resources.Identifier>()
+    private val widths = (8 .. 64 step 2).toList()
+
+    private fun spawn(w: Float, h: Float, anywhere: Boolean): Bat {
+        val dir = if (random.nextBoolean()) 1f else -1f
+        val size = 7f + random.nextFloat() * 7f
+        val x = if (anywhere) random.nextFloat() * w else if (dir > 0) -size * 2 else w + size * 2
+        return Bat(x, h * (0.06f + random.nextFloat() * 0.36f), dir * (6f + random.nextFloat() * 10f), size,
+            2f + random.nextFloat() * 5f, random.nextFloat() * 6.28f, 3.2f + random.nextFloat() * 2.2f, 0.35f + random.nextFloat() * 0.3f)
+    }
+
+    fun draw(g: GuiGraphicsExtractor, w: Float, h: Float, fade: Float) {
+        val now = System.nanoTime()
+        val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceAtMost(0.1f)
+        last = now
+        if (list.isEmpty()) repeat(count) { list += spawn(w, h, true) }
+        val t = now / 1e9
+        val scale = (mc.window.guiScale.toFloat()).coerceAtLeast(1f)
+        for (i in list.indices) {
+            val b = list[i]
+            b.x += b.speed * dt
+            if (b.x < -b.size * 3 || b.x > w + b.size * 3) { list[i] = spawn(w, h, false); continue }
+            val wingsUp = kotlin.math.sin(t * b.flap * 2 * Math.PI + b.phase) > 0
+            val y = b.y + kotlin.math.sin(t * 0.7 + b.phase).toFloat() * b.bob
+            val px = widths.minBy { kotlin.math.abs(it - b.size * scale) }
+            val ph = Math.round(px * 0.714f)
+            val name = (if (wingsUp) "up_" else "down_") + px
+            val id = sprites.getOrPut(name) { net.minecraft.resources.Identifier.fromNamespaceAndPath(Marceline.MOD_ID, "textures/gui/bat/$name.png") }
+            val pose = g.pose()
+            pose.pushMatrix()
+            pose.translate(Math.round((b.x - px / scale / 2f) * scale) / scale, Math.round((y - ph / scale / 2f) * scale) / scale)
+            pose.scale(1f / scale, 1f / scale)
+            // facing the way it flies
+            if (b.speed < 0) { pose.translate(px.toFloat(), 0f); pose.scale(-1f, 1f) }
+            val a = (b.alpha * fade * 255).toInt().coerceIn(0, 255)
+            g.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, id, 0, 0, 0f, 0f, px, ph, px, ph, (a shl 24) or 0x2A0C12)
+            pose.popMatrix()
+        }
+    }
 }
