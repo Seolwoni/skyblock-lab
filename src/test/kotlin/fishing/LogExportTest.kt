@@ -1,6 +1,6 @@
 package fishing
 
-import dev.riftwalk.utils.LogExport
+import dev.marceline.utils.LogExport
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

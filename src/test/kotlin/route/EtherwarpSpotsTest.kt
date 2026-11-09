@@ -1,9 +1,9 @@
 package route
 
-import dev.riftwalk.features.impl.fishing.TravelMath
-import dev.riftwalk.features.impl.fishing.TravelMath.Candidate
-import dev.riftwalk.features.impl.fishing.TravelMath.Why
-import dev.riftwalk.utils.PathMath.P
+import dev.marceline.features.impl.fishing.TravelMath
+import dev.marceline.features.impl.fishing.TravelMath.Candidate
+import dev.marceline.features.impl.fishing.TravelMath.Why
+import dev.marceline.utils.PathMath.P
 import java.util.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

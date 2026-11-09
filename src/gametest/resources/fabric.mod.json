@@ -1,15 +1,15 @@
 {
 	"schemaVersion": 1,
-	"id": "riftwalk-gametest",
+	"id": "marceline-gametest",
 	"version": "1.0.0",
-	"name": "Riftwalk Game Tests",
+	"name": "Marceline Game Tests",
 	"environment": "client",
 	"entrypoints": {
 		"fabric-client-gametest": [
-			"dev.riftwalk.gametest.SmokeTest"
+			"dev.marceline.gametest.SmokeTest"
 		]
 	},
 	"depends": {
-		"riftwalk": "*"
+		"marceline": "*"
 	}
 }

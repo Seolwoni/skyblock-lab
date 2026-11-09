@@ -1,4 +1,4 @@
-rootProject.name = "Riftwalk"
+rootProject.name = "Marceline"
 
 pluginManagement {
     repositories {

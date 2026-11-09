@@ -1,0 +1,6 @@
+{
+  "ui.click": {
+    "subtitle": "Marceline click",
+    "sounds": ["marceline:click"]
+  }
+}

@@ -1,9 +1,9 @@
 package mining
 
-import dev.riftwalk.features.impl.mining.MiningMath
-import dev.riftwalk.features.impl.mining.MiningMath.Candidate
-import dev.riftwalk.utils.HumanProfile
-import dev.riftwalk.utils.HumanTiming
+import dev.marceline.features.impl.mining.MiningMath
+import dev.marceline.features.impl.mining.MiningMath.Candidate
+import dev.marceline.utils.HumanProfile
+import dev.marceline.utils.HumanTiming
 import java.util.Random
 import kotlin.math.abs
 import kotlin.test.Test

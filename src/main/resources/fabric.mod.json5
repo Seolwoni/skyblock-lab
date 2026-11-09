@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "id": "riftwalk",
+  "id": "marceline",
   "version": "${version}",
-  "name": "Riftwalk",
+  "name": "Marceline",
   //#if CHEAT
-  "description": "SkyBlock toolkit for @MINECRAFT_VERSION@: fishing, dungeons and routes in one clean menu.\nOpen with /rw. Built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
+  "description": "SkyBlock toolkit for @MINECRAFT_VERSION@: fishing, dungeons and routes in one clean menu.\nOpen with /mar. Built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
   //#else
-  //!"description": "SkyBlock toolkit for @MINECRAFT_VERSION@: dungeons, fishing helpers and routes in one clean menu (legit build).\nOpen with /rw. Built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
+  //!"description": "SkyBlock toolkit for @MINECRAFT_VERSION@: dungeons, fishing helpers and routes in one clean menu (legit build).\nOpen with /mar. Built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
   //#endif
   "authors": [
     "seolwoni"
@@ -16,25 +16,25 @@
     "yourboykyle - Secret Routes (GPL-3.0)"
   ],
   "license": ["CC0-1.0", "GPL-3.0-only"],
-  "icon": "assets/riftwalk/icon.png",
+  "icon": "assets/marceline/icon.png",
   "environment": "*",
   "entrypoints": {
     "modmenu": [
-      "dev.riftwalk.ui.clickgui.ModMenuIntegration"
+      "dev.marceline.ui.clickgui.ModMenuIntegration"
     ],
     "client": [
       {
-        "value": "dev.riftwalk.Riftwalk",
+        "value": "dev.marceline.Marceline",
         "adapter": "kotlin"
       },
       "xyz.yourboykyle.secretroutes.Main"
     ]
   },
   "mixins": [
-    "riftwalk.mixins.json",
+    "marceline.mixins.json",
     "secretroutes.mixins.json"
   ],
-  "accessWidener": "riftwalk.accesswidener",
+  "accessWidener": "marceline.accesswidener",
   "depends": {
     "fabricloader": ">=0.19.5",
     "minecraft": "@MINECRAFT_VERSION@",

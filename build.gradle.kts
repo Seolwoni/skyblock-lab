@@ -11,10 +11,10 @@ plugins {
     `maven-publish`
     kotlin("jvm")
     kotlin("plugin.serialization")
-    id("riftwalk.variants")
-    id("riftwalk.preprocessing")
-    id("riftwalk.publishing")
-    id("riftwalk.loom")
+    id("marceline.variants")
+    id("marceline.preprocessing")
+    id("marceline.publishing")
+    id("marceline.loom")
     idea
 }
 
@@ -116,7 +116,7 @@ dependencies {
 fabricApi {
     configureTests {
         createSourceSet = true
-        modId = "riftwalk-gametest"
+        modId = "marceline-gametest"
         enableGameTests = false
         enableClientGameTests = true
         eula = true
@@ -206,7 +206,7 @@ tasks.named<Jar>("jar") {
 
 listOf("jarCheat", "jarLegit").forEach { taskName ->
     tasks.named<ShadowJar>(taskName) {
-        // Riftwalk-<mod_version>-<minecraft_version>-<cheat|legit>.jar
+        // Marceline-<mod_version>-<minecraft_version>-<cheat|legit>.jar
         archiveVersion.set("$mod_version-$minecraft_version")
         // Assist Core / Assist Path API stubs are only for compiling; the real classes come from those mods.
         exclude("com/seolwoni/**")

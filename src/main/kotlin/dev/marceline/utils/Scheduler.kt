@@ -1,0 +1,62 @@
+package dev.marceline.utils
+
+import dev.marceline.event.EventBus
+import dev.marceline.event.impl.RenderWorldEvent
+import dev.marceline.event.impl.TickEvent
+import dev.marceline.init.types.ISelfInit
+import java.util.concurrent.*
+
+object Scheduler: ISelfInit {
+    private val tasks = CopyOnWriteArrayList<Task>()
+    private var currentTicks = 0L
+
+    /**
+     * Schedules a task to run only after both [msDelay] and [tickDelay] have passed.
+     */
+    fun schedule(msDelay: Int, tickDelay: Int = msDelay / 50, action: Runnable) {
+        tasks.add(Task(
+            System.currentTimeMillis() + msDelay,
+            currentTicks + tickDelay,
+            action
+        ))
+    }
+
+    override fun init() {
+        EventBus.register<TickEvent.Server> {
+            currentTicks ++
+            process { task ->
+                task.ticksPassed = currentTicks >= task.targetTicks
+            }
+        }
+
+        EventBus.register<RenderWorldEvent> {
+            process { task ->
+                task.msPassed = System.currentTimeMillis() >= task.targetMs
+            }
+        }
+    }
+
+    private inline fun process(updateState: (Task) -> Unit) {
+        if (tasks.isEmpty()) return
+
+        for (task in tasks) {
+            updateState(task)
+
+            if (task.msPassed && task.ticksPassed && ! task.executed) {
+                synchronized(task) {
+                    if (! task.executed) {
+                        task.executed = true
+                        task.action.run()
+                        tasks.remove(task)
+                    }
+                }
+            }
+        }
+    }
+
+    private class Task(val targetMs: Long, val targetTicks: Long, val action: Runnable) {
+        @Volatile var msPassed = false
+        @Volatile var ticksPassed = false
+        @Volatile var executed = false
+    }
+}

@@ -1,0 +1,112 @@
+package dev.marceline.features.impl.floor7.dragons
+
+import dev.marceline.compat.hasNoSpeed
+import dev.marceline.compat.overridesLimiter
+import net.minecraft.world.entity.EntityTypes
+import dev.marceline.Marceline.mc
+import dev.marceline.features.impl.floor7.dragons.WitherDragonEnum.Companion.dragonSpawnCount
+import dev.marceline.utils.*
+import dev.marceline.utils.ChatUtils.unformattedText
+import dev.marceline.utils.MathUtils.xzInAABB
+import dev.marceline.utils.dungeons.DungeonListener
+import dev.marceline.utils.dungeons.enums.DungeonClass
+import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.network.protocol.game.*
+import net.minecraft.sounds.SoundEvents
+import net.minecraft.world.entity.decoration.ArmorStand
+import net.minecraft.world.item.Items
+import net.minecraft.world.phys.Vec3
+
+object DragonCheck {
+    private val healthRegex = Regex("\\d+(?:\\.\\d+)?[bBmMkK]")
+    private val colorRegex = Regex("§.")
+
+    fun isAliveOnScoreboard(dragon: WitherDragonEnum) = ScoreboardUtils.getLines().any {
+        val line = it.unformattedText.remove(colorRegex) // why tf it still have colors???
+        line.contains(dragon.displayName, ignoreCase = true).also {
+            if (it) ChatUtils.debug("dragon", "tab line for ${dragon.name}: $line")
+        } && healthRegex.find(line)?.value != "0"
+    }
+
+    fun handleSpawnPacket(particle: ClientboundLevelParticlesPacket) {
+        if (particle.particle.type != ParticleTypes.FLAME) return
+        if (particle.x % 1 != 0.0) return
+        if (particle.z % 1 != 0.0) return
+        if (particle.count != 20) return
+        if (particle.y != 19.0) return
+        if (! particle.hasNoSpeed) return
+        if (! particle.overridesLimiter) return
+        if (particle.xDist != 2f) return
+        if (particle.yDist != 3f) return
+        if (particle.zDist != 2f) return
+
+        var best: WitherDragonEnum? = null
+        var worse: WitherDragonEnum? = null
+
+        for (dragon in WitherDragonEnum.entries) {
+            if (dragon.state != WitherDragonState.SPAWNING) {
+                if (particle.x !in dragon.xRange || particle.z !in dragon.zRange) continue
+                dragon.state = WitherDragonState.SPAWNING
+            }
+
+            if (best == null || dragon.timeToSpawn < best.timeToSpawn) best = dragon
+            if (worse == null || dragon.timeToSpawn > best.timeToSpawn) worse = dragon
+        }
+
+        if (WitherDragons.dragPrio.value) {
+            if (WitherDragons.firstDragonOnly.value && dragonSpawnCount >= 2) {
+                if (best != null) WitherDragons.priorityDragon = best
+                return
+            }
+
+            val prioClass = if (WitherDragons.soloPriority.value == 0) DungeonClass.Healer else DungeonClass.Tank
+            if (DungeonListener.thePlayer?.clazz == prioClass && worse != null) WitherDragons.priorityDragon = worse
+            else if (best != null) WitherDragons.priorityDragon = best
+        }
+        else if (best != null) WitherDragons.priorityDragon = best
+    }
+
+    fun dragonUpdate(packet: ClientboundSetEntityDataPacket) {
+        val dragon = WitherDragonEnum.entries.find { it.entityId == packet.id }?.apply {
+            if (entity == null || entity?.isAlive != true) updateEntity(packet.id)
+        } ?: return
+
+        dragon.health = (packet.packedItems.find { it.id == 9 }?.value as? Float) ?: return
+
+        if (dragon.health <= 0 && dragon.state != WitherDragonState.DEAD) {
+            dragon.setDead()
+        }
+    }
+
+    fun dragonSpawn(packet: ClientboundAddEntityPacket) {
+        if (packet.type != EntityTypes.ENDER_DRAGON) return
+        val spawnVec = Vec3(packet.x, packet.y, packet.z)
+        val newId = packet.id
+
+        WitherDragonEnum.entries.find { dragon ->
+            spawnVec.xzInAABB(dragon.boxesDimensions) && dragon.state == WitherDragonState.SPAWNING
+        }?.setAlive(newId) ?: WitherDragonEnum.entries.find { dragon ->
+            dragon.state == WitherDragonState.ALIVE && dragon.entity == null && dragon.entityId == newId
+        }?.updateEntity(newId, hard = true)
+    }
+
+    fun dragonSprayed(packet: ClientboundSetEquipmentPacket) {
+        if (packet.slots.none { it.second.item == Items.PACKED_ICE }) return
+        val sprayedEntity = mc.level?.getEntity(packet.entity) as? ArmorStand ?: return
+
+        WitherDragonEnum.entries.forEach { dragon ->
+            val entity = dragon.entity
+            if (dragon.sprayedTime != null || dragon.state != WitherDragonState.ALIVE || entity == null || sprayedEntity.distanceTo(entity) > 8) return@forEach
+            dragon.sprayedTime = DungeonListener.currentTime - dragon.spawnedTime
+        }
+    }
+
+    fun trackArrows(packet: ClientboundSoundPacket) {
+        if (packet.sound.value() != SoundEvents.ARROW_HIT_PLAYER) return
+        val priorityDragon = WitherDragons.priorityDragon ?: return
+        if (priorityDragon.state != WitherDragonState.ALIVE) return
+        if (DungeonListener.currentTime - priorityDragon.spawnedTime <= priorityDragon.skipKillTime) {
+            priorityDragon.arrowsHit ++
+        }
+    }
+}

@@ -1,4 +1,4 @@
-import dev.riftwalk.features.impl.floor7.terminals.TerminalClick
+import dev.marceline.features.impl.floor7.terminals.TerminalClick
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.floor

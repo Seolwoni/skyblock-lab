@@ -1,6 +1,6 @@
 package route
 
-import dev.riftwalk.utils.HumanMotion
+import dev.marceline.utils.HumanMotion
 import java.util.Random
 import kotlin.math.abs
 import kotlin.test.Test

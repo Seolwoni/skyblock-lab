@@ -1,7 +1,7 @@
 package human
 
-import dev.riftwalk.utils.HumanProfile
-import dev.riftwalk.utils.HumanTiming
+import dev.marceline.utils.HumanProfile
+import dev.marceline.utils.HumanTiming
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue

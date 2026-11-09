@@ -1,8 +1,8 @@
 package route
 
-import dev.riftwalk.features.impl.fishing.TravelMath
-import dev.riftwalk.features.impl.fishing.TravelMath.Move
-import dev.riftwalk.utils.PathMath.P
+import dev.marceline.features.impl.fishing.TravelMath
+import dev.marceline.features.impl.fishing.TravelMath.Move
+import dev.marceline.utils.PathMath.P
 import java.util.Random
 import kotlin.math.abs
 import kotlin.math.hypot

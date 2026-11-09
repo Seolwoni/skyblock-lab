@@ -4,7 +4,7 @@ Source read on 2026-11-04 (shallow clones, read only):
 
 | Mod | Licence | Size of the fishing code | Shape |
 |---|---|---|---|
-| **Riftwalk Auto Fishing** (ours) | — | ~2,300 lines in 7 files | state machine FIND/TRAVEL/CAST/WAIT_BITE/REEL/FIGHT/SELL/BREAK |
+| **Marceline Auto Fishing** (ours) | — | ~2,300 lines in 7 files | state machine FIND/TRAVEL/CAST/WAIT_BITE/REEL/FIGHT/SELL/BREAK |
 | Poseidon (noname-mods) | LGPL-3 | ~1,400 (FishingManager) + catch registry, particles, HUD | IDLE → WAITING → BITING → REELING |
 | HypixelClient (chase-irql) | CC0 | ~830 (AutoFisher + FishingCombat) | IDLE → DELAY_BEFORE_CAST → FISHING → DELAY_BEFORE_REEL → COMBAT (SCANNING/REACTING/KILLING/RETURNING) |
 | skyblock-autofisher (lyn1dev) | CC0 | ~370 | one tick handler + scheduled clicks |

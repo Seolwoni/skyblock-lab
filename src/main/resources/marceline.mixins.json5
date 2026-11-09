@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "dev.marceline.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "plugin": "dev.marceline.init.AutoMixinDiscovery",
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

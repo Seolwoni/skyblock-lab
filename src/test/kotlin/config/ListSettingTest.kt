@@ -1,6 +1,6 @@
 package config
 
-import dev.riftwalk.config.types.ListSetting
+import dev.marceline.config.types.ListSetting
 import com.google.gson.JsonParser
 import kotlin.test.*
 

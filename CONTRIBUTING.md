@@ -1,6 +1,6 @@
-# Contributing to Riftwalk
+# Contributing to Marceline
 
-Thanks for your interest in improving Riftwalk. This guide covers how to set
+Thanks for your interest in improving Marceline. This guide covers how to set
 up the project, the conventions we follow, and how to get a change merged.
 
 ## Contributor License Agreement

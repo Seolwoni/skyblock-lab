@@ -1,12 +1,12 @@
 package route
 
-import dev.riftwalk.features.impl.fishing.TravelFail
-import dev.riftwalk.features.impl.fishing.TravelFail.Reason
-import dev.riftwalk.features.impl.fishing.TravelMath
-import dev.riftwalk.features.impl.fishing.TravelMath.Move
-import dev.riftwalk.features.impl.fishing.TravelPlanner
-import dev.riftwalk.utils.PathMath
-import dev.riftwalk.utils.PathMath.P
+import dev.marceline.features.impl.fishing.TravelFail
+import dev.marceline.features.impl.fishing.TravelFail.Reason
+import dev.marceline.features.impl.fishing.TravelMath
+import dev.marceline.features.impl.fishing.TravelMath.Move
+import dev.marceline.features.impl.fishing.TravelPlanner
+import dev.marceline.utils.PathMath
+import dev.marceline.utils.PathMath.P
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

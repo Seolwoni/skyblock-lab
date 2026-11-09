@@ -1,0 +1,325 @@
+package dev.marceline.features.impl.floor7.devices
+
+import dev.marceline.config.types.*
+import dev.marceline.event.EventBus
+import dev.marceline.event.impl.*
+import dev.marceline.features.Feature
+import dev.marceline.init.RemoteFeatures
+import dev.marceline.ui.clickgui.components.*
+import dev.marceline.utils.*
+import dev.marceline.utils.Humanize
+import dev.marceline.utils.MathUtils.add
+import dev.marceline.utils.MathUtils.toVec
+import dev.marceline.utils.NumbersUtils.toFixed
+import dev.marceline.utils.dungeons.DungeonListener
+import dev.marceline.utils.location.LocationUtils
+import dev.marceline.utils.render.Render2D.drawString
+import dev.marceline.utils.render.RenderHelper.width
+import dev.marceline.utils.render.world.Render3D.renderBoxBounds
+import dev.marceline.utils.render.world.Render3D.renderString
+import dev.marceline.utils.render.world.RenderContext
+import net.minecraft.core.BlockPos
+import net.minecraft.sounds.SoundEvents
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.ButtonBlock
+import net.minecraft.world.phys.Vec3
+import java.awt.Color
+import java.util.*
+
+object SimonSays: Feature("Simon Says Solver") {
+    private val maxStage = RemoteFeatures.getFeature(SimonSays::class.simpleName)["maxClicks"]?.asInt ?: 0
+
+    private val progressDisplay by ToggleSetting("Progress Display").withDescription("Displays the current Simon Says stage.").section("HUD")
+    private val progressFormat by TextInputSetting("Progress Format", "&7SS: {stage}/&a{maxStage}").withDescription("Replaces {stage} and {maxStage} with the current and maximum Simon Says stage. Supports color codes.").showIf { progressDisplay.value }
+
+    private val ssSkip by ToggleSetting("SS skip Compatibility", true).withDescription("Always assume at the start that you perfectly SS skip").section("Options")
+    private val blockWrongClicks by ToggleSetting("Block Wrong Clicks").withDescription("Blocks clicks if you aren't looking at the correct button. &eSneak to override.")
+    private val color1 by ColorSetting("First Color", Color.GREEN).withDescription("Color of the first button.")
+    private val color2 by ColorSetting("Second Color", Color.YELLOW).withDescription("Color of the second button.")
+    private val color3 by ColorSetting("Other Color", Color.RED).withDescription("Color of the rest of the buttons.")
+    private val outline by ToggleSetting("Outline", false).withDescription("Renders the box with an outline.")
+    private val phase by ToggleSetting("Phase", true).withDescription("Renders the box through walls.")
+
+    private val buttonNumbers by ToggleSetting("Button Numbers", false).withDescription("Displays numbers for the current sequence.")
+    private val numberColor by ColorSetting("Number Color", Color.WHITE, false).withDescription("Color of the button numbers.").showIf { buttonNumbers.value }
+
+    //#if CHEAT
+    private val triggerBot by ToggleSetting("Triggerbot", false).withDescription("Automatically clicks the correct button when you're aiming at it.").section("Auto")
+    private val autoStart by ToggleSetting("Auto Start", false).withDescription("Automatically starts the device when it can be started.")
+    private val startClicks by SliderSetting("Start Clicks", 3, 1, 10, 1).withDescription("Amount of clicks to start the device.").showIf { autoStart.value }
+    private val startClickDelay by SliderSetting("Start Click Delay", 3, 1, 25, 1).withDescription("Delay in ticks between each start click.").showIf { autoStart.value }
+    private val autoSolve by ToggleSetting("Auto Simon Says", false).withDescription("Looks at the next button of the sequence and presses it, while you stand at the device")
+    private val solveDelay by SliderSetting("Press Delay", 3, 1, 10, 1, " ticks").withDescription("Ticks between presses (too fast and the device can miss one)").showIf { autoSolve.value }
+    //#endif
+
+    private val alertsEnabled by ToggleSetting("Alerts Enabled", true).section("Alerts")
+    private val sendChat by ToggleSetting("SS Break Alert", true).showIf { alertsEnabled.value }.withDescription("Sends in party chat when the device got reset")
+    private val sendRestartChat by ToggleSetting("Send Restart Chat", true).showIf { alertsEnabled.value }.withDescription("Sends a message in party chat when you restart the device")
+    private val alertSound by ToggleSetting("Alert Sound", true).showIf { alertsEnabled.value }.withDescription("Plays a sound when the device fails")
+    private val showTitle by ToggleSetting("Show Title", true).showIf { alertsEnabled.value }.withDescription("Shows a title when the device fails")
+
+    private val deviceRegex = Regex("(.+) (activated|completed) a (terminal|device|lever)! \\((\\d)/(\\d)\\)")
+    private val startRegex = Regex("^\\[BOSS] Goldor: Who dares trespass into my domain\\?$")
+    private val obsidians = (120 .. 123).flatMap { y -> (92 .. 95).map { z -> BlockPos(111, y, z) } }
+    private val buttons = (120 .. 123).flatMap { y -> (92 .. 95).map { z -> BlockPos(110, y, z) } }
+
+    private val buttonCheckPos = BlockPos(110, 120, 93)
+    private val startButton = BlockPos(110, 121, 91)
+    private val deviceCenter = Vec3(110.5, 121.5, 93.5)
+
+    private val lastKnownPositions = HashMap<String, Vec3>()
+    private val solution = ArrayList<SSButton>()
+    private var skipOver = false
+    private var lastClick = 0L
+    private var sequenceLength = 0
+    private var stage = 0
+
+    private var thingsDone = 0
+    private var ticks = 0
+    private var canBreak = false
+    private var wasBroken = false
+
+    private var startTick = 0L
+    private var pressGap = - 1
+
+    override fun init() {
+        hudElement(
+            name = "Simon Says Progress",
+            enabled = { progressDisplay.value },
+            shouldDraw = { LocationUtils.F7Phase == 3 && stage > 0 }
+        ) { ctx, example ->
+            val displayedStage = if (example) 3 else stage
+            val color = ColorUtils.colorCodeByPercent(displayedStage, maxStage)
+            val text = progressFormat.value.replace("{stage}", "$color$displayedStage&7").replace("{maxStage}", maxStage.toString())
+
+            ctx.drawString(text, 0, 0)
+            text.width().toFloat() to 9f
+        }
+
+        register<WorldChangeEvent> {
+            resetSolver()
+            reset()
+        }
+
+        register<TickEvent.Start> {
+            if (LocationUtils.F7Phase != 3) return@register
+            level.players().forEach { lastKnownPositions[it.gameProfile.name] = it.position() }
+        }
+
+        //#if CHEAT
+        register<ChatMessageEvent> {
+            if (! autoStart.value) return@register
+            if (LocationUtils.F7Phase != 3) return@register
+            if (! event.unformattedText.matches(startRegex)) return@register
+            if (PlayerUtils.getSelectionBlock() == startButton) repeat(startClicks.value) {
+                ThreadUtils.scheduledTask(it * startClickDelay.value) {
+                    PlayerUtils.rightClick()
+                }
+            }
+        }
+
+        register<TickEvent.Start> {
+            if (! triggerBot.value && ! autoSolve.value) return@register
+            if (LocationUtils.F7Phase != 3) return@register
+            val expected = solution.firstOrNull() ?: return@register
+
+            // Auto Simon Says: look at the next button (the click below happens once the aim has reached it)
+            if (autoSolve.value && mc.gui.screen() == null && player.eyePosition.distanceTo(deviceCenter) < 5.5) {
+                val aim = Humanize.aimPoint(Vec3(expected.button.x + 0.88, expected.button.y + 0.5, expected.button.z + 0.5), 0.08)
+                val rot = MathUtils.calcYawPitch(aim)
+                Humanize.turnTo(player, rot.yaw, rot.pitch, 0.8f)
+            }
+
+            if (autoSolve.value && pressGap < 0) pressGap = Humanize.around(solveDelay.value)
+            val delay = if (autoSolve.value) pressGap else 2
+            if (lastClick + delay >= DungeonListener.currentTime) return@register
+            if (PlayerUtils.getSelectionBlock() != expected.button) return@register
+
+            PlayerUtils.rightClick()
+            pressGap = - 1
+        }
+        //#endif
+
+        register<BlockChangeEvent> {
+            if (event.pos !in obsidians) return@register
+            if (event.newBlock != Blocks.SEA_LANTERN) return@register
+            if (ssSkip.value && solution.size == 2 && ! skipOver) {
+                solution.removeFirst()
+                solution.forEachIndexed { index, button -> button.number = index + 1 }
+                sequenceLength --
+            }
+            if (solution.none { it.obsidian == event.pos }) solution.add(SSButton(event.pos))
+            sequenceLength = (solution.size).coerceAtMost(maxStage)
+        }
+
+        register<BlockChangeEvent> {
+            if (event.pos != buttonCheckPos) return@register
+            if (event.newBlock == Blocks.AIR) {
+                sequenceLength = 0
+                return@register
+            }
+
+            if (event.newBlock != Blocks.STONE_BUTTON) return@register
+            stage = maxOf(stage, sequenceLength)
+            skipOver = true
+        }
+
+        register<RenderWorldEvent> {
+            if (LocationUtils.F7Phase != 3) return@register
+            if (solution.isEmpty()) return@register
+
+            for (i in solution.indices) {
+                val buttonPos = solution[i].button
+                val color = when (i) {
+                    0 -> color1
+                    1 -> color2
+                    else -> color3
+                }.value
+
+                event.ctx.renderSSBox(buttonPos, color)
+            }
+
+            if (buttonNumbers.value) {
+                for ((buttonPos, steps) in solution.groupBy { it.button }) {
+                    val numbers = steps.joinToString(", ") { "${it.number}" }
+                    event.ctx.renderString(numbers, buttonPos.toVec().add(x = 0.8, y = 0.6, z = 0.5), numberColor.value, phase = phase.value)
+                }
+            }
+        }
+
+        fun handleClick(event: PlayerInteractEvent, clickedPos: BlockPos) {
+            if (LocationUtils.F7Phase != 3) return
+            if (clickedPos == startButton) return resetSolver()
+            if (solution.isEmpty()) return
+            if (WorldUtils.getBlockAt(clickedPos) != Blocks.STONE_BUTTON) return
+            if (lastClick == DungeonListener.currentTime) return event.cancel()
+            lastClick = DungeonListener.currentTime
+
+            val expected = solution.firstOrNull() ?: return
+
+            if (clickedPos != expected.button) {
+                if (blockWrongClicks.value && ! player.isCrouching) return event.cancel()
+
+                if (solution.size == 3 && clickedPos == solution[1].button) {
+                    for (i in 1 downTo 0) solution.removeAt(i)
+                }
+            }
+            else solution.remove(expected)
+        }
+
+        register<PlayerInteractEvent.RIGHT_CLICK.BLOCK> { handleClick(event, event.pos) }
+        register<PlayerInteractEvent.LEFT_CLICK.BLOCK> { handleClick(event, event.pos) }
+
+        register<ChatMessageEvent> {
+            if (LocationUtils.F7Phase != 3) return@register
+            val msg = event.unformattedText
+
+            if (startRegex.matches(msg)) {
+                resetSolver()
+                reset()
+                serverTickListener.register()
+                startTick = DungeonListener.currentTime
+                return@register
+            }
+
+            val (name, _, type, completedStr, _) = deviceRegex.find(msg)?.destructured ?: return@register
+            val completed = completedStr.toIntOrNull() ?: 0
+
+            if (type == "device") {
+                val position = level.players().find { it.gameProfile.name == name }?.position() ?: lastKnownPositions[name]
+                if (position != null && position.distanceToSqr(deviceCenter) <= 25) {
+                    resetSolver()
+                    val time = (DungeonListener.currentTime - startTick) / 20.0
+                    ChatUtils.modMessage("&bSimon Says Took §e${time.toFixed(2)}s&b to complete!")
+                }
+            }
+
+            if (! serverTickListener.isActive) return@register
+
+            when (type) {
+                "terminal", "lever" -> thingsDone ++
+                "device" -> {
+                    if ((thingsDone + 1) >= completed) {
+                        serverTickListener.unregister()
+                    }
+                }
+            }
+        }
+    }
+
+    val serverTickListener = EventBus.listener<TickEvent.Server> {
+        ticks --
+
+        if (obsidians.any { WorldUtils.getBlockAt(it) != Blocks.OBSIDIAN }) {
+            ticks = 12
+            canBreak = true
+
+            if (wasBroken) {
+                wasBroken = false
+                if (alertsEnabled.value) {
+                    if (sendRestartChat.value) ChatUtils.sendCommand("pc SS Started Again!")
+                    if (showTitle.value) ChatUtils.showTitle("§a§l§nSS Started!")
+                }
+            }
+
+            return@listener
+        }
+
+        if (ticks > 0 || ! canBreak) return@listener
+        if (! buttons.all { pos -> WorldUtils.getBlockAt(pos) == Blocks.AIR }) return@listener
+
+        canBreak = false
+        wasBroken = true
+
+        if (alertsEnabled.value) {
+            if (alertSound.value) ThreadUtils.scheduledTask { player.playSound(SoundEvents.ANVIL_LAND, 5f, 0f) }
+            if (showTitle.value) ChatUtils.showTitle("§c§l§nSS BROKE!")
+            if (sendChat.value) ChatUtils.sendCommand("pc SS Broke!")
+        }
+
+        resetSolver()
+    }
+
+    override fun onDisable() {
+        super.onDisable()
+        resetSolver()
+        reset()
+    }
+
+    private fun resetSolver() {
+        solution.clear()
+        skipOver = false
+        sequenceLength = 0
+        stage = 0
+        lastClick = 0
+    }
+
+    private fun reset() {
+        serverTickListener.unregister()
+        lastKnownPositions.clear()
+        thingsDone = 0
+        ticks = 0
+        canBreak = false
+        wasBroken = false
+        startTick = 0L
+    }
+
+    private fun RenderContext.renderSSBox(pos: BlockPos, color: Color) {
+        val state = level.getBlockState(pos)
+        var depth = if (state.block == Blocks.STONE_BUTTON && state.getValue(ButtonBlock.POWERED)) 1.0 else 2.0
+        depth /= 16
+
+        renderBoxBounds(
+            pos.x + 1 - depth,
+            pos.y + 0.375, pos.z + 0.3125, pos.x + 1.0,
+            pos.y + 0.625, pos.z + 0.6875, color,
+            outline = outline.value,
+            phase = phase.value
+        )
+    }
+
+    private class SSButton(val obsidian: BlockPos) {
+        val button = obsidian.west()
+        var number = solution.size + 1
+    }
+}

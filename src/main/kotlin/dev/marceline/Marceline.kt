@@ -1,0 +1,70 @@
+package dev.marceline
+
+import dev.marceline.init.ClassGraphInitializer
+import dev.marceline.utils.render.ItemRenderer
+import kotlinx.coroutines.*
+import me.owdding.dfu.item.MeowddingItemDfu
+import net.fabricmc.api.ClientModInitializer
+import net.fabricmc.fabric.api.client.rendering.v1.PictureInPictureRendererRegistry
+import net.minecraft.client.Minecraft
+import net.minecraft.network.chat.Component
+import org.slf4j.LoggerFactory
+
+object Marceline: ClientModInitializer {
+    const val MOD_ID = "@MOD_ID@"
+    const val MOD_NAME = "@MOD_NAME@"
+    const val MOD_VERSION = "@MOD_VERSION@"
+    val PREFIX by lazy {
+        if (isCheat) dev.marceline.utils.ModChat.prefix
+        else Component.empty().apply {
+            append(Component.literal("[").withStyle { it.withBold(true).withColor(0x4498DB).withShadowColor(0x2B5C85) })
+            append(Component.literal("N").withStyle { it.withBold(true).withColor(0x588CD2).withShadowColor(0x3B5782) })
+            append(Component.literal("o").withStyle { it.withBold(true).withColor(0x6C81CA).withShadowColor(0x4A5280) })
+            append(Component.literal("a").withStyle { it.withBold(true).withColor(0x9469B9).withShadowColor(0x69447A) })
+            append(Component.literal("m").withStyle { it.withBold(true).withColor(0xBC52A7).withShadowColor(0x873D73) })
+            append(Component.literal("m").withStyle { it.withBold(true).withColor(0xD0469F).withShadowColor(0x96366F) })
+            append(Component.literal("]").withStyle { it.withBold(true).withColor(0xE43A96).withShadowColor(0xA62E6E) })
+        }
+    }
+
+    val scope = CoroutineScope(Dispatchers.Default + SupervisorJob() + CoroutineName(MOD_NAME))
+
+    @JvmField val logger = LoggerFactory.getLogger(MOD_NAME)
+    @JvmStatic val mc by lazy { Minecraft.getInstance() }
+    @JvmField var isLoaded = false
+
+    @JvmField
+    var isCheat = run {
+        //#if CHEAT
+        true
+        //#else
+        //!false
+        //#endif
+    }
+
+    val availableDebugFlags = mutableSetOf<String>()
+    val debugFlags = object: LinkedHashSet<String>() {
+        override fun contains(o: String): Boolean {
+            availableDebugFlags.add(o)
+            return super.contains(o)
+        }
+    }
+
+    override fun onInitializeClient() {
+        moveOldConfig()
+        PictureInPictureRendererRegistry.register { ItemRenderer() }
+        MeowddingItemDfu.load()
+
+        ClassGraphInitializer().initAll()
+
+        isLoaded = true
+    }
+
+    /** Settings, logs and routes used to live in config/Riftwalk (the mod's old name): move them over once. */
+    private fun moveOldConfig() = runCatching {
+        val cfg = net.fabricmc.loader.api.FabricLoader.getInstance().configDir
+        val old = cfg.resolve("Riftwalk")
+        val now = cfg.resolve(MOD_NAME)
+        if (java.nio.file.Files.isDirectory(old) && ! java.nio.file.Files.exists(now)) java.nio.file.Files.move(old, now)
+    }.onFailure { logger.warn("Could not move config/Riftwalk to config/$MOD_NAME: ${it.message}") }
+}

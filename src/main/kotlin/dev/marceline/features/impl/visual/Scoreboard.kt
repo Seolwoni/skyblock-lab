@@ -1,0 +1,152 @@
+package dev.marceline.features.impl.visual
+
+import dev.marceline.config.types.SliderSetting
+import dev.marceline.config.types.ToggleSetting
+import dev.marceline.event.impl.MainThreadPacketReceivedEvent
+import dev.marceline.features.Feature
+import dev.marceline.ui.clickgui.components.settings.Style
+import dev.marceline.ui.hud.HudElement
+import dev.marceline.utils.ChatUtils.formattedText
+import dev.marceline.utils.ColorUtils.withAlpha
+import dev.marceline.utils.location.LocationUtils
+import dev.marceline.utils.render.Render2D.drawCenteredString
+import dev.marceline.utils.render.Render2D.drawRect
+import dev.marceline.utils.render.Render2D.drawString
+import dev.marceline.utils.render.RenderHelper.width
+import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.network.chat.Component
+import net.minecraft.network.protocol.game.*
+import net.minecraft.world.scores.*
+import java.awt.Color
+import net.minecraft.world.scores.Scoreboard as MCScoreboard
+
+object Scoreboard: Feature("Draws a custom scoreboard instead of the vanilla one.") {
+    private val hideServerId by ToggleSetting("Hide Server ID").withDescription("Hides the 'm151AM' text from the scoreboard")
+    private val backgroundOpacity by SliderSetting("Background Opacity", 75, 0, 100, 1, "%").withDescription("The opacity of the scoreboard background. 0% is transparent, 100% is opaque.")
+
+    private var needsUpdate = true
+    private val cachedLines = mutableListOf<String>()
+    private var cachedTitle = ""
+    private var cachedW = 0f
+    private var cachedH = 0f
+
+    @Suppress("RemoveRedundantQualifierName")
+    private val hud = object: HudElement() {
+        override val name = "Scoreboard"
+
+        init { themedPanel = false }
+        override val toggle get() = Scoreboard.enabled
+
+        override fun draw(ctx: GuiGraphicsExtractor, example: Boolean): Pair<Float, Float> {
+            val objective = level.scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR) ?: return 0f to 0f
+
+            if (needsUpdate) updateCache(level.scoreboard, objective)
+            if (cachedLines.isEmpty()) return 0f to 0f
+
+            val boxWidth = cachedW.toDouble()
+            val boxHeight = cachedH.toDouble()
+            val xOffset = - boxWidth - 5
+            val yOffset = - (boxHeight / 2)
+            val padding = 8
+            val backgroundAlpha = (backgroundOpacity.value / 100f * 255).toInt()
+
+            // violet glass card: soft shadow, hairline edge, sheen, and an accent line under the title
+            val fx = xOffset.toFloat()
+            val fy = yOffset.toFloat()
+            val fw = boxWidth.toFloat()
+            val fh = boxHeight.toFloat()
+            Style.drawShadow(ctx, fx, fy, fw, fh, 6f, 0.6f * backgroundAlpha / 191f)
+            Style.roundRect(ctx, fx - 0.5f, fy - 0.5f, fw + 1f, fh + 1f, 6.5f, Color(255, 255, 255, 20 * backgroundAlpha / 191))
+            Style.roundRect(ctx, fx, fy, fw, fh, 6f, Color(16, 11, 26, backgroundAlpha))
+            with(dev.marceline.utils.render.Render2D) {
+                ctx.drawVerticalGradient(fx + 4f, fy + 0.5f, fw - 8f, 10f, Color(255, 255, 255, 14), Color(255, 255, 255, 0))
+            }
+            val ruleY = fy + padding + mc.font.lineHeight + 1.5f
+            Style.gradientPill(ctx, fx + padding, ruleY, fw - padding * 2, 1f, Style.accentColor.withAlpha(200), Style.accent2.withAlpha(200))
+
+            ctx.drawCenteredString(cachedTitle, (xOffset + boxWidth / 2).toFloat(), (yOffset + padding).toFloat(), shadow = false)
+
+            val startY = yOffset + padding + mc.font.lineHeight + 4
+            val lineHeights = mc.font.lineHeight + 2
+
+            cachedLines.forEachIndexed { index, text ->
+                ctx.drawString(text, (xOffset + padding).toFloat(), (startY + (index * lineHeights)).toFloat())
+            }
+
+            return cachedW to cachedH
+        }
+
+        override fun isHovered(mx: Int, my: Int): Boolean {
+            if (cachedW == 0f) return false
+            val visualWidth = cachedW * scale
+            val visualHeight = cachedH * scale
+            return mx >= x - visualWidth - 5 && mx <= x && my >= y - (visualHeight / 2) && my <= y + (visualHeight / 2)
+        }
+
+        override fun drawBackground(ctx: GuiGraphicsExtractor, mx: Int, my: Int) {
+            if (cachedW == 0f) return
+            val scaledW = cachedW * scale
+            val scaledH = cachedH * scale
+            val drawX = x - scaledW - 5
+            val drawY = y - (scaledH / 2)
+
+            val hovered = mx >= drawX && mx <= drawX + scaledW && my >= drawY && my <= drawY + scaledH
+            val borderColor = if (isDragging || hovered) Style.accentColor else Color(255, 255, 255, 40)
+
+            ctx.drawRect(drawX.toDouble(), drawY.toDouble(), scaledW.toDouble(), scaledH.toDouble(), Color(10, 10, 10, 150))
+            ctx.drawRect(drawX.toDouble(), drawY.toDouble(), scaledW.toDouble(), 1.0, borderColor)
+            ctx.drawRect(drawX.toDouble(), (drawY + scaledH - 1).toDouble(), scaledW.toDouble(), 1.0, borderColor)
+        }
+    }
+
+    override fun init() {
+        hud.x = 200f
+        hud.y = 200f
+        hudElements.add(hud)
+
+        register<MainThreadPacketReceivedEvent.Post> {
+            if (
+                event.packet is ClientboundSetScorePacket || event.packet is ClientboundSetObjectivePacket ||
+                event.packet is ClientboundSetDisplayObjectivePacket || event.packet is ClientboundResetScorePacket ||
+                event.packet is ClientboundSetPlayerTeamPacket
+            ) {
+                needsUpdate = true
+            }
+        }
+    }
+
+    private fun updateCache(scoreboard: MCScoreboard, objective: Objective) {
+        cachedLines.clear()
+        cachedTitle = objective.displayName.formattedText
+
+        val scores = scoreboard.listPlayerScores(objective).sortedByDescending { it.value }.take(15)
+
+        if (scores.isEmpty()) {
+            cachedW = 0f
+            cachedH = 0f
+            needsUpdate = false
+            return
+        }
+
+        var maxW = cachedTitle.width().toFloat()
+
+        scores.forEachIndexed { index, score ->
+            val name = score.ownerName().string
+            val team = scoreboard.getPlayersTeam(name)
+            var line = PlayerTeam.formatNameForTeam(team, Component.literal(name)).formattedText
+
+            if (LocationUtils.inSkyblock && hideServerId.value && index == 0) {
+                line = "§7Date: " + line.substringBefore(" §8")
+            }
+
+            cachedLines.add(line)
+            maxW = maxOf(maxW, line.width().toFloat())
+        }
+
+        val padding = 8f
+        val lineHeight = mc.font.lineHeight
+        cachedW = maxW + (padding * 2)
+        cachedH = (cachedLines.size * (lineHeight + 2)) + lineHeight + (padding * 2f)
+        needsUpdate = false
+    }
+}

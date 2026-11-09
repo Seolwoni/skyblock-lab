@@ -1,6 +1,6 @@
 package human
 
-import dev.riftwalk.utils.WatchSigns
+import dev.marceline.utils.WatchSigns
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

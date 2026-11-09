@@ -1,6 +1,6 @@
 package config
 
-import dev.riftwalk.config.types.MapSetting
+import dev.marceline.config.types.MapSetting
 import com.google.gson.JsonParser
 import kotlin.test.*
 

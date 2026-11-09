@@ -1,7 +1,7 @@
 package config
 
-import dev.riftwalk.config.ConfigMigrator
-import dev.riftwalk.config.migrators.ConfigMigratorV0ToV1
+import dev.marceline.config.ConfigMigrator
+import dev.marceline.config.migrators.ConfigMigratorV0ToV1
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject

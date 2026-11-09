@@ -22,7 +22,7 @@ jobs:
         run: |
           # Noamm's data (puzzle answers, room list...) is normally downloaded in game. Keep a copy in the jar
           # so the mod still works when api.noamm.org is down. Fresh copies are kept on the noamm-data branch.
-          if curl -fsSL --retry 3 --max-time 60 -A "Riftwalk-CI" https://api.noamm.org/na/data/download -o /tmp/data.zip; then
+          if curl -fsSL --retry 3 --max-time 60 -A "Marceline-CI" https://api.noamm.org/na/data/download -o /tmp/data.zip; then
             echo "fresh noamm data"
             mkdir -p /tmp/ndrepo && cd /tmp/ndrepo && git init -q && cp /tmp/data.zip . && git add data.zip \
               && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "noamm data $(date -u +%F)" \
@@ -53,7 +53,7 @@ jobs:
       - name: build 26.2
         run: |
           set -o pipefail
-          echo "Riftwalk $RW_VERSION"
+          echo "Marceline $RW_VERSION"
           ./gradlew :26.2:build -Pmod_version=$RW_VERSION --stacktrace 2>&1 | tee build.log
       - name: unit tests
         id: unittest
@@ -97,7 +97,7 @@ jobs:
           [ -f gametest.log ] && tail -150 gametest.log > /tmp/gt/tail.txt || true
           [ -f unittest.log ] && cp unittest.log /tmp/gt/unittest.txt || true
           find . -path "*test-results/test/*.xml" -not -path "./.git/*" -exec cat {} + 2>/dev/null | grep -oE '<testsuite [^>]*>|<testcase [^>]*name="[^"]*"|<failure [^>]*message="[^"]*"' > /tmp/gt/unittest-results.txt || true
-          find . -name "riftwalk-test-result.txt" -not -path "./.git/*" -exec cp {} /tmp/gt/ \; 2>/dev/null || true
+          find . -name "marceline-test-result.txt" -not -path "./.git/*" -exec cp {} /tmp/gt/ \; 2>/dev/null || true
           find . -name "*.png" -path "*screenshots*" -not -path "./.git/*" -exec cp {} /tmp/gt/shots/ \; 2>/dev/null || true
           LOG=$(find . -name "latest.log" -path "*run*" -not -path "./.git/*" | head -1); [ -n "$LOG" ] && grep -E -B2 -A8 "Exception|ERROR" "$LOG" | head -400 > /tmp/gt/latest-errors.txt || true
           git config user.name "ci"
@@ -105,7 +105,7 @@ jobs:
           grep -E -A6 "error:|^e: " build.log | head -400 > /tmp/compile.txt || true
           tail -300 build.log > /tmp/tail.txt
           ls -la build/libs > /tmp/libs.txt 2>&1 || true
-          for j in build/libs/Riftwalk-*-26.2.jar; do
+          for j in build/libs/Marceline-*-26.2.jar; do
             echo "== $j" >> /tmp/libs.txt
             unzip -l "$j" | grep -c "xyz/yourboykyle/secretroutes/.*class" >> /tmp/libs.txt || true
             echo "assist stubs in jar: $(unzip -l "$j" | grep -c "com/seolwoni/")" >> /tmp/libs.txt
@@ -130,7 +130,7 @@ jobs:
           git rm -rf --cached . > /dev/null
           cp /tmp/compile.txt /tmp/tail.txt /tmp/libs.txt .
           cp -r /tmp/gt gt
-          mkdir -p jar && cp build/libs/Riftwalk-*-26.2.jar jar/ 2>/dev/null || true
+          mkdir -p jar && cp build/libs/Marceline-*-26.2.jar jar/ 2>/dev/null || true
           cp /tmp/assist/*.jar jar/ 2>/dev/null || true
           mkdir -p gt && cp /tmp/assist/*-build.log gt/ 2>/dev/null || true
           echo "${{ github.sha }} ${{ job.status }} ${{ env.RW_VERSION }}" > status.txt
@@ -141,13 +141,13 @@ jobs:
       - name: upload jars
         uses: actions/upload-artifact@v4
         with:
-          name: riftwalk-26.2
-          path: build/libs/Riftwalk-*.jar
+          name: marceline-26.2
+          path: build/libs/Marceline-*.jar
       - name: release
         if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no release]')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.RW_VERSION }}
-          name: Riftwalk ${{ env.RW_VERSION }}
-          body: "Riftwalk - NoammAddons + Secret Routes 기반, 개인 서버 전용. cheat jar 사용."
-          files: build/libs/Riftwalk-*-26.2.jar
+          name: Marceline ${{ env.RW_VERSION }}
+          body: "Marceline - NoammAddons + Secret Routes 기반, 개인 서버 전용. cheat jar 사용."
+          files: build/libs/Marceline-*-26.2.jar

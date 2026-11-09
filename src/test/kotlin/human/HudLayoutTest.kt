@@ -1,7 +1,7 @@
 package human
 
-import dev.riftwalk.utils.HudLayout
-import dev.riftwalk.utils.HudLayout.R
+import dev.marceline.utils.HudLayout
+import dev.marceline.utils.HudLayout.R
 import java.util.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

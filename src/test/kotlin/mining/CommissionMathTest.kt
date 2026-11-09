@@ -1,9 +1,9 @@
 package mining
 
-import dev.riftwalk.features.impl.mining.CommissionMath
-import dev.riftwalk.features.impl.mining.CommissionMath.Commission
-import dev.riftwalk.features.impl.mining.CommissionMath.Job
-import dev.riftwalk.features.impl.mining.CommissionMath.Point
+import dev.marceline.features.impl.mining.CommissionMath
+import dev.marceline.features.impl.mining.CommissionMath.Commission
+import dev.marceline.features.impl.mining.CommissionMath.Job
+import dev.marceline.features.impl.mining.CommissionMath.Point
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

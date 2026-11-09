@@ -1,7 +1,7 @@
 package fishing
 
-import dev.riftwalk.features.impl.fishing.FishingMath
-import dev.riftwalk.utils.SkyblockText
+import dev.marceline.features.impl.fishing.FishingMath
+import dev.marceline.utils.SkyblockText
 import kotlin.math.hypot
 import kotlin.test.Test
 import kotlin.test.assertEquals
