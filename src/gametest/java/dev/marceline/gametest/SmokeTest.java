@@ -195,10 +195,10 @@ public class SmokeTest implements FabricClientGameTest {
 		try {
 			context.runOnClient(mc -> mc.reloadResourcePacks());
 			context.waitTicks(12);
-			String overlay = context.computeOnClient(mc -> mc.overlay() == null ? "none" : mc.overlay().getClass().getSimpleName());
+			String overlay = context.computeOnClient(mc -> mc.gui.overlay() == null ? "none" : mc.gui.overlay().getClass().getSimpleName());
 			log.add("loading overlay: " + overlay);
 			context.takeScreenshot("rw-08-loading");
-			for (int i = 0; i < 60 && context.computeOnClient(mc -> mc.overlay() != null); i++) context.waitTicks(10);
+			for (int i = 0; i < 60 && context.computeOnClient(mc -> mc.gui.overlay() != null); i++) context.waitTicks(10);
 		} catch (Throwable t) {
 			failures.add("loading screen: " + t);
 		}
