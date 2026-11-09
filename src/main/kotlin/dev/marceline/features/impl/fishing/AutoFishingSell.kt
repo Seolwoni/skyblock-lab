@@ -66,6 +66,10 @@ internal fun AutoFishing.sell(p: LocalPlayer) {
         0 -> { // put the rod away and open the SkyBlock Menu
             if (p.fishing != null) { rod()?.let { hold(it); use(p) }; sellGap = delay(4, 10); return }
             hold(menuSlot.value - 1)
+            // what to sell, read now by name from the plain inventory: inside the sell menu the server shows the
+            // same items with other names / lore, so there they are recognised by their SkyBlock id instead
+            sellSnapshot.clear()
+            for (i in 9 until 36) p.inventory.getItem(i).let { if (shouldSell(it)) sellSnapshot[i] = sellKey(it) }
             sellGap = delay(3, 8)
             sellStep = 1
         }
@@ -100,6 +104,12 @@ internal fun AutoFishing.sell(p: LocalPlayer) {
             // queued as inventory slots (9-35), not window slots: those stay put if the server swaps the window
             val queue = sellInventorySlots(p)
             if (queue.isEmpty() && sellTimer < 40) return
+            if (queue.isEmpty() && sellSnapshot.isNotEmpty()) {
+                // tell what the menu shows instead, for the log
+                val (slot, key) = sellSnapshot.entries.first()
+                val now = p.inventory.getItem(slot)
+                journal.log("sell: ${sellSnapshot.size} stacks to sell before the menu, none recognised in it - slot $slot was $key, now ${sellKey(now)} \"${now.hoverName.string}\"")
+            }
             sellQueue.clear(); sellQueue += queue
             sellPass++
             soldThisRun = 0
@@ -115,7 +125,7 @@ internal fun AutoFishing.sell(p: LocalPlayer) {
             }
             // the last click: wait until that stack is gone before the next (a click sent too early is ignored by the server)
             if (sellClicked >= 0) {
-                val still = shouldSell(p.inventory.getItem(sellClicked))
+                val still = stillToSell(p, sellClicked)
                 if (still && sellWaitClick++ < 12) return
                 if (still) journal.log("sell: inventory slot $sellClicked didn't go, moving on")
                 else { sold++; soldThisRun++ }
@@ -133,12 +143,12 @@ internal fun AutoFishing.sell(p: LocalPlayer) {
                 }
                 journal.log("sell: done, $sold sold so far (this time $soldThisRun)${if (left.isNotEmpty()) ", ${left.size} stacks wouldn't sell" else ""}")
                 // nothing went at all: the menu doesn't take them - say so instead of coming straight back to it
-                if (soldThisRun == 0 && left.isNotEmpty()) return sellDone(p, false, "the sell menu didn't take anything")
+                if (soldThisRun == 0 && sellSnapshot.isNotEmpty()) return sellDone(p, false, if (left.isNotEmpty()) "the sell menu didn't take anything" else "couldn't find the items to sell in the sell menu")
                 sellStep = 5
                 sellGap = delay(4, 12)
                 return
             }
-            if (! shouldSell(p.inventory.getItem(next))) return
+            if (! stillToSell(p, next)) return
             val slot = p.containerMenu.slots.firstOrNull { it.container is net.minecraft.world.entity.player.Inventory && it.containerSlot == next }
             if (slot == null) { journal.log("sell: inventory slot $next isn't in this window"); return }
             GuiUtils.clickSlot(slot.index, GuiUtils.ButtonType.LEFT)
@@ -150,8 +160,19 @@ internal fun AutoFishing.sell(p: LocalPlayer) {
     }
 }
 
-/** Inventory slots (9-35, never the hotbar) holding junk. */
-internal fun AutoFishing.sellInventorySlots(p: LocalPlayer): List<Int> = (9 until 36).filter { shouldSell(p.inventory.getItem(it)) }
+/** What an item is for selling: its SkyBlock id, or the Minecraft item when it has none. */
+internal fun AutoFishing.sellKey(stack: net.minecraft.world.item.ItemStack): String =
+    if (stack.isEmpty) "empty" else stack.skyblockId.ifBlank { net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.item).toString() }
+
+/** The slot still holds what was there to sell when the menu was opened. */
+internal fun AutoFishing.stillToSell(p: LocalPlayer, slot: Int): Boolean {
+    val want = sellSnapshot[slot] ?: return false
+    val now = p.inventory.getItem(slot)
+    return ! now.isEmpty && sellKey(now) == want
+}
+
+/** Inventory slots (9-35, never the hotbar) still holding what was there to sell before the menu opened. */
+internal fun AutoFishing.sellInventorySlots(p: LocalPlayer): List<Int> = sellSnapshot.keys.sorted().filter { stillToSell(p, it) }
 
 
 internal fun AutoFishing.sellDone(p: LocalPlayer, ok: Boolean, why: String?) {
