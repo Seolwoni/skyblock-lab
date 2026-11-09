@@ -136,8 +136,8 @@ class AxisTurnTest {
             val cfg = split.copy(pitchLag = lag)
             median(List(200) { i ->
                 // an up / down heavy turn, where pitch is what takes longest
-                val r = turn(cfg, 5000L + i, 45f, 59f)
-                settled(r.views.map { it.second }, 59f, 2.1f, false) - settled(r.views.map { it.first }, 45f, 1.5f, true)
+                val r = turn(cfg, 5000L + i, 20f, 59f)
+                settled(r.views.map { it.second }, 59f, 2.1f, false) - settled(r.views.map { it.first }, 20f, 1.5f, true)
             })
         }
         assertTrue(gaps[0] <= gaps[1] && gaps[1] <= gaps[2] && gaps[0] < gaps[2], "gaps by lag: $gaps")

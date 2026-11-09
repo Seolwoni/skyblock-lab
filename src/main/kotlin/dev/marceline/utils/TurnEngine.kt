@@ -265,7 +265,10 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
         val hold = tolPitch + 0.1f
         val yawOut = ay > tolerance || abs(wrap(yaw - v.yaw)) > tolerance
         val rpNow = pitch - v.pitch
-        if (! edge && yawOut && abs(rpNow) > hold && sgnP == (if (rpNow < 0f) - 1f else 1f)) sp = minOf(sp, abs(rpNow) - hold)
+        // (held where it is once there: "> hold" alone let a pitch sitting exactly on the hold slip in next tick)
+        val keep = minOf(abs(rpNow), hold)
+        val holding = ! edge && yawOut && abs(rpNow) > tolPitch
+        if (holding && sgnP == (if (rpNow < 0f) - 1f else 1f)) sp = minOf(sp, maxOf(0f, abs(rpNow) - keep))
         if (sy <= 0f && sp <= 0f) return false
         // each axis bends with the other's movement, by its own amount and side
         val bend = if (dist > 4f) minOf(1f, dist / 25f) else 0f
@@ -273,9 +276,9 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
         val ddy = sgnY * sy - (if (ay > tolerance) curve * bend * sgnP * sp else 0f)
         var ddp = sgnP * sp + (if (ap > tolPitch && ! edge) curvePitch * bend * sgnY * sy else 0f)
         // the bend mustn't carry pitch into its tolerance before yaw either
-        if (! edge && yawOut && abs(rpNow) > hold) {
+        if (holding) {
             val left = rpNow - ddp
-            if (abs(left) < hold || left * rpNow < 0f) ddp = rpNow - (if (rpNow < 0f) - hold else hold)
+            if (abs(left) < keep || left * rpNow < 0f) ddp = rpNow - (if (rpNow < 0f) - keep else keep)
         }
         glide(v, v.yaw + ddy, (v.pitch + ddp).coerceIn(- 90f, 90f), now)
         return false
