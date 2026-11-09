@@ -16,7 +16,16 @@
     "yourboykyle - Secret Routes (GPL-3.0)"
   ],
   "license": ["CC0-1.0", "GPL-3.0-only"],
-  "icon": "assets/marceline/icon.png",
+  "icon": {
+    "16": "assets/marceline/icon/16.png",
+    "24": "assets/marceline/icon/24.png",
+    "32": "assets/marceline/icon/32.png",
+    "48": "assets/marceline/icon/48.png",
+    "64": "assets/marceline/icon/64.png",
+    "96": "assets/marceline/icon/96.png",
+    "128": "assets/marceline/icon/128.png",
+    "256": "assets/marceline/icon/256.png"
+  },
   "environment": "*",
   "entrypoints": {
     "modmenu": [
