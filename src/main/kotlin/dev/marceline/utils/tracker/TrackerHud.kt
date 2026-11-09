@@ -54,6 +54,13 @@ object TrackerHud {
         for (e in extras) lines += "§7${e.label}" to e.shown
         val total = rows.sumOf { it.third }
         if (! o.countsOnly) lines += "§cProfit" to short(total)
+        // the all-time figure under any shorter span, so both are in view
+        if (o.span != TrackerSpan.TOTAL && ! example) {
+            val all = t.bucket(TrackerSpan.TOTAL)
+            val allValue = if (o.countsOnly) NumbersUtils.formatComma(all.items.values.sumOf { it.amount })
+                else short(all.items.entries.sumOf { (id, it) -> TrackerPrices.each(id, o.prices) * it.amount })
+            lines += "§7All time" to allValue
+        }
         val hours = Uptime.perHour(total, b.uptimeMs)
         val rateBase = o.rateCounter?.let { Uptime.perHour(b.counter(it).toDouble(), b.uptimeMs) }
         if (b.uptimeMs > 0) {

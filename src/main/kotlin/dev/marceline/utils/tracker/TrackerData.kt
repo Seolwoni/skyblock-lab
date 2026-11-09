@@ -39,7 +39,7 @@ class TrackerSave(
 )
 
 /** Which span a tracker shows. */
-enum class TrackerSpan(val title: String) { SESSION("Session"), TODAY("Today"), TOTAL("Total") }
+enum class TrackerSpan(val title: String) { SESSION("Session"), TODAY("Today"), TOTAL("All Time") }
 
 /**
  * The time actually spent: it runs only while the tracker keeps being fed. A gap longer than [pauseAfterMs] (or the
