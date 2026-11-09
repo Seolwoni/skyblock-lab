@@ -5,7 +5,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 /**
- * Copies log files into the phone's / computer's Downloads folder (Marceline sub-folder), where a file manager
+ * Log files in the phone's / computer's Downloads folder (Downloads/Marceline/logs), where a file manager
  * can reach them; a launcher's game folder often can't be opened on Android.
  */
 object LogExport {
@@ -21,6 +21,20 @@ object LogExport {
         return out.distinct()
     }
 
+    /** The sub-folder of Downloads the logs go to. */
+    const val SUBDIR = "Marceline/logs"
+
+    /** Downloads/Marceline/logs in the first Downloads folder that exists and takes a folder, or null. */
+    fun logsDir(mobile: Boolean = Platform.isMobile): Path? {
+        for (d in downloadDirs(mobile, System.getProperty("user.home"), System.getenv("EXTERNAL_STORAGE"))) {
+            val base = Path.of(d)
+            if (! Files.isDirectory(base)) continue
+            val target = base.resolve(SUBDIR)
+            if (runCatching { Files.createDirectories(target) }.isSuccess && Files.isWritable(target)) return target
+        }
+        return null
+    }
+
     /** Copies [files] into the first Downloads folder that works. The folder used, or the error. */
     fun copy(files: List<Path>, mobile: Boolean = Platform.isMobile): Result<Path> = runCatching {
         val dirs = downloadDirs(mobile, System.getProperty("user.home"), System.getenv("EXTERNAL_STORAGE"))
@@ -28,7 +42,7 @@ object LogExport {
         for (d in dirs) {
             val base = Path.of(d)
             if (! Files.isDirectory(base)) continue
-            val target = base.resolve("Marceline")
+            val target = base.resolve(SUBDIR)
             try {
                 Files.createDirectories(target)
                 for (f in files) if (Files.isRegularFile(f)) Files.copy(f, target.resolve(f.fileName.toString()), StandardCopyOption.REPLACE_EXISTING)

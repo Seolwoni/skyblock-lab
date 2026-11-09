@@ -266,7 +266,8 @@ internal fun AutoFishing.writeReport(reason: String) {
     lastReport = lines
     sessionStart = 0L
     sendDiscord(reason, lines, ms, coins, hours)
-    if (autoSaveLogs.value) java.util.concurrent.CompletableFuture.runAsync {
+    // (the journal already writes into Downloads/Marceline/logs as it goes; copy only where that isn't possible)
+    if (autoSaveLogs.value && ! dev.marceline.utils.Journal.mirroring) java.util.concurrent.CompletableFuture.runAsync {
         Thread.sleep(2000) // the journal writes in the background: let the last lines land first
         mc.execute { saveLogsToDownloads(false) }
     }
@@ -315,7 +316,7 @@ internal fun AutoFishing.logFiles(): List<java.nio.file.Path> {
     return (listOf(cur).filter { java.nio.file.Files.exists(it) } + runs.filter { it != cur }).take(2)
 }
 
-/** Copies the logs into Downloads/Marceline; [loud] says so in chat either way. */
+/** Copies the logs into Downloads/Marceline/logs; [loud] says so in chat either way. */
 internal fun AutoFishing.saveLogsToDownloads(loud: Boolean) {
     dev.marceline.utils.LogExport.copy(logFiles())
         .onSuccess { if (loud) info("&aLogs saved to &f$it") else journal.log("logs copied to $it") }

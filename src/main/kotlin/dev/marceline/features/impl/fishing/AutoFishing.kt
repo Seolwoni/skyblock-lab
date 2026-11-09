@@ -222,7 +222,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val checkButton by dev.marceline.config.types.ButtonSetting("Fishing Check") { runCatching { fishingCheck() }.onFailure { info("&cCheck failed: ${it.message}") } }
         .section("Server Check").withDescription("Prints what the mod can see right now: hotbar item IDs, floating texts nearby (hotspot / bite / name tags), the hook, tab stats, mana and bait. Stand by the water with the rod out")
     internal val saveLogsButton by dev.marceline.config.types.ButtonSetting("Save Logs To Downloads") { saveLogsToDownloads(true) }
-        .withDescription("Copies this game's log (session reports included) and the previous one into Downloads/Marceline, where a file manager can open them (phone or PC)")
+        .withDescription("Copies this game's log (session reports included) and the previous one into Downloads/Marceline/logs, where a file manager can open them (phone or PC). The log is also written there live while you play")
     internal val autoSaveLogs by ToggleSetting("Save Logs After Each Session", dev.marceline.utils.Platform.isMobile)
         .withDescription("Does the same on its own whenever a session ends (on by default on phones)")
     internal val copyLogButton by dev.marceline.config.types.ButtonSetting("Copy Log Path") {

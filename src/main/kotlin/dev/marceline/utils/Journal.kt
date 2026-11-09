@@ -12,7 +12,8 @@ import java.util.concurrent.Executors
 /**
  * A plain-text diary of what the automatic features did and why.
  * One file per game run (config/<mod>/journal/run_<start>.log): every Journal writes into it, each line tagged
- * with its name. The newest [KEEP_RUNS] runs are kept. Written off the game thread.
+ * with its name. The same lines also go to Downloads/Marceline/logs (see [LogExport]), where a file manager can
+ * open them. The newest [KEEP_RUNS] runs are kept in both. Written off the game thread.
  */
 class Journal(private val name: String) {
     val path: String get() = runFile.toAbsolutePath().toString()
@@ -28,10 +29,28 @@ class Journal(private val name: String) {
                 }
                 Files.writeString(runFile, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
             }.onFailure { Marceline.logger.warn("journal write failed: ${it.message}") }
+            mirror(line)
         }
     }
 
     companion object {
+        /** Downloads/Marceline/logs/<this run's file>; looked up once, null when there is no Downloads folder. */
+        private val mirrorFile: Path? by lazy { runCatching { LogExport.logsDir()?.resolve(runFile.fileName.toString()) }.getOrNull() }
+        private var mirrorBroken = false
+
+        /** True while every line also lands in Downloads/Marceline/logs. */
+        val mirroring: Boolean get() = ! mirrorBroken && mirrorFile != null
+
+        /** The same line into the Downloads copy (on the journal thread). One failure turns the copy off for this run. */
+        private fun mirror(line: String) {
+            if (mirrorBroken) return
+            val f = mirrorFile ?: return
+            runCatching {
+                if (Files.exists(f) && Files.size(f) > MAX_BYTES) Files.write(f, Files.readAllLines(f).let { it.subList(it.size / 2, it.size) })
+                Files.writeString(f, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+            }.onFailure { mirrorBroken = true; Marceline.logger.warn("journal copy in Downloads failed: ${it.message}") }
+        }
+
         private const val KEEP_RUNS = 10
         private const val MAX_BYTES = 20_000_000L
         private val fmt = DateTimeFormatter.ofPattern("MM-dd HH:mm:ss.SSS")
@@ -49,6 +68,14 @@ class Journal(private val name: String) {
 
         init {
             io.execute { runCatching { runs().filter { it != runFile }.drop(KEEP_RUNS - 1).forEach { Files.deleteIfExists(it) } } }
+            // the Downloads copies: the same number of runs
+            io.execute {
+                runCatching {
+                    val d = mirrorFile?.parent ?: return@runCatching
+                    Files.list(d).use { st -> st.filter { it.fileName.toString().let { n -> n.startsWith("run_") && n.endsWith(".log") } }.sorted(Comparator.reverseOrder()).toList() }
+                        .filter { it != mirrorFile }.drop(KEEP_RUNS - 1).forEach { Files.deleteIfExists(it) }
+                }
+            }
         }
     }
 }
