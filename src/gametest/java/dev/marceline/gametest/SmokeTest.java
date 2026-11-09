@@ -161,13 +161,17 @@ public class SmokeTest implements FabricClientGameTest {
 				int stillOn = 0;
 				java.util.Set<String> fixed = java.util.Set.of("ClickGui", "WebSocketFeature", "DoorFix", "ClassColors", "ModHider", "MenuScreens");
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled && !fixed.contains(f.getClass().getSimpleName())) stillOn++;
+				// the ESC menu keeps our look while everything is off
+				mc.gui.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true));
+				String escOff = mc.gui.screen() == null ? "none" : mc.gui.screen().getClass().getSimpleName();
+				mc.gui.setScreen(null);
 				dev.marceline.features.MasterSwitch.INSTANCE.toggle();
 				java.util.Set<String> after = new java.util.HashSet<>();
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled) after.add(f.getJsonName());
-				return "on before " + before.size() + ", on while off " + stillOn + ", restored " + before.equals(after);
+				return "on before " + before.size() + ", on while off " + stillOn + ", esc while off " + escOff + ", restored " + before.equals(after);
 			});
 			log.add("all on/off: " + master);
-			if (!master.contains("on while off 0") || !master.endsWith("restored true")) failures.add("all on/off did not work: " + master);
+			if (!master.contains("on while off 0") || !master.contains("esc while off MarcelinePauseScreen") || !master.endsWith("restored true")) failures.add("all on/off did not work: " + master);
 
 			boolean alive = context.computeOnClient(mc -> mc.player != null && mc.level != null);
 			if (!alive) failures.add("player or level gone after toggling features");

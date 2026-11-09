@@ -24,6 +24,8 @@
     "64": "assets/marceline/icon/64.png",
     "96": "assets/marceline/icon/96.png",
     "128": "assets/marceline/icon/128.png",
+    "160": "assets/marceline/icon/160.png",
+    "192": "assets/marceline/icon/192.png",
     "256": "assets/marceline/icon/256.png"
   },
   "environment": "*",
