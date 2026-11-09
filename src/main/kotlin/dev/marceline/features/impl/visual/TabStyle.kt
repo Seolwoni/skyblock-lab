@@ -9,8 +9,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import java.awt.Color
 
 /**
- * The player list (Tab) in the Marceline look: the vanilla grey boxes become rounded dark-violet glass panels
- * with a soft shadow, a hairline edge and an accent line, and each player's slot a faint violet chip.
+ * The player list (Tab) in the Marceline look: the vanilla grey boxes become rounded dark wine-glass panels
+ * with a soft shadow, a hairline edge and an accent line, and each player's slot a faint warm chip.
  * Hooked into the vanilla fills (MixinPlayerTabOverlay), so everything the server puts in the list stays as it is.
  */
 object TabStyle: Feature("Draws the Tab player list in the Marceline dark glass look.", toggled = true) {
@@ -33,14 +33,14 @@ object TabStyle: Feature("Draws the Tab player list in the Marceline dark glass 
             VANILLA_PANEL -> {
                 val a = (opacity.value / 100f * 255).toInt()
                 Style.drawShadow(ctx, x - 2f, y - 2f, w + 4f, h + 4f, 5f, 0.5f)
-                Style.roundRect(ctx, x - 2.5f, y - 2.5f, w + 5f, h + 5f, 5.5f, Color(255, 255, 255, 18))
+                Style.roundRect(ctx, x - 2.5f, y - 2.5f, w + 5f, h + 5f, 5.5f, Color(255, 236, 220, 20))
                 Style.roundRect(ctx, x - 2f, y - 2f, w + 4f, h + 4f, 5f, Color(17, 13, 15, a))
                 ctx.drawVerticalGradient(x, y - 1.5f, w, minOf(8f, h / 2f), Color(255, 255, 255, 12), Color(255, 255, 255, 0))
-                Style.roundRect(ctx, x + 6f, y - 2f, w - 12f, 0.75f, 0.4f, Style.mix(Style.accentColor, Style.accent2, 0.5f).withAlpha(150))
+                Style.goldHairline(ctx, x + 4f, y - 1.6f, w - 8f, 0.9f, 0.6f)
                 return true
             }
             VANILLA_SLOT -> {
-                Style.roundRect(ctx, x, y, w, h, 1.5f, Color(167, 107, 250, (slotTint.value / 100f * 255).toInt()))
+                Style.roundRect(ctx, x, y, w, h, 1.5f, Color(232, 196, 180, (slotTint.value / 100f * 255 * 0.7f).toInt()))
                 return true
             }
         }

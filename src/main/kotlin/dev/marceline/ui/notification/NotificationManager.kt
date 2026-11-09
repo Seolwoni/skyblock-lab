@@ -27,8 +27,8 @@ object NotificationManager: ISelfInit {
     private const val PAD = 9f
     private const val MAX_VISIBLE = 5
     private val bg = Color(22, 17, 19, 240)
-    private val titleColor = Color(237, 231, 255)
-    private val textColor = Color(176, 164, 204)
+    private val titleColor = Color(243, 234, 222)
+    private val textColor = Color(206, 190, 180)
 
     fun push(title: String, message: String, duration: Long = 3000L) {
         val t = title.addColor()
@@ -112,7 +112,9 @@ object NotificationManager: ISelfInit {
                 val am = n.anim.value
                 val x = screenW - (WIDTH + 10f) * am + (1f - am) * 12f
                 val a = am * pv
-                val y = screenH - height - 10f - n.stack.value
+                // on the title screen, stay clear of the version / copyright line along the bottom
+                val bottom = if (mc.gui.screen() is net.minecraft.client.gui.screens.TitleScreen) 24f else 10f
+                val y = screenH - height - bottom - n.stack.value
 
                 val hovered = mX >= x && mX <= x + WIDTH && mY >= y && mY <= y + height
                 if (! hovered && alive) n.elapsedTime += delta
@@ -120,9 +122,9 @@ object NotificationManager: ISelfInit {
                 val alpha = (a * 255).toInt().coerceIn(0, 255)
                 Style.drawShadow(ctx, x, y, WIDTH, height, 6f, 0.7f * a)
                 Style.roundRect(ctx, x, y, WIDTH, height, 6f, bg.withAlpha((bg.alpha * a).toInt()))
-                // accent stripe on the left and a top highlight, like light on glass
+                // warm hairline edge, wine stripe on the left and a gold hairline along the top, like the menus
                 Style.roundRect(ctx, x + 4f, y + PAD, 2f, height - PAD * 2 - 2f, 1f, Style.mix(Style.accentColor, Style.accent2, 0.3f).withAlpha(alpha))
-                Style.roundRect(ctx, x + 12f, y + 1f, WIDTH - 24f, 1f, 0.5f, Color(255, 255, 255, (16 * a).toInt()))
+                Style.goldHairline(ctx, x + 10f, y + 0.6f, WIDTH - 20f, a * 0.8f)
 
                 val title = n.title.replace(Regex("§[0-9a-fk-or]"), "")
                 if (title == "Marceline" && UiFont.active) {
@@ -136,7 +138,8 @@ object NotificationManager: ISelfInit {
                 else ctx.drawString("§l$title", x + PAD + 5f, y + PAD, titleColor.withAlpha(alpha), shadow = false)
                 var ly = y + PAD + 12f
                 for (l in lines) {
-                    ctx.drawString(l, x + PAD + 5f, ly, textColor.withAlpha(alpha), shadow = false)
+                    // the game's bright magenta / aqua / yellow codes come out in the Marceline palette
+                    Style.drawPaletteString(ctx, l, x + PAD + 5f, ly, textColor, { width(it).toFloat() }, alpha)
                     ly += 10f
                 }
 
