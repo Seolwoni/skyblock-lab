@@ -54,12 +54,13 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
     private fun fade() = ((System.currentTimeMillis() - openedAt) / 350f).coerceIn(0f, 1f).let { 1f - (1f - it) * (1f - it) }
 
     /** The wine tint over the (already blurred) background. */
-    fun tint(graphics: GuiGraphicsExtractor) =
+    fun tint(graphics: GuiGraphicsExtractor) {
         graphics.drawVerticalGradient(0, 0, width, height, Color(14, 8, 10, 130), Color(36, 8, 16, 185))
         // soft vignette: darker edges keep the eye in the middle
         val band = (minOf(width, height) * 0.18f).toInt().coerceAtLeast(1)
         graphics.drawVerticalGradient(0, 0, width, band, Color(0, 0, 0, 90), Color(0, 0, 0, 0))
         graphics.drawVerticalGradient(0, height - band, width, band, Color(0, 0, 0, 0), Color(0, 0, 0, 110))
+    }
 
     fun render(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, corners: (GuiGraphicsExtractor, Float) -> Unit) {
         // the menu's smooth font (Pretendard), like the settings window
