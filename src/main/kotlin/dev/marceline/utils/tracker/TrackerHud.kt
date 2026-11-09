@@ -1,7 +1,6 @@
 package dev.marceline.utils.tracker
 
 import dev.marceline.utils.NumbersUtils
-import dev.marceline.utils.render.Render2D.drawString
 import dev.marceline.utils.render.RenderHelper.width
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import java.awt.Color
@@ -32,6 +31,27 @@ object TrackerHud {
         val rateCounter: String? = null,
     )
 
+    /**
+     * The game's colour codes in the Marceline palette for tracker text: soft versions of the rarity colours
+     * (uncommon sage, rare dusk blue, epic plum, legendary gold, mythic rose), ivory and warm greys for the rest.
+     */
+    private fun palette(c: Char): Color? = when (c.lowercaseChar()) {
+        'f' -> text
+        '7' -> dim
+        '8' -> Color(128, 110, 106)
+        'a', '2' -> Color(158, 196, 160)
+        '9', '1', 'b', '3' -> Color(146, 166, 210)
+        '5' -> Color(182, 132, 196)
+        '6', 'e' -> title
+        'd' -> profit
+        'c', '4' -> Color(226, 104, 112)
+        else -> null
+    }
+
+    private fun drawText(ctx: GuiGraphicsExtractor, s: String, x: Float, y: Float, base: Color) {
+        dev.marceline.ui.clickgui.components.settings.Style.drawPaletteString(ctx, s, x, y, base, { it.width().toFloat() }, 255, ::palette)
+    }
+
     private fun short(n: Double) = NumbersUtils.format(n.toLong())
 
     /** Draws [t] and returns its size. [extras] go under the items; [example] shows sample numbers (HUD editor). */
@@ -53,7 +73,7 @@ object TrackerHud {
         if (rows.size > shown.size) lines += "§8+${rows.size - shown.size} more" to ""
         for (e in extras) lines += "§7${e.label}" to e.shown
         val total = rows.sumOf { it.third }
-        if (! o.countsOnly) lines += "§cProfit" to short(total)
+        if (! o.countsOnly) lines += "§dProfit" to short(total)
         // the all-time figure under any shorter span, so both are in view
         if (o.span != TrackerSpan.TOTAL && ! example) {
             val all = t.bucket(TrackerSpan.TOTAL)
@@ -76,8 +96,8 @@ object TrackerHud {
         var y = 0f
         lines.forEachIndexed { i, (l, r) ->
             val first = i == 0
-            ctx.drawString(l, 0f, y, if (first) title else if (l.startsWith("§c")) profit else text, shadow = false)
-            if (r.isNotEmpty()) ctx.drawString(r, w - r.width(), y, if (l.startsWith("§c")) profit else if (l.startsWith("§7")) dim else value, shadow = false)
+            drawText(ctx, l, 0f, y, if (first) title else if (l.startsWith("§d")) profit else text)
+            if (r.isNotEmpty()) drawText(ctx, r, w - r.width(), y, if (l.startsWith("§d")) profit else if (l.startsWith("§7")) dim else value)
             y += if (first) 11f else 10f
         }
         return w to y

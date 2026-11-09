@@ -144,7 +144,7 @@ object Style {
      * Draws [text] with its colour codes mapped through [paletteColor]; bold carries. [base] is used before the
      * first code and for codes left as they are mapped to the game's colour. Returns the width drawn.
      */
-    fun drawPaletteString(ctx: GuiGraphicsExtractor, text: String, x: Float, y: Float, base: Color, width: (String) -> Float, alpha: Int = 255): Float {
+    fun drawPaletteString(ctx: GuiGraphicsExtractor, text: String, x: Float, y: Float, base: Color, width: (String) -> Float, alpha: Int = 255, palette: (Char) -> Color? = ::paletteColor): Float {
         var cx = x
         var color = base
         var bold = false
@@ -167,7 +167,7 @@ object Style {
                     code == 'r' -> { bold = false; color = base }
                     code in "0123456789abcdef" -> {
                         bold = false
-                        color = paletteColor(code) ?: Color(VANILLA_CODES["0123456789abcdef".indexOf(code)])
+                        color = palette(code) ?: Color(VANILLA_CODES["0123456789abcdef".indexOf(code)])
                     }
                 }
                 i += 2
