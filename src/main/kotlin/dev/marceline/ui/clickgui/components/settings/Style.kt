@@ -90,6 +90,10 @@ object Style {
         }
     }
 
+    /** The game's 16 text colours, by code 0-f. */
+    private val VANILLA_CODES = intArrayOf(0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA,
+        0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF)
+
     /** Antique gold of the menus (hairlines, subtitles). */
     val gold = Color(201, 164, 106)
 
@@ -163,7 +167,7 @@ object Style {
                     code == 'r' -> { bold = false; color = base }
                     code in "0123456789abcdef" -> {
                         bold = false
-                        color = paletteColor(code) ?: Color(net.minecraft.ChatFormatting.getByCode(code)?.color ?: base.rgb and 0xFFFFFF)
+                        color = paletteColor(code) ?: Color(VANILLA_CODES["0123456789abcdef".indexOf(code)])
                     }
                 }
                 i += 2

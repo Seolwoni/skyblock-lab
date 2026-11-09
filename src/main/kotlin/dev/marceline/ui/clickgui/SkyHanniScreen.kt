@@ -556,7 +556,7 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
                     val hs = if (big) 1.2f else 1f
                     // tab titles in the menus' serif, group headings in gold
                     val headW = if (big) UiFont.displayed { ctx.drawString("§l${entry.text}", tx, y + 2f, Style.mix(textMain, Style.accent2, 0.18f), scale = hs, shadow = false); uiWidth("§l${entry.text}") * hs }
-                        else { ctx.drawString("§l${entry.text}", tx, y + 4f, Style.gold, shadow = false); uiWidth("§l${entry.text}") }
+                        else { ctx.drawString("§l${entry.text}", tx, y + 4f, Style.gold, shadow = false); uiWidth("§l${entry.text}").toFloat() }
                     val on = headerOnCount(entry.text)
                     if (on != null) ctx.drawString(on, tx + 6f + headW, y + 5f, textFaint, shadow = false)
                     if (big) {
