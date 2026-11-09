@@ -212,7 +212,9 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
         var dp = pitch + osPitch - v.pitch
         val tolPitch = tolerance * PITCH_TOLERANCE
         // yaw has reached its overshoot point (pitch there too, or held just short of the real target waiting for yaw)
-        if ((osYaw != 0f || osPitch != 0f) && abs(dy) <= tolerance && (abs(dp) <= tolPitch || abs(rp) <= tolPitch + 0.15f)) {
+        // (pitch may sit up to a degree past its hold: with Mouse Grid the last fraction can't be moved, and waiting
+        // for it here stalled the turn for good)
+        if ((osYaw != 0f || osPitch != 0f) && abs(dy) <= tolerance && (abs(dp) <= tolPitch || abs(rp) <= tolPitch + 0.1f + 1f)) {
             // correct back, starting this same tick (no dead tick in between)
             osYaw = 0f; osPitch = 0f
             curveFrom = realDist

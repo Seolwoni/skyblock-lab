@@ -117,6 +117,22 @@ class AxisTurnTest {
     }
 
     @Test
+    fun `every turn finishes with Mouse Grid on, at any sensitivity and tolerance`() {
+        // Mouse Grid rounds each move to whole mouse counts; a turn must still end (a cast stalled on this in game)
+        var n = 0
+        for (sens in listOf(0.0, 0.2, 0.5, 0.8, 1.0)) for (tol in listOf(0.35f, 0.6f, 0.8f, 1.5f)) {
+            val cfg = split.copy(snap = true, sensitivity = sens)
+            val r = Random((sens * 100).toLong() + (tol * 10).toLong())
+            repeat(150) { i ->
+                val from = r.nextFloat() * 360f - 180f to r.nextFloat() * 140f - 60f
+                val to = from.first + r.nextFloat() * 340f - 170f to (from.second + r.nextFloat() * 160f - 80f).coerceIn(- 90f, 90f)
+                val run = turn(cfg, 9000L + n++, to.first, to.second, from, tol, max = 400)
+                assertTrue(run.ticks < 400, "sens $sens tol $tol turn $from -> $to never finished")
+            }
+        }
+    }
+
+    @Test
     fun `7 - a pitch target at the edge doesn't wobble`() {
         for (seed in 0L until 100L) {
             val r = turn(split, seed, 40f, 90f)
