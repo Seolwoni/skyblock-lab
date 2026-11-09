@@ -1,75 +1,94 @@
-<p align="center"><img src="src/main/resources/assets/marceline/textures/gui/logo.png" width="112" alt="Marceline emblem"></p>
+<p align="center"><img src="src/main/resources/assets/marceline/textures/gui/logo.png" width="128" alt="Marceline emblem"></p>
 
-<h1 align="center">Marceline</h1>
+<p align="center"><img src="docs/assets/wordmark.png" alt="MARCELINE"></p>
 
-<p align="center">A personal Hypixel SkyBlock mod for Fabric (Minecraft 26.2) — fishing, mining, dungeons and routes in one quiet, dark-red menu.<br>
-Built for one player and a private test server. Not released, not distributed.</p>
+<p align="center"><i>Slow dance with you</i></p>
+
+<p align="center">A private Hypixel SkyBlock companion for Fabric · Minecraft 26.2<br>
+<sub>Kept for one player and a private test server. Not released, not distributed.</sub></p>
+
+<p align="center">❦</p>
 
 ---
 
-## At a glance
+### Ⅰ · At a Glance
 
 | | |
 |---|---|
-| **Open** | `/mar` (or `/marceline`) — the settings window; the title screen ("Slow dance with you") and ESC menu have a MARCELINE button too |
-| **Tabs** | General · Dungeons (Core / Floor 7 / Routes) · Fishing · Mining · Visual · Misc · Dev |
-| **Logs** | one file per game run in `config/Marceline/journal/run_<start>.log` (the newest 10 are kept) |
-| **Settings** | `config/Marceline/` (moved over from `config/Riftwalk/` on the first start) |
-| **Builds** | every push to `main` is built and tested by CI; the jar, test results and screenshots land on the `ci-log` branch |
+| **Open** | `/mar` or `/marceline`, or the **MARCELINE** button on the title screen and in the ESC menu |
+| **Chapters** | General · Dungeons (Core, Floor 7, Routes) · Fishing · Mining · Visual · Misc · Dev |
+| **Install** | the one Marceline jar, with Fabric API and Fabric Language Kotlin. Assist Core and Assist Path travel inside it |
+| **Journal** | one log per game run, in `config/Marceline/journal/` and, live, in `Downloads/Marceline/logs/` |
+| **Settings** | `config/Marceline/` |
 
-The full list of features, tab by tab, with what each one does: **[docs/FEATURES.md](docs/FEATURES.md)**.
+Every feature, tab by tab, with what it does: **[docs/FEATURES.md](docs/FEATURES.md)**.
 
-## Fishing
+---
 
-Auto Fishing walks to water or lava (or a hotspot), finds a spot by the edge, casts, reads the bite, reels,
-fights its own sea creatures (Hyperion from a safe angle, or a weapon), sells junk, takes breaks and writes a
-session report. It waits instead of stopping for low mana or low health, comes back after dying, and a stall
-watchdog writes down why whenever nothing has changed for a while.
+### Ⅱ · Fishing
 
-## Mining
+Auto Fishing finds water, lava or a hotspot, settles by the edge, casts, reads the bite and reels in. It fights
+its own sea creatures (the Hyperion from a safe angle, or a weapon of your choice), sells the junk on your list,
+takes its breaks, and writes a report at the end of each session. Low mana or low health makes it wait rather
+than stop; a death brings it back to the spot; and when nothing changes for too long, it notes why and begins again.
 
-Auto Mining mines where you stand — Mithril and Titanium, or the gemstones you tick — choosing the next block the
-way a person would and turning with Human Behaviour. In **Commissions** mode it reads your commissions from the tab
-list, warps, walks a route you recorded once per area, mines the right blocks, claims with the Royal Pigeon and
-repeats. It skips blocks that won't break, leaves blocks to players already on them, and stops on a full inventory.
+### Ⅲ · Mining
 
-## Dungeons
+Auto Mining works the ground you stand on: Mithril and Titanium, or the gemstones you choose, picking the next
+block the way a person would. In **Commissions** it reads your tasks from the tab list, warps, walks a route you
+recorded once per area, mines what is asked, claims with the Royal Pigeon, and returns for the next.
 
-Dungeon helpers, Floor 7 tools and routes with Secret Routes built in: map, puzzle solvers, terminals, waypoints,
-splits, chest profit and more.
+### Ⅳ · Dungeons
 
-## How the automation behaves
+The dungeon map, puzzle solvers, terminals, Floor 7 tools, splits, chest profit and routes, with Secret Routes and
+the Assist mods built in.
 
-Every automatic look goes through one place (`utils/Humanize.kt`): eased turns, small aim errors, a human reaction
-before acting. Failure rate, delay spread and slip chance come from one profile (`HumanProfile`, the Human
-Behaviour settings). The maths is kept pure and unit-tested — including distribution tests (long tail, bounds,
-same seed → same sequence). Details: [docs/HUMANIZATION.md](docs/HUMANIZATION.md), rules for contributors:
-[AGENTS.md](AGENTS.md).
+---
 
-## Look
+### Ⅴ · The Hand
 
-Warm charcoal panels, wine-red to rose accents and a little antique gold. The emblem is an original red electric
-guitar and a bat inside a gold ring. Marceline has its own title screen and ESC menu (Visual → Menu Screens turns
-them back to the game's).
+Every automatic glance passes through one place. A turn speeds up, cruises and eases in along a slight arc, with
+each axis keeping its own pace; small slips, pauses and reaction times are drawn from a single profile, the Human
+Behaviour settings. One broker decides who holds the view when two features want it at once. The arithmetic is
+kept pure and tested, distributions included: a long tail, firm bounds, the same seed giving the same sequence.
 
-## Documents
+Details in **[docs/HUMANIZATION.md](docs/HUMANIZATION.md)**; the house rules in **[AGENTS.md](AGENTS.md)**.
 
-| File | What's in it |
+### Ⅵ · The Look
+
+Warm charcoal, wine deepening to rose, a thread of antique gold. Titles are set in Cormorant Garamond, the rest in
+Pretendard. The emblem is an original: a red V-bodied guitar and a bat inside a gold ring.
+
+The game itself wears the same colours: the loading screen, the title screen with its drifting bats, the ESC menu,
+the settings window, notifications, scoreboard, tab list, chat, tooltips, and the buttons of the game's own
+menus. *Visual → Menu Screens* returns the title and ESC menus to the game's.
+
+---
+
+### Ⅶ · Papers
+
+| | |
 |---|---|
-| [docs/FEATURES.md](docs/FEATURES.md) | every feature and what it does, generated from the code (`python3 tools/gen_features.py`) |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | what's done, what's next |
+| [docs/FEATURES.md](docs/FEATURES.md) | every feature and what it does, generated from the code |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | what is done, what comes next |
 | [docs/HUMANIZATION.md](docs/HUMANIZATION.md) | how automatic input is shaped, and the numbers behind it |
-| [docs/FISHING-COMPARISON.md](docs/FISHING-COMPARISON.md) | fishing compared with other mods |
+| [docs/FISHING-COMPARISON.md](docs/FISHING-COMPARISON.md) | fishing, set beside other mods |
 | [docs/REFERENCES.md](docs/REFERENCES.md) | sources and references |
 | [AGENTS.md](AGENTS.md) | rules for working on the code |
 
-## Built on
+### Ⅷ · The Workshop
 
-- **NoammAddons** by Noamm — the base this started from (CC0 1.0).
-- **Secret Routes** by yourboykyle — included under GPL-3.0 (`LICENSE-SECRETROUTES.txt`).
-- **Pretendard** (menu text) and **Cormorant Garamond** (titles) — SIL Open Font License (`LICENSE-PRETENDARD-OFL.txt`, `LICENSE-CORMORANT-OFL.txt`).
-- Parts adapted from Odin (`LICENSE-ODIN.txt`) and others, credited in the files they came from.
+Each push to `main` is built and tested; the jar, the test results and in-game screenshots are kept on the
+`ci-log` branch, and a release is cut for every version. `[gametest]` in a commit message runs the game itself;
+`[assist]` rebuilds the bundled Assist mods.
 
-## License
+### Ⅸ · With Thanks
 
-The original parts are CC0 1.0 (`LICENSE`). Secret Routes code is GPL-3.0.
+- **NoammAddons** by Noamm, the ground this was built on (CC0 1.0).
+- **Secret Routes** by yourboykyle, included under GPL-3.0 (`LICENSE-SECRETROUTES.txt`).
+- **Cormorant Garamond** and **Pretendard**, under the SIL Open Font License (`LICENSE-CORMORANT-OFL.txt`, `LICENSE-PRETENDARD-OFL.txt`).
+- Parts adapted from Odin (`LICENSE-ODIN.txt`) and others, credited where they appear.
+
+The original parts are CC0 1.0 (`LICENSE`); the Secret Routes code is GPL-3.0.
+
+<p align="center">❦</p>
