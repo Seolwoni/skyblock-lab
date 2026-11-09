@@ -10,13 +10,14 @@ import net.minecraft.network.chat.Style
  * just in tones that sit well next to the prefix.
  */
 object ModChat {
-    const val BASE = 0xE9E3F7 // body text (instead of plain white)
+    const val BASE = 0xEFE6DA // body text: warm ivory (instead of plain white)
 
+    // the 16 codes in the Marceline palette: wine, rose and gold where the game has purple, blue and yellow
     private val palette = mapOf(
-        '0' to 0x1A1426, '1' to 0x6366F1, '2' to 0x34D399, '3' to 0x8B5CF6,
-        '4' to 0xE11D48, '5' to 0xA855F7, '6' to 0xFBBF24, '7' to 0xA79BC4,
-        '8' to 0x6B5F86, '9' to 0x818CF8, 'a' to 0x86EFAC, 'b' to 0xC4B5FD,
-        'c' to 0xFB7185, 'd' to 0xF472B6, 'e' to 0xFDE68A, 'f' to BASE,
+        '0' to 0x1A0E11, '1' to 0x9C3A52, '2' to 0x6FBF8E, '3' to 0xC08F6E,
+        '4' to 0xC2263F, '5' to 0xB3263E, '6' to 0xC9A46A, '7' to 0xB8A79E,
+        '8' to 0x7A6863, '9' to 0xD9788A, 'a' to 0x9FDCB2, 'b' to 0xE8C8B8,
+        'c' to 0xF06878, 'd' to 0xE8506A, 'e' to 0xE6C98E, 'f' to BASE,
     )
 
     fun colorOf(code: Char): Int? = palette[code.lowercaseChar()]
