@@ -90,6 +90,7 @@ interface FishingVars {
     val badHotspots: HashSet<Int>
     var aimTries: Int
     var travelStuck: Int
+    var travelGiveUps: Int
     var ownMoveTicks: Int
     var expectedSlot: Int
     var lastLookYaw: Float?
@@ -199,6 +200,7 @@ interface FishingVars {
     var sellWaitClick: Int
     var sellMenuId: Int
     val sellSnapshot: HashMap<Int, String>
+    val sellRefused: HashSet<String>
     var soldThisRun: Int
     var statDeaths: Int
     var statStalls: Int
@@ -285,6 +287,7 @@ class FishingVarsImpl : FishingVars {
     override val badHotspots: HashSet<Int> = HashSet<Int>()
     override var aimTries: Int = 0
     override var travelStuck: Int = 0
+    override var travelGiveUps: Int = 0 // ways given up on in a row (3: stop)
     override var ownMoveTicks: Int = 0
     override var expectedSlot: Int = - 1
     override var lastLookYaw: Float? = null
@@ -403,6 +406,7 @@ class FishingVarsImpl : FishingVars {
     override var sellWaitClick: Int = 0
     override var sellMenuId: Int = - 1 // the sell menu's window id (a new window means the slots moved)
     override var soldThisRun: Int = 0 // stacks sold in this visit to the sell menu
+    override val sellRefused: HashSet<String> = HashSet() // items the sell menu wouldn't take: left alone this session
     override val sellSnapshot: HashMap<Int, String> = HashMap() // inventory slot -> what was there to sell, taken before the menu opened
     override var statDeaths: Int = 0
     override var statStalls: Int = 0 // times the stall watchdog started over

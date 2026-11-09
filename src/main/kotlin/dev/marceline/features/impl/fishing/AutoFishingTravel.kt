@@ -191,7 +191,9 @@ internal fun AutoFishing.travel(p: LocalPlayer) {
     if (pathGoal != goal) { walkBest = Double.MAX_VALUE; walkNoProgress = 0; walkReplans = 0 }
     if (pathGoal != goal || --repath <= 0) {
         pathGoal = goal
-        path = if (flat < 70) findPath(p, BlockPos.containing(goal.x, goal.y + 0.1, goal.z)) ?: emptyList() else emptyList()
+        // far away: walk in legs of ~50 blocks towards it (the path search only reaches so far), ground level there
+        val target = if (flat < 70) BlockPos.containing(goal.x, goal.y + 0.1, goal.z) else legTarget(p, goal)
+        path = target?.let { findPath(p, it) } ?: emptyList()
         pathIndex = 0
         repath = 100
     }
@@ -211,16 +213,22 @@ internal fun AutoFishing.travel(p: LocalPlayer) {
     }
     if (path.isEmpty()) {
         stopWalking()
-        if (planIn == 6 && ++travelStuck > 25) {
+        // no walkable way and no hop: give it 5 s (counted every tick, with or without teleport travel), then
+        // look again; three of those in a row means there's no way there from here
+        if (++travelStuck > 100) {
+            travelStuck = 0
             hotspot?.let { badHotspots += it.id }
             hotspot = null
             scouting = false
+            journal.log("no way found to ${BlockPos.containing(goal).toShortString()} (${flat.toInt()}m) - looking again")
+            if (++travelGiveUps >= 3) return failStop("couldn't find a way to the spot (${flat.toInt()}m away)")
             state = FishingState.FIND
             status = "no safe way there"
         }
         else status = "planning a way there"
         return
     }
+    travelGiveUps = 0
     status = "going to ${if (hotspot != null) "the hotspot" else "the spot"} (${p.position().distanceTo(goal).toInt()}m)"
     walkPath(p)
 }
@@ -559,6 +567,24 @@ internal fun AutoFishing.steerFrame(p: LocalPlayer, dt: Float) {
     val sp = kotlin.math.hypot(trackVelYaw.toDouble(), trackVelPitch.toDouble()).toFloat()
     if (sp > max) { trackVelYaw *= max / sp; trackVelPitch *= max / sp }
     dev.marceline.utils.Aim.nudgeAs(AutoFishing, aimPriority(), trackVelYaw * dt, trackVelPitch * dt)
+}
+
+/** A point ~50 blocks from [p] towards [goal], on the ground there (top block of that column, near our height). */
+internal fun AutoFishing.legTarget(p: LocalPlayer, goal: Vec3): BlockPos? {
+    val level = p.level()
+    val dx = goal.x - p.x; val dz = goal.z - p.z
+    val d = kotlin.math.sqrt(dx * dx + dz * dz).takeIf { it > 0.0 } ?: return null
+    val x = (p.x + dx / d * 50.0).toInt(); val z = (p.z + dz / d * 50.0).toInt()
+    val top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
+    // from the top down to below us: the first spot with a solid floor and room to stand that isn't fluid
+    for (y in top downTo (p.blockY - 30)) {
+        val feet = BlockPos(x, y, z)
+        val below = level.getBlockState(feet.below())
+        if (below.isAir || ! below.fluidState.isEmpty) continue
+        if (! level.getBlockState(feet).isAir || ! level.getBlockState(feet.above()).isAir) continue
+        return feet
+    }
+    return null
 }
 
 //#endif

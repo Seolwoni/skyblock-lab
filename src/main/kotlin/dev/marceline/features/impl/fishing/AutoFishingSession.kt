@@ -223,7 +223,8 @@ internal fun AutoFishing.resumeTick() {
     val spot = rebootSpot
     journal.log("back on ${area ?: "the island"}")
     if (rebootHotspot && hotspots.value) state = FishingState.FIND
-    else if (spot != null && spot.distanceTo(p.position()) < 250) {
+    // the spot anywhere on the island (a respawn can be a few hundred blocks away), not just the nearest pool
+    else if (spot != null && spot.distanceTo(p.position()) < 1_000) {
         stand = spot
         path = emptyList()
         travelStuck = 0

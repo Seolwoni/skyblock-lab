@@ -49,6 +49,7 @@ internal fun AutoFishing.freeSlots(p: LocalPlayer) = (0 until 36).count { p.inve
 /** Only what's on your sell list is ever sold. */
 internal fun AutoFishing.shouldSell(stack: net.minecraft.world.item.ItemStack): Boolean {
     if (stack.isEmpty || stack.item == Items.FISHING_ROD) return false
+    if (sellRefused.isNotEmpty() && sellKey(stack) in sellRefused) return false
     val name = itemKey(stack) ?: return false
     return name in sellNames()
 }
@@ -127,7 +128,13 @@ internal fun AutoFishing.sell(p: LocalPlayer) {
             if (sellClicked >= 0) {
                 val still = stillToSell(p, sellClicked)
                 if (still && sellWaitClick++ < 12) return
-                if (still) journal.log("sell: inventory slot $sellClicked didn't go, moving on")
+                if (still) {
+                    // the menu won't take this one (soulbound, not sellable there...): leave it be from now on
+                    val key = sellSnapshot[sellClicked]
+                    journal.log("sell: inventory slot $sellClicked ($key, \"${p.inventory.getItem(sellClicked).hoverName.string}\") didn't go - not selling it again this session")
+                    key?.let { sellRefused += it }
+                    sellQueue.removeAll { sellSnapshot[it] == key }
+                }
                 else { sold++; soldThisRun++ }
                 sellClicked = - 1; sellWaitClick = 0
             }

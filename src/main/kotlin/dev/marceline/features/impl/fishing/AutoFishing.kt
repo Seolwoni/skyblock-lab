@@ -458,6 +458,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         path = emptyList()
         sellFails = 0
         sold = 0
+        sellRefused.clear(); travelGiveUps = 0
         reels.clear()
         mine.clear()
         mineAlive.clear()

@@ -189,7 +189,8 @@ internal fun AutoFishing.tick() {
         val nums = FishingTracker.numbers()
         val sig = "$state|${p.fishing != null}|${nums["casts"]}|${nums["reels"]}|$kills|${p.blockPosition().toShortString()}"
         // waiting for a bite (it has its own recast timeout) and breaks are quiet on purpose
-        if (sig != stallSig || state == FishingState.BREAK || (state == FishingState.WAIT_BITE && p.fishing != null)) { stallSig = sig; stallSince = tickCount }
+        // (nor are a zone-out / pre-cast wait, and selling, which has its own time limit)
+        if (sig != stallSig || state == FishingState.BREAK || state == FishingState.SELL || wait > 0 || (state == FishingState.WAIT_BITE && p.fishing != null)) { stallSig = sig; stallSince = tickCount }
         // waiting for mana / health is slow on purpose: give it 30 s before calling it stuck
         else if (tickCount - stallSince > (if (status.startsWith("waiting for mana") || healthWaiting) maxOf(30, stallSeconds.value) else stallSeconds.value) * 20) {
             statStalls++
