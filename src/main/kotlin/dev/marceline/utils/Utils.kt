@@ -7,7 +7,7 @@ import java.awt.Color
 import java.net.URI
 
 object Utils {
-    val favoriteColor = Color(214, 64, 88) // Marceline violet (was Noamm blue)
+    val favoriteColor = Color(214, 64, 88) // Marceline dark-red (was Noamm blue)
 
 
     fun Packet<*>.send() = mc.connection?.send(this)

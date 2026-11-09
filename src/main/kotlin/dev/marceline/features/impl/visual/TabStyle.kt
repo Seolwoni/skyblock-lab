@@ -13,7 +13,7 @@ import java.awt.Color
  * with a soft shadow, a hairline edge and an accent line, and each player's slot a faint violet chip.
  * Hooked into the vanilla fills (MixinPlayerTabOverlay), so everything the server puts in the list stays as it is.
  */
-object TabStyle: Feature("Draws the Tab player list in the Marceline violet glass look.", toggled = true) {
+object TabStyle: Feature("Draws the Tab player list in the Marceline dark glass look.", toggled = true) {
     private val opacity by SliderSetting("Panel Opacity", 82, 30, 100, 2, "%")
     private val slotTint by SliderSetting("Slot Tint", 14, 0, 40, 1, "%").withDescription("How visible each player's slot chip is")
 

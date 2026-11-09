@@ -118,15 +118,15 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
         val h = b.hover
         val alpha = f * (if (b.enabled) 1f else 0.45f)
         val tint = if (b.danger) Color(232, 80, 106) else SkyHanniTheme.logoFrom
-        Style.roundRect(g, b.x, b.y, b.w, b.h, 3f, Style.mix(Color(255, 255, 255), tint, h * 0.5f).withAlpha(((22 + 30 * h) * alpha).toInt()))
-        val edge = Style.mix(Color(255, 255, 255), tint, h).withAlpha(((45 + 90 * h) * alpha).toInt())
-        g.drawRect(b.x + 3f, b.y, b.w - 6f, 1f, edge)
-        g.drawRect(b.x + 3f, b.y + b.h - 1f, b.w - 6f, 1f, edge)
-        g.drawRect(b.x, b.y + 3f, 1f, b.h - 6f, edge)
-        g.drawRect(b.x + b.w - 1f, b.y + 3f, 1f, b.h - 6f, edge)
+        val r = 6f
+        // a light rounded rim, then dark glass inside it: the rim shows only at the edge, corners stay round
+        val rim = Style.mix(Color(255, 236, 220), tint, h).withAlpha(((48 + 92 * h) * alpha).toInt())
+        Style.roundRect(g, b.x, b.y, b.w, b.h, r, rim)
+        Style.roundRect(g, b.x + 1f, b.y + 1f, b.w - 2f, b.h - 2f, r - 1f, Color(14, 10, 12, ((150 - 25 * h) * alpha).toInt()))
+        if (h > 0.02f) Style.roundRect(g, b.x + 1f, b.y + 1f, b.w - 2f, b.h - 2f, r - 1f, tint.withAlpha((34 * h * alpha).toInt()))
         if (h > 0.02f) {
-            val lw = (b.w - 24f) * h
-            g.drawRect(b.x + (b.w - lw) / 2f, b.y + b.h - 2f, lw, 1f, (if (b.danger) tint else SkyHanniTheme.gold).withAlpha((220 * h * alpha).toInt()))
+            val lw = (b.w - 2 * r - 12f) * h
+            g.drawRect(b.x + (b.w - lw) / 2f, b.y + b.h - 3f, lw, 0.75f, (if (b.danger) tint else SkyHanniTheme.gold).withAlpha((220 * h * alpha).toInt()))
         }
         spaced(g, b.label, b.x + b.w / 2f, b.y + (b.h - 8f * 0.85f) / 2f, 0.85f, 1.4f, Color.WHITE.withAlpha(((200 + 55 * h) * alpha).toInt()))
     }
