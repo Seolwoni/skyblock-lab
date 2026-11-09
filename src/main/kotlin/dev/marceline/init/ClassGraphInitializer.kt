@@ -83,6 +83,7 @@ class ClassGraphInitializer {
         }
 
         ConfigManager.load()
+        dev.marceline.features.MasterSwitch.restoreKept()
 
         register<RenderOverlayEvent> {
             if (mc.gui.screen() is HudEditorScreen) return@register

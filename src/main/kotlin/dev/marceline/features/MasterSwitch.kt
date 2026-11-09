@@ -16,6 +16,22 @@ object MasterSwitch {
         ConfigManager.save()
     }
 
+    /**
+     * After the config loads: a look-only feature an older "All Off" switched off (and saved) comes back on now,
+     * instead of waiting for "All On". Otherwise the vanilla title and ESC menus stay until then.
+     */
+    fun restoreKept() {
+        val names = ClickGui.masterSaved.value.split("\n").filter { it.isNotBlank() }
+        if (names.isEmpty()) return
+        val kept = FeatureManager.features.filter { it.keepOnMasterOff && it.jsonName in names }
+        if (kept.isEmpty()) return
+        kept.filter { ! it.enabled }.forEach { dev.marceline.utils.Safely("MasterSwitch ${it.name}") { it.toggle() } }
+        val rest = names - kept.map { it.jsonName }.toSet()
+        // keep "All Off" active with a placeholder line when only look features were in the list
+        ClickGui.masterSaved.value = rest.ifEmpty { listOf(" ") }.joinToString("\n")
+        ConfigManager.save()
+    }
+
     private fun turnOff() {
         val on = FeatureManager.features.filter { it.enabled && it !is ClickGui && ! it.keepOnMasterOff }
         if (on.isEmpty()) return NotificationManager.push("Marceline", "&7Nothing is on")
