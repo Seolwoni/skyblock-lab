@@ -42,7 +42,8 @@ interface AimBroker {
 
 /** What the broker drives: [Humanize] in the game, a [TurnEngine] on a fake view in tests. */
 interface Turner {
-    fun turnTo(yaw: Float, pitch: Float, tolerance: Float, overshoot: Boolean): Boolean
+    /** [urgent]: a CRITICAL aim (no pitch start lag). */
+    fun turnTo(yaw: Float, pitch: Float, tolerance: Float, overshoot: Boolean, urgent: Boolean = false): Boolean
     fun glide(yaw: Float, pitch: Float)
     fun setView(yaw: Float, pitch: Float)
     fun nudgeView(dYaw: Float, dPitch: Float)
@@ -83,7 +84,7 @@ class LeasedAimBroker(private val turner: Turner, val leaseTicks: Int = 40): Aim
     override fun turnTo(owner: Any, yaw: Float, pitch: Float, tolerance: Float, overshoot: Boolean): Boolean {
         if (holder !== owner) return false
         lastMove = now
-        return turner.turnTo(yaw, pitch, tolerance, overshoot)
+        return turner.turnTo(yaw, pitch, tolerance, overshoot, priority == AimPriority.CRITICAL)
     }
 
     override fun glide(owner: Any, yaw: Float, pitch: Float) = move(owner) { turner.glide(yaw, pitch) }
@@ -113,8 +114,8 @@ class LeasedAimBroker(private val turner: Turner, val leaseTicks: Int = 40): Aim
 private object HumanizeTurner: Turner {
     private val player get() = net.minecraft.client.Minecraft.getInstance().player
 
-    override fun turnTo(yaw: Float, pitch: Float, tolerance: Float, overshoot: Boolean) =
-        player?.let { Humanize.turnTo(it, yaw, pitch, tolerance, overshoot) } ?: false
+    override fun turnTo(yaw: Float, pitch: Float, tolerance: Float, overshoot: Boolean, urgent: Boolean) =
+        player?.let { Humanize.turnTo(it, yaw, pitch, tolerance, overshoot, lag = ! urgent) } ?: false
 
     override fun glide(yaw: Float, pitch: Float) { player?.let { Humanize.glide(it, yaw, pitch) } }
     override fun setView(yaw: Float, pitch: Float) { player?.let { Humanize.setView(it, yaw, pitch) } }

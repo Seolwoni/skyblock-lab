@@ -25,7 +25,7 @@ class AimBrokerTest {
         val engine = TurnEngine(Random(seed)) { cfg }
         var tick = 0L
         val turner = object: Turner {
-            override fun turnTo(yaw: Float, pitch: Float, tolerance: Float, overshoot: Boolean) = engine.turn(view, yaw, pitch, tolerance, overshoot, tick)
+            override fun turnTo(yaw: Float, pitch: Float, tolerance: Float, overshoot: Boolean, urgent: Boolean) = engine.turn(view, yaw, pitch, tolerance, overshoot, tick, ! urgent)
             override fun glide(yaw: Float, pitch: Float) = engine.glide(view, yaw, pitch, tick)
             override fun setView(yaw: Float, pitch: Float) = engine.write(view, yaw, pitch)
             override fun nudgeView(dYaw: Float, dPitch: Float) = engine.write(view, view.yaw + dYaw, view.pitch + dPitch)

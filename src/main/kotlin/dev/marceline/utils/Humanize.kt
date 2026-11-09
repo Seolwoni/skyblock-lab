@@ -25,7 +25,7 @@ object Humanize {
     /** The turning state and maths (Assist Core Body.turnTo, ported); the settings are read on every call. */
     internal val engine = TurnEngine(rnd) { turnConfig() }
 
-    private fun turnConfig() = TurnConfig(
+    private fun turnConfig() = profile().let { prof -> TurnConfig(
         pace = pace,
         turnSpeed = HumanBehaviour.turnSpeed.value,
         overshoot = HumanBehaviour.overshoot.value,
@@ -36,7 +36,9 @@ object Humanize {
         pauseRatio = HumanBehaviour.pauseTicks.value / 100.0,
         snap = on && HumanBehaviour.mouseGrid.value,
         sensitivity = net.minecraft.client.Minecraft.getInstance().options.sensitivity().get(),
-    )
+        pitchShare = prof.pitchShare,
+        pitchLag = prof.pitchLag,
+    ) }
 
     private fun gameTick(): Long = net.minecraft.client.Minecraft.getInstance().level?.gameTime ?: 0L
 
@@ -128,7 +130,7 @@ object Humanize {
      * Turns towards yaw / pitch like a hand on a mouse: speeds up, cruises, eases in, along a gentle arc.
      * Returns true once within [tolerance] degrees. With Human Behaviour off it snaps.
      */
-    fun turnTo(p: LocalPlayer, yaw: Float, pitch: Float, tolerance: Float = 1.5f, overshoot: Boolean = true): Boolean {
+    fun turnTo(p: LocalPlayer, yaw: Float, pitch: Float, tolerance: Float = 1.5f, overshoot: Boolean = true, lag: Boolean = true): Boolean {
         if (! on) {
             PlayerUtils.rotate(yaw, pitch)
             return true
@@ -143,7 +145,7 @@ object Humanize {
             glide(p, y1, p1)
             return done && kotlin.math.abs(wrap(yaw - y0)) <= tolerance * 4
         }
-        return engine.turn(PlayerView(p), yaw, pitch, tolerance, overshoot, gameTick())
+        return engine.turn(PlayerView(p), yaw, pitch, tolerance, overshoot, gameTick(), lag)
     }
 
     fun lookAt(p: LocalPlayer, target: Vec3, tolerance: Float = 1.5f): Boolean {
