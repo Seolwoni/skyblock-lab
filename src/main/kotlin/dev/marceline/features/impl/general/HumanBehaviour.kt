@@ -20,6 +20,8 @@ object HumanBehaviour: Feature(
 
     val turnSpeed by SliderSetting("Turn Speed", 1.0, 0.5, 2.0, 0.05, "x").section("Turning").withDescription("Top speed of head turns (each turn picks its own speed around this)")
     val curvedTurns by ToggleSetting("Curved Turns", true).withDescription("Turns follow a slight arc instead of a ruler-straight line")
+    val pitchShare by SliderSetting("Pitch Share", 0.75, 0.5, 1.0, 0.05, "x").withDescription("Up / down top speed as a share of left / right (big up / down turns use at least 0.9, none at straight up / down)")
+    val pitchLag by SliderSetting("Pitch Lag", 2, 0, 5, 1, " ticks").withDescription("On big new turns up / down starts this much after left / right (scaled by the turn, none under 30°, none for device clicks)")
     val aimSpread by SliderSetting("Aim Spread", 0.12, 0.0, 0.45, 0.01, " blocks").withDescription("Aims at a point near the middle of a block / mob, not the exact centre (same spot each time for the same target)")
     val mouseGrid by ToggleSetting("Mouse Grid", true).withDescription("View changes come in whole mouse counts for your sensitivity (no in-between amounts a mouse can't make)")
     val stepSpread by SliderSetting("Step Spread", 0.40, 0.0, 1.0, 0.05).withDescription("How much each tick's share of a turn varies (log-normal sigma)")

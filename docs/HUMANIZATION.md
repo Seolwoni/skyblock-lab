@@ -30,6 +30,8 @@
 | 아이들 조준 | 랜덤워크, ±3° 경계 | Auto Fishing › Look › Movement Size / Drift Range |
 | 클릭 면 내부 | ±0.12 | Human Behaviour › Aim Spread |
 | 오버슈트 | 회전량(최대 10°)의 0.1-0.3, 20° 넘는 회전만 | Human Behaviour › Overshoot / Min / Max |
+| 피치 속도 비율 | yaw 상한의 0.75 (60° 넘는 상하 회전은 최소 0.9, ±90 목표는 1.0). 사람 손은 좌우보다 상하가 느리고, 총 이동량이 아닌 속도 상한이라 작은 보정도 끝까지 간다 | Human Behaviour › Turning › Pitch Share (`HumanProfile.pitchShare`) |
+| 피치 출발 지연 | 큰 새 턴에서 2틱, 회전 크기에 비례 (30° 미만 0, 90° 이상 전부), 추적 중·CRITICAL 조준·±90 목표는 없음. 측정: 출발 차 중앙값 0/1/3틱 (지연 0/2/5), 총 턴 소요 중앙값 15-30° 8→7, 30-90° 12→12, 90-170° 20→19틱 | Human Behaviour › Turning › Pitch Lag (`HumanProfile.pitchLag`) |
 | 웨이포인트 도착 오프셋 | 축당 ±0.15, 반경은 그만큼 축소 (퍼즐은 축당 0.12) | Human Behaviour › Movement › Waypoint Offset |
 | 출발 흔들림 | slipChance 확률로 ±1.5°, 6틱에 걸쳐 사라짐 | Start Wobble (확률은 `HumanProfile.slipChance`) |
 | 점프 지연 | 로그정규 중앙값 1.8틱, σ 0.6, 0-5틱 | Jump Delay / Jump Spread / Jump Delay Max |
@@ -42,3 +44,4 @@
 | 마나 | 예약분 300 밑이면 걷기, 비용 = 이동 틱 + 마나 회복 틱 × 가중치 + 소울플로우 × 40 | Mana Reserve / Mana Weight |
 
 순수 수학: `utils/HumanMotion.kt`, `utils/WatchSigns.kt` ↔ `src/test/kotlin/human/HumanMotionTest.kt`, `WatchSignsTest.kt`.
+축 독립(`axisStep`, `pitchCeiling`, `lagRemaining`) ↔ `AxisIndependenceTest.kt`, 실제 턴 불변식 ↔ `AxisTurnTest.kt`.

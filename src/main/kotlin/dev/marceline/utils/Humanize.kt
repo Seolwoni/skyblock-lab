@@ -75,6 +75,8 @@ object Humanize {
             failRate = HumanBehaviour.mistakeRate.value / 100.0,
             delaySpread = HumanBehaviour.delaySpread.value / 100.0,
             slipChance = HumanBehaviour.slips.value / 100.0,
+            pitchShare = HumanBehaviour.pitchShare.value.coerceIn(0.5, 1.0),
+            pitchLag = HumanBehaviour.pitchLag.value.coerceIn(0, 5),
         )
     }.getOrDefault(HumanProfile())
 
