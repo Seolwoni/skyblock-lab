@@ -26,6 +26,8 @@ open class Feature(
     val description: String? by lazy { FeatureDescriptions.fallback(this, this.name, givenDescription) }
     @JvmField var enabled = toggled
     open val category = initCategory()
+    /** Left alone by the master switch ("All Off"): pure looks with no automation, like the menu screens. */
+    open val keepOnMasterOff: Boolean get() = false
 
     private val remotelyDisabled get() = RemoteFeatures.isDisabled(this::class.java.simpleName)
 

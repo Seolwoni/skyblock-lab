@@ -17,7 +17,7 @@ object MasterSwitch {
     }
 
     private fun turnOff() {
-        val on = FeatureManager.features.filter { it.enabled && it !is ClickGui }
+        val on = FeatureManager.features.filter { it.enabled && it !is ClickGui && ! it.keepOnMasterOff }
         if (on.isEmpty()) return NotificationManager.push("Marceline", "&7Nothing is on")
         on.forEach { dev.marceline.utils.Safely("MasterSwitch ${it.name}") { it.toggle() } }
         // Some built-in parts (server link, door fix, class colours, mod hider) can't be switched off: skip those.

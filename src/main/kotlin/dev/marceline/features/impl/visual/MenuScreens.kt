@@ -13,6 +13,9 @@ import net.minecraft.client.gui.screens.TitleScreen
  * Swapped in where the game opens its own screen (see MixinGuiScreen.onSetScreen).
  */
 object MenuScreens: Feature("Marceline title screen and ESC menu: blurred background, the Marceline mark and flat buttons.", toggled = true) {
+    /** Only looks: "All Off" (MasterSwitch) leaves it on, so the ESC menu keeps the Marceline style. */
+    override val keepOnMasterOff get() = true
+
     private val title by ToggleSetting("Title Screen", true).withDescription("The main menu you see after starting the game")
     private val pause by ToggleSetting("ESC Menu", true).withDescription("The menu that opens with ESC in a world or on a server")
 

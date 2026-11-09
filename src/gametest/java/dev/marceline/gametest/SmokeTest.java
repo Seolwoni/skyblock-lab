@@ -159,7 +159,7 @@ public class SmokeTest implements FabricClientGameTest {
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled) before.add(f.getJsonName());
 				dev.marceline.features.MasterSwitch.INSTANCE.toggle();
 				int stillOn = 0;
-				java.util.Set<String> fixed = java.util.Set.of("ClickGui", "WebSocketFeature", "DoorFix", "ClassColors", "ModHider");
+				java.util.Set<String> fixed = java.util.Set.of("ClickGui", "WebSocketFeature", "DoorFix", "ClassColors", "ModHider", "MenuScreens");
 				for (Feature f : FeatureManager.INSTANCE.getFeatures()) if (f.enabled && !fixed.contains(f.getClass().getSimpleName())) stillOn++;
 				dev.marceline.features.MasterSwitch.INSTANCE.toggle();
 				java.util.Set<String> after = new java.util.HashSet<>();
