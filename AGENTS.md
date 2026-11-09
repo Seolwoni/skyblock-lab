@@ -48,6 +48,7 @@ A file for [guiding coding agents](https://agents.md/).
 ## 완료 기준
 
 - main에 푸시 → ci-log `status.txt`가 해당 커밋에서 `success`
-- 단위 테스트 실패 0, gametest `RESULT: PASS`
+- 단위 테스트 실패 0. gametest는 기본으로 돌리지 않는다(사용자가 게임에서 직접 테스트). 필요할 때만 커밋 메시지에 `[gametest]`
+- 배포하지 않는다: CI는 릴리스를 만들지 않고, jar는 ci-log 브랜치에만 둔다
 - jar를 `/home/claude/out/`에 복사해 전달하고, 테스트 개수와 버전을 보고
 

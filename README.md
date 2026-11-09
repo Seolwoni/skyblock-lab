@@ -11,7 +11,7 @@ Built for one player and a private test server. Not released, not distributed.</
 
 | | |
 |---|---|
-| **Open** | `/mar` (or `/marceline`) — the settings window; the title screen and ESC menu have a MARCELINE button too |
+| **Open** | `/mar` (or `/marceline`) — the settings window; the title screen ("Slow dance with you") and ESC menu have a MARCELINE button too |
 | **Tabs** | General · Dungeons (Core / Floor 7 / Routes) · Fishing · Mining · Visual · Misc · Dev |
 | **Logs** | one file per game run in `config/Marceline/journal/run_<start>.log` (the newest 10 are kept) |
 | **Settings** | `config/Marceline/` (moved over from `config/Riftwalk/` on the first start) |

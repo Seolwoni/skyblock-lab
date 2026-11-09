@@ -164,7 +164,7 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
 }
 
 class MarcelineTitleScreen: net.minecraft.client.gui.screens.TitleScreen(false) {
-    private val menu = StyledMenu(this, 46f, "SKYBLOCK TOOLKIT") {
+    private val menu = StyledMenu(this, 46f, "SLOW DANCE WITH YOU") {
         buildList {
             add(listOf(StyledMenu.MenuButton("SINGLEPLAYER") { StyledMenu.open(net.minecraft.client.gui.screens.worldselection.SelectWorldScreen(this@MarcelineTitleScreen)) }))
             add(listOf(StyledMenu.MenuButton("MULTIPLAYER") { StyledMenu.open(net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen(this@MarcelineTitleScreen)) }))

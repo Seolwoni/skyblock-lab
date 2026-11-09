@@ -62,6 +62,8 @@ jobs:
           ./gradlew :26.2:test --stacktrace 2>&1 | tail -60 | tee unittest.log
           test ${PIPESTATUS[0]} -eq 0
       - name: game test
+        # off by default (tested by hand in game); a commit with [gametest] in its message runs it
+        if: contains(github.event.head_commit.message, '[gametest]')
         id: gametest
         continue-on-error: true
         timeout-minutes: 30
@@ -138,16 +140,3 @@ jobs:
           git add compile.txt tail.txt libs.txt status.txt gt jar; [ -d probe ] && git add probe || true
           git commit -m "build log ${{ github.run_number }}"
           git push -f origin ci-log
-      - name: upload jars
-        uses: actions/upload-artifact@v4
-        with:
-          name: marceline-26.2
-          path: build/libs/Marceline-*.jar
-      - name: release
-        if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no release]')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.RW_VERSION }}
-          name: Marceline ${{ env.RW_VERSION }}
-          body: "Marceline - NoammAddons + Secret Routes 기반, 개인 서버 전용. cheat jar 사용."
-          files: build/libs/Marceline-*-26.2.jar
