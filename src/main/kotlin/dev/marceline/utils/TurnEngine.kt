@@ -44,21 +44,34 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
     private var gFromPitch = 0f
     private var gToYaw = 0f
     private var gToPitch = 0f
-    private var gStart = 0L
     private var gTick = 0L
+    /** How far into tick [gTick] the glide started (0, or where a glide replaced mid-tick had got to). */
+    private var gT0 = 0f
+    /** The partial tick of the last frame drawn. */
+    private var gLastT = 0f
 
     private fun wrap(d: Float): Float = HumanMotion.wrapDeg(d)
 
-    /** Turn to [yaw]/[pitch] over the rest of game tick [now], a little every frame. */
+    /**
+     * Turn to [yaw]/[pitch] over the rest of game tick [now], a little every frame.
+     * A glide left from an earlier tick is finished first (as before). A glide of this same tick is not: the new one
+     * starts from where the view is now and takes over the frames that are left, so nothing jumps.
+     */
     fun glide(v: ViewAccess, yaw: Float, pitch: Float, now: Long) {
-        settle(v)
+        settleOlder(v, now)
+        gT0 = if (gliding) gLastT.coerceIn(0f, 1f) else 0f
         gFromYaw = v.yaw
         gFromPitch = v.pitch
         gToYaw = HumanMotion.glideTarget(gFromYaw, yaw)
         gToPitch = pitch.coerceIn(- 90f, 90f)
-        gStart = System.nanoTime()
         gTick = now
+        gLastT = gT0
         gliding = true
+    }
+
+    /** Finishes a glide from a tick before [now]; one of this tick stays under way. */
+    fun settleOlder(v: ViewAccess, now: Long) {
+        if (gliding && gTick != now) settle(v)
     }
 
     /** Finishes a glide that's still under way. */
@@ -72,7 +85,10 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
     fun frame(v: ViewAccess, now: Long, partial: Float) {
         if (! gliding) return
         val t = if (gTick == now) partial.coerceIn(0f, 1f) else 1f
-        write(v, HumanMotion.glideAt(gFromYaw, gToYaw, t), HumanMotion.glideAt(gFromPitch, gToPitch, t))
+        // share of the glide done by now: t itself for a glide that started with the tick (gT0 = 0)
+        val s = if (gT0 >= 1f) 1f else ((t - gT0) / (1f - gT0)).coerceIn(0f, 1f)
+        write(v, HumanMotion.glideAt(gFromYaw, gToYaw, s), HumanMotion.glideAt(gFromPitch, gToPitch, s))
+        gLastT = t
         if (t >= 1f) gliding = false
     }
 
@@ -108,7 +124,7 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
     fun turn(v: ViewAccess, yaw: Float, pitch: Float, tolerance: Float, overshoot: Boolean, now: Long): Boolean {
         val c = config()
         val pace = c.pace.coerceIn(0, 2)
-        settle(v)
+        settleOlder(v, now)
         val ry = wrap(yaw - v.yaw)
         val rp = pitch - v.pitch
         val realDist = sqrt(ry * ry + rp * rp)

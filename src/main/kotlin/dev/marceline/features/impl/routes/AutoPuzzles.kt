@@ -19,6 +19,9 @@ import kotlin.math.abs
  * dodging and are not done here.
  */
 object AutoPuzzles: Feature("Solves puzzles by itself using the Puzzle Solvers' answers: Three Weirdos, Tic Tac Toe, Quiz, Boulder, Water Board, Teleport Maze and Ice Fill.") {
+    /** View priority (AimBroker): walking a puzzle is travel. */
+    private val AIM_TRAVEL = dev.marceline.utils.AimPriority.TRAVEL
+
     private val weirdos by ToggleSetting("Three Weirdos", true).section("Puzzles")
     private val ttt by ToggleSetting("Tic Tac Toe", true)
     private val quiz by ToggleSetting("Quiz", true)
@@ -128,7 +131,7 @@ object AutoPuzzles: Feature("Solves puzzles by itself using the Puzzle Solvers' 
         AutoRoutes.sprintKey(false)
         val yaw = Math.toDegrees(kotlin.math.atan2(goal.z - p.z, goal.x - p.x)).toFloat() - 90f
         AutoRoutes.lastTurnTick = AutoRoutes.moveTick; AutoRoutes.lastDriveTick = AutoRoutes.moveTick
-        dev.marceline.utils.Humanize.turnTo(p, yaw, p.xRot, 4f)
+        dev.marceline.utils.Aim.turn(AutoPuzzles, AIM_TRAVEL, yaw, p.xRot, 4f)
         mc.options.keyUp.isDown = true
         walkingNow = true
         mc.options.keyShift.isDown = a.key.startsWith("icefill") // sneak on ice so we don't slide past

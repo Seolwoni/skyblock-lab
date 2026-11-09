@@ -496,7 +496,15 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         dev.marceline.utils.SoundUtils.playSound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_PLING.value(), 1f, 0.6f)
     }
 
+    /** View priorities (AimBroker): fighting may take the view from anything travelling; moving and casting is travel. */
+    internal val AIM_TRAVEL = dev.marceline.utils.AimPriority.TRAVEL
+    internal val AIM_COMBAT = dev.marceline.utils.AimPriority.COMBAT
+
+    /** The priority for what Auto Fishing is doing now. */
+    internal fun aimPriority() = if (state == FishingState.FIGHT) AIM_COMBAT else AIM_TRAVEL
+
     internal fun stop(reason: String?) {
+        dev.marceline.utils.Aim.release(this)
         if (running) runCatching { writeReport(reason ?: "stopped") }
         if (running) journal.log("stop  ${reason ?: "-"}  (state=$state, kills=$kills, creatures=$creaturesCaught)")
         if (running) releaseCentre()

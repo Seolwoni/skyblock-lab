@@ -18,6 +18,9 @@ import net.minecraft.world.item.Items
 import java.awt.Color
 
 object ArrowAlign: Feature("Arrow Align Solver") {
+    /** View priority (AimBroker): device clicks come before anything else. */
+    private val AIM_CRITICAL = dev.marceline.utils.AimPriority.CRITICAL
+
     private val colorStyle by DropdownSetting("Color Style", 0, listOf("Dynamic", "Custom")).withDescription("Dynamic: Colors the text based on the clicks needed.")
     private val textColor by ColorSetting("Text Color", Color.WHITE, false).showIf { colorStyle.value == 1 }
     private val blockWrongClicks by ToggleSetting("Block Wrong Clicks").withDescription("Sneak to disable.")
@@ -95,7 +98,7 @@ object ArrowAlign: Feature("Arrow Align Solver") {
             val index = clicksRemaining.keys.minByOrNull { i -> player.eyePosition.distanceToSqr(frameCentre(i)) } ?: return@register
             if (player.eyePosition.distanceTo(frameCentre(index)) > 4.5) return@register
             val rot = dev.marceline.utils.MathUtils.calcYawPitch(dev.marceline.utils.Humanize.aimPoint(frameCentre(index), 0.12))
-            if (! dev.marceline.utils.Humanize.turnTo(player, rot.yaw, rot.pitch, 1f)) { alignPending = null; return@register }
+            if (! dev.marceline.utils.Aim.turn(ArrowAlign, AIM_CRITICAL, rot.yaw, rot.pitch, 1f)) { alignPending = null; return@register }
             // click on the tick after the aim arrived, so the crosshair is really on the frame
             if (alignPending != index) { alignPending = index; alignCooldown = dev.marceline.utils.Humanize.reaction() / 2; return@register }
             val hit = mc.hitResult as? net.minecraft.world.phys.EntityHitResult ?: return@register

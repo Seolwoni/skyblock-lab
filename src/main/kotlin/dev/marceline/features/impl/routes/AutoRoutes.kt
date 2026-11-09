@@ -290,7 +290,12 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
         if (assistLog.value) AssistBridge.logStart("Auto Routes in ${Main.currentRoom?.name ?: DungeonScanner.currentRoom?.getName() ?: "?"}")
     }
 
+    /** View priorities (AimBroker): following a route is travel; the idle drift while standing is idle. */
+    internal val AIM_TRAVEL = dev.marceline.utils.AimPriority.TRAVEL
+    internal val AIM_IDLE = dev.marceline.utils.AimPriority.IDLE
+
     internal fun stop(reason: String?) {
+        dev.marceline.utils.Aim.release(this)
         lastStopReason = reason
         if (running && assistLog.value) AssistBridge.logEnd(reason ?: "stopped", "room ${Main.currentRoom?.name ?: "-"}")
         running = false

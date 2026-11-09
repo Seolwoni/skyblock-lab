@@ -242,7 +242,7 @@ internal object TravelBlink {
             }
             Phase.AIM -> {
                 if (! turn(p, aimYaw, aimPitch, 0.8f)) return
-                dev.marceline.utils.Humanize.glide(p, aimYaw, aimPitch) // the last bit, spread over the frames
+                dev.marceline.utils.Aim.glideAs(AutoFishing, AutoFishing.AIM_TRAVEL, aimYaw, aimPitch) // the last bit, spread over the frames
                 if (t.move == Move.ETHERWARP && ! p.isCrouching) return // the sneak hasn't reached the server yet
                 phase = Phase.HOLD
                 wait = HumanMotion.between(tpHoldMin.value, tpHoldMax.value, RANDOM)

@@ -27,6 +27,9 @@ import java.awt.Color
 import java.util.*
 
 object SimonSays: Feature("Simon Says Solver") {
+    /** View priority (AimBroker): device clicks come before anything else. */
+    private val AIM_CRITICAL = dev.marceline.utils.AimPriority.CRITICAL
+
     private val maxStage = RemoteFeatures.getFeature(SimonSays::class.simpleName)["maxClicks"]?.asInt ?: 0
 
     private val progressDisplay by ToggleSetting("Progress Display").withDescription("Displays the current Simon Says stage.").section("HUD")
@@ -127,7 +130,7 @@ object SimonSays: Feature("Simon Says Solver") {
             if (autoSolve.value && mc.gui.screen() == null && player.eyePosition.distanceTo(deviceCenter) < 5.5) {
                 val aim = Humanize.aimPoint(Vec3(expected.button.x + 0.88, expected.button.y + 0.5, expected.button.z + 0.5), 0.08)
                 val rot = MathUtils.calcYawPitch(aim)
-                Humanize.turnTo(player, rot.yaw, rot.pitch, 0.8f)
+                dev.marceline.utils.Aim.turn(SimonSays, AIM_CRITICAL, rot.yaw, rot.pitch, 0.8f)
             }
 
             if (autoSolve.value && pressGap < 0) pressGap = Humanize.around(solveDelay.value)

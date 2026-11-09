@@ -13,6 +13,9 @@ A file for [guiding coding agents](https://agents.md/).
 
 - 모든 자동 동작은 HumanBehaviour 헬퍼를 거친다. 직접 yaw/pitch를 세팅하지 않는다.
   (`Humanize.turnTo` / `glide` / `setView` / `nudgeView`; 시선을 쓰는 곳은 `utils/Humanize.kt` 하나뿐)
+- 기능은 Humanize를 직접 부르지 않고 `Aim`(utils/AimBroker.kt)을 거친다: `Aim.turn(this, 우선순위, yaw, pitch, tol)`,
+  `glideAs` / `setViewAs` / `nudgeAs`. 우선순위(`AimPriority`: IDLE < TRAVEL < COMBAT < CRITICAL)는 기능 파일의 상수로 두고,
+  멈출 때 `Aim.release(this)`. `AimBrokerTest`가 Humanize 직접 호출을 막는다
 - 새 자동 기능은 실패율과 지연 분산을 파라미터로 받는다. 상수 하드코딩 금지.
   (`HumanProfile(failRate, delaySpread, slipChance)`, 기본값은 `Humanize.profile()` = Human Behaviour 설정)
 - 순수 수학은 분리하고 분포 단언 테스트를 붙인다 (P99 > 2× 중앙값 등).

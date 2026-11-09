@@ -522,7 +522,7 @@ internal fun AutoFishing.doHop(p: LocalPlayer) {
         0 -> { // sneak (etherwarp) or stand (AOTV), turn onto the aim
             PlayerUtils.toggleSneak(h.ether)
             if (! turn(p, h.yaw, h.pitch, 0.6f)) return
-            dev.marceline.utils.Humanize.setView(p, h.yaw, h.pitch)
+            dev.marceline.utils.Aim.setViewAs(AutoFishing, aimPriority(), h.yaw, h.pitch)
             if (h.ether != p.isCrouching) return // the sneak hasn't reached the server yet
             if (h.ether) { // check once more from where we really are
                 val range = dev.marceline.utils.items.EtherwarpHelper.getEtherwarpDistance(p.inventory.getItem(h.slot)) ?: 57.0
@@ -558,7 +558,7 @@ internal fun AutoFishing.steerFrame(p: LocalPlayer, dt: Float) {
     val max = 380f
     val sp = kotlin.math.hypot(trackVelYaw.toDouble(), trackVelPitch.toDouble()).toFloat()
     if (sp > max) { trackVelYaw *= max / sp; trackVelPitch *= max / sp }
-    dev.marceline.utils.Humanize.nudgeView(p, trackVelYaw * dt, trackVelPitch * dt)
+    dev.marceline.utils.Aim.nudgeAs(AutoFishing, aimPriority(), trackVelYaw * dt, trackVelPitch * dt)
 }
 
 //#endif

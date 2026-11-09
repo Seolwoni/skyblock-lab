@@ -76,7 +76,7 @@ internal fun AutoFishing.onBreak(p: LocalPlayer) {
         val ease = t * t * (3 - 2 * t)
         offYaw = fromYaw + (toYaw - fromYaw) * ease
         offPitch = fromPitch + (toPitch - fromPitch) * ease
-        dev.marceline.utils.Humanize.glide(p, anchorYaw + offYaw + wobYaw, (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f))
+        dev.marceline.utils.Aim.glideAs(AutoFishing, aimPriority(), anchorYaw + offYaw + wobYaw, (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f))
         if (t >= 1f) moveLen = 0
     }
 }
@@ -272,7 +272,7 @@ internal fun AutoFishing.tick() {
     if (returning) {
         status = "looking back at the ${fluidName()}"
         if (! turn(p, anchorYaw + offYaw + wobYaw, anchorPitch + offPitch + wobPitch, 0.8f)) return
-        dev.marceline.utils.Humanize.setView(p, anchorYaw + offYaw + wobYaw, anchorPitch + offPitch + wobPitch) // land exactly
+        dev.marceline.utils.Aim.setViewAs(AutoFishing, aimPriority(), anchorYaw + offYaw + wobYaw, anchorPitch + offPitch + wobPitch) // land exactly
         returning = false
     }
     if (state == FishingState.WAIT_BITE) lookMovement(p)
@@ -345,7 +345,7 @@ internal object CastState : FishingStateHandler {
             val ty = anchorYaw + offYaw + wobYaw
             val tp = (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f)
             if (! turn(p, ty, tp, 0.35f)) return
-            dev.marceline.utils.Humanize.setView(p, ty, tp)
+            dev.marceline.utils.Aim.setViewAs(AutoFishing, aimPriority(), ty, tp)
             // would this throw come down in the water / lava? if it hits the floor or a wall, aim again first
             if (hook == null && ! throwLandsInFluid(p, ty, tp)) {
                 if (++aimFixes > 3) {

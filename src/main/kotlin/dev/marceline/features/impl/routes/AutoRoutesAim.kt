@@ -64,11 +64,8 @@ internal fun AutoRoutes.turn(yaw: Float, pitch: Float, tolerance: Float = 2f, se
     val p = mc.player ?: return false
     lastTurnTick = moveTick
     lastDriveTick = moveTick
-    val arrived = if (smoothTurning.value) dev.marceline.utils.Humanize.turnTo(p, yaw, pitch, tolerance)
-    else {
-        dev.marceline.utils.Humanize.setView(p, yaw, pitch)
-        true
-    }
+    val arrived = if (smoothTurning.value) dev.marceline.utils.Aim.turn(AutoRoutes, AutoRoutes.AIM_TRAVEL, yaw, pitch, tolerance)
+    else dev.marceline.utils.Aim.setViewAs(AutoRoutes, AutoRoutes.AIM_TRAVEL, yaw, pitch)
     if (! arrived) return false // keep the settle state: chasing a moving aim must not restart the pause
     if (! settle || aimPause.value <= 0) return true
 

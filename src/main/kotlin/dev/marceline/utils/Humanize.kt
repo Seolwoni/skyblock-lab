@@ -118,6 +118,9 @@ object Humanize {
         return point.add(off)
     }
 
+    /** Forgets the turn in progress (speed, arc, overshoot, last target). Only [AimBroker] calls this, when the view changes hands. */
+    internal fun resetTurnState() = engine.resetTurnState()
+
     /** Fresh top speed for the next turn, so no two movements look the same. */
     fun newTurn() = engine.newTurn()
 
@@ -132,7 +135,7 @@ object Humanize {
         }
         if (HumanBehaviour.useAssistCore.value && AssistBridge.coreLoaded) {
             // Assist Core works out the step; it's drawn with our frame glide like every other turn
-            settle(p)
+            engine.settleOlder(PlayerView(p), gameTick())
             val y0 = p.yRot; val p0 = p.xRot
             val done = AssistBridge.turn(p, yaw, pitch, tolerance)
             val y1 = p.yRot; val p1 = p.xRot

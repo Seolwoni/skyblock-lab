@@ -81,6 +81,9 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
     private val statusHud by ToggleSetting("Status HUD", true)
 
     private val journal = Journal("mining")
+
+    /** View priority (AimBroker): mining and walking routes is travel. */
+    private val AIM_TRAVEL = dev.marceline.utils.AimPriority.TRAVEL
     private val rnd = Random()
 
     private var running = false
@@ -208,6 +211,7 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
     private fun stop(reason: String?) {
         if (running) report(reason ?: "stopped")
         running = false
+        dev.marceline.utils.Aim.release(this)
         target = null
         mc.options.keyAttack.isDown = false
         stopWalking()
@@ -301,7 +305,7 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         val t = target ?: return
         val aim = aimPoint(t)
         val rot = MathUtils.calcYawPitch(aim)
-        Humanize.turnTo(p, rot.yaw, rot.pitch, tolerance = 2f)
+        dev.marceline.utils.Aim.turn(AutoMining, AIM_TRAVEL, rot.yaw, rot.pitch, tolerance = 2f)
         val hit = mc.hitResult as? BlockHitResult
         val onTarget = hit != null && hit.type == HitResult.Type.BLOCK && hit.blockPos == t
         mc.options.keyAttack.isDown = onTarget
@@ -598,7 +602,7 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         }
         val yaw = Math.toDegrees(kotlin.math.atan2(goal.z - p.z, goal.x - p.x)).toFloat() - 90f
         if (rnd.nextInt(120) == 0) walkPitch = 6f + rnd.nextFloat() * 10f
-        Humanize.turnTo(p, yaw, walkPitch, tolerance = 3f, overshoot = false)
+        dev.marceline.utils.Aim.turn(AutoMining, AIM_TRAVEL, yaw, walkPitch, tolerance = 3f, overshoot = false)
         var off = (yaw - p.yRot) % 360f
         if (off > 180f) off -= 360f
         if (off < - 180f) off += 360f

@@ -54,7 +54,7 @@ internal fun AutoFishing.escapeLava(p: LocalPlayer) {
         // aim at the last safe spot, a little above it so a teleport lands on top
         val target = back.add(0.0, 1.2, 0.0)
         val rot = MathUtils.calcYawPitch(target)
-        dev.marceline.utils.Humanize.setView(p, rot.yaw, rot.pitch)
+        dev.marceline.utils.Aim.setViewAs(AutoFishing, aimPriority(), rot.yaw, rot.pitch)
         mc.options.keyUp.isDown = true
         // swimming alone often can't climb out: teleport back with AOTV, else the Hyperion, every half second
         if (lavaTicks % 10 == 4) {

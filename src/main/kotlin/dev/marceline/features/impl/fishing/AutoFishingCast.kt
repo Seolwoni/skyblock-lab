@@ -366,11 +366,11 @@ internal fun AutoFishing.turn(p: LocalPlayer, yaw: Float, pitch: Float, tol: Flo
     val dp = pitch - p.xRot
     if (abs(dy) <= tol && abs(dp) <= tol) return true
     if (! smoothTurns.value) {
-        dev.marceline.utils.Humanize.setView(p, yaw, pitch)
+        dev.marceline.utils.Aim.setViewAs(AutoFishing, aimPriority(), yaw, pitch)
         return true
     }
     // no overshoot while fighting: a creature on the move needs the aim to stay on it
-    return dev.marceline.utils.Humanize.turnTo(p, yaw, pitch, tol, overshoot = state != FishingState.FIGHT)
+    return dev.marceline.utils.Aim.turn(AutoFishing, aimPriority(), yaw, pitch, tol, overshoot = state != FishingState.FIGHT)
 }
 
 
@@ -390,7 +390,7 @@ internal fun AutoFishing.lookMovement(p: LocalPlayer) {
         val ease = t * t * (3 - 2 * t)
         offYaw = fromYaw + (toYaw - fromYaw) * ease
         offPitch = fromPitch + (toPitch - fromPitch) * ease
-        dev.marceline.utils.Humanize.glide(p, anchorYaw + offYaw + wobYaw, (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f))
+        dev.marceline.utils.Aim.glideAs(AutoFishing, aimPriority(), anchorYaw + offYaw + wobYaw, (anchorPitch + offPitch + wobPitch).coerceIn(- 90f, 90f))
         if (t >= 1f) moveLen = 0
         return
     }

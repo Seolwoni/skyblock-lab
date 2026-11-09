@@ -291,7 +291,7 @@ internal fun AutoFishing.trackFrame() {
     trackVelPitch += (k * errP - c * trackVelPitch) * dt
     val sp = kotlin.math.hypot(trackVelYaw.toDouble(), trackVelPitch.toDouble()).toFloat()
     if (sp > trackMaxSpeed) { trackVelYaw *= trackMaxSpeed / sp; trackVelPitch *= trackMaxSpeed / sp }
-    dev.marceline.utils.Humanize.nudgeView(p, trackVelYaw * dt, trackVelPitch * dt)
+    dev.marceline.utils.Aim.nudgeAs(AutoFishing, AutoFishing.AIM_COMBAT, trackVelYaw * dt, trackVelPitch * dt)
 }
 
 internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
@@ -370,7 +370,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 if (castDownPitch == 0f) castDownPitch = 78f + RANDOM.nextFloat() * 11f
                 if (lavaAround(p) || ! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
                 if (! turn(p, p.yRot, castDownPitch, 3f)) return
-                dev.marceline.utils.Humanize.glide(p, p.yRot, castDownPitch) // the last few degrees, so the cast stage takes it as is
+                dev.marceline.utils.Aim.glideAs(AutoFishing, AutoFishing.AIM_COMBAT, p.yRot, castDownPitch) // the last few degrees, so the cast stage takes it as is
                 val swapped = p.inventory.selectedSlot != hype
                 hold(hype) // the Hyperion comes out once we're looking down
                 hypeStage = 2
@@ -381,10 +381,10 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 // only ever looking down: a stage left over from before (or a look that wandered up) goes back to "look down"
                 if (p.xRot < 75f) { hypeStage = 1; journal.log("hyperion held: looking ${"%.0f".format(p.xRot)} deg, turning down first"); return }
                 // next to lava: straight down only, whatever the pitch drifted to
-                if (lavaAround(p) && abs(p.xRot - 90f) > 2f) { castDownPitch = 90f; dev.marceline.utils.Humanize.glide(p, p.yRot, 90f); return }
+                if (lavaAround(p) && abs(p.xRot - 90f) > 2f) { castDownPitch = 90f; dev.marceline.utils.Aim.glideAs(AutoFishing, AutoFishing.AIM_COMBAT, p.yRot, 90f); return }
                 if (! blastSafe(p, p.yRot, p.xRot)) { // this look would teleport us off the edge: straight down instead
                     castDownPitch = 90f
-                    if (abs(p.xRot - 90f) > 2f) { dev.marceline.utils.Humanize.glide(p, p.yRot, 90f); return }
+                    if (abs(p.xRot - 90f) > 2f) { dev.marceline.utils.Aim.glideAs(AutoFishing, AutoFishing.AIM_COMBAT, p.yRot, 90f); return }
                     if (! blastSafe(p, p.yRot, 90f)) { // no safe blast from here: fight it with the sword instead
                         blastBlocked = true
                         hypeStage = 0
@@ -416,7 +416,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 castDownPitch = if (lavaAround(p)) 90f else (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
                 if (abs(castDownPitch - p.xRot) > 1.5f) {
                     // keep casting: drift the view to the new pitch in place instead of restarting the sequence
-                    dev.marceline.utils.Humanize.glide(p, p.yRot, castDownPitch)
+                    dev.marceline.utils.Aim.glideAs(AutoFishing, AutoFishing.AIM_COMBAT, p.yRot, castDownPitch)
                 }
             }
         }

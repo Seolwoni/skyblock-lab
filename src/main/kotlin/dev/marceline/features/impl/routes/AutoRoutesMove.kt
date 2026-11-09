@@ -412,7 +412,7 @@ internal fun AutoRoutes.idleLook() {
     val step = hb.idleStep.value.toFloat()
     val ny = dev.marceline.utils.HumanMotion.walk(idleYaw, step, bound, moveRnd)
     val np = dev.marceline.utils.HumanMotion.walk(idlePitch, step * 0.6f, bound * 0.6f, moveRnd)
-    dev.marceline.utils.Humanize.glide(p, p.yRot + (ny - idleYaw), (p.xRot + (np - idlePitch)).coerceIn(- 90f, 90f))
+    if (! dev.marceline.utils.Aim.glideAs(AutoRoutes, AutoRoutes.AIM_IDLE, p.yRot + (ny - idleYaw), (p.xRot + (np - idlePitch)).coerceIn(- 90f, 90f))) return
     idleYaw = ny; idlePitch = np
 }
 
