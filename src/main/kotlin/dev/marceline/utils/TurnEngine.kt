@@ -250,6 +250,7 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
         val sy = HumanMotion.axisStep(yawBudget, c.stepSpread, c.pauseRatio, rnd, pausedYaw).coerceAtMost(ay)
         pausedYaw = yawBudget > 0f && sy == 0f
         var sp: Float
+        val lagging = lagLeft > 0
         if (lagLeft > 0) {
             sp = 0f
             lagLeft--
@@ -274,7 +275,7 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
         val bend = if (dist > 4f) minOf(1f, dist / 25f) else 0f
         // (an axis that has arrived isn't pushed off again, and nothing bends pitch at the ±90 edge)
         val ddy = sgnY * sy - (if (ay > tolerance) curve * bend * sgnP * sp else 0f)
-        var ddp = sgnP * sp + (if (ap > tolPitch && ! edge) curvePitch * bend * sgnY * sy else 0f)
+        var ddp = sgnP * sp + (if (ap > tolPitch && ! edge && ! lagging) curvePitch * bend * sgnY * sy else 0f)
         // the bend mustn't carry pitch into its tolerance before yaw either
         if (holding) {
             val left = rpNow - ddp
