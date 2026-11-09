@@ -50,6 +50,41 @@ jobs:
           # major.minor from gradle.properties, the last number is this build's number: 1.1.0 -> 1.1.<build>
           BASE=$(grep '^mod_version=' gradle.properties | cut -d= -f2 | cut -d. -f1-2)
           echo "RW_VERSION=$BASE.${{ github.run_number }}" >> $GITHUB_ENV
+      - name: assist mods (bundled inside the jar)
+        run: |
+          # Assist Core / Assist Path ride along inside Marceline (Fabric jar-in-jar, META-INF/jars).
+          # [assist] in the commit message builds them fresh and keeps them on the assist-jars branch;
+          # every other build takes the last ones from there. Without both, the build stops (no release without them).
+          mkdir -p /tmp/assist .assist
+          if echo "${{ github.event.head_commit.message }}" | grep -q "\[assist\]"; then
+            for r in assist-core assist-path; do
+              git clone -q --depth 1 "https://github.com/Seolwoni/$r" "/tmp/src-$r" || { echo "$r clone failed"; continue; }
+              # The core/ folder inside each Assist mod is a copy of assist-core: refresh it to the latest.
+              if [ "$r" != "assist-core" ] && [ -d "/tmp/src-$r/core" ]; then
+                rm -rf "/tmp/src-$r/core/src" && cp -r /tmp/src-assist-core/src "/tmp/src-$r/core/src"
+                cp /tmp/src-assist-core/build.gradle "/tmp/src-$r/core/build.gradle"
+              fi
+              (cd "/tmp/src-$r" && chmod +x gradlew && ./gradlew build -x test --stacktrace > "/tmp/assist/$r-build.log" 2>&1) || echo "$r build failed"
+              find "/tmp/src-$r/build/libs" -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-dev.jar" -exec cp {} /tmp/assist/ \;
+            done
+            ls -la /tmp/assist
+            if [ "$(ls /tmp/assist/assist-core*.jar /tmp/assist/assist-path*.jar 2>/dev/null | wc -l)" -ge 2 ]; then
+              mkdir -p /tmp/ajrepo && cd /tmp/ajrepo && git init -q && cp /tmp/assist/*.jar . && git add *.jar \
+                && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "assist jars $(date -u +%F)" \
+                && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:assist-jars || true
+              cd "$GITHUB_WORKSPACE"
+              cp /tmp/assist/*.jar .assist/
+            else
+              echo "fresh Assist build incomplete, using the saved jars"
+            fi
+          fi
+          if [ "$(ls .assist/*.jar 2>/dev/null | wc -l)" -lt 2 ]; then
+            git fetch -q origin assist-jars && git archive origin/assist-jars | tar -x -C .assist || true
+          fi
+          ls -la .assist
+          if [ "$(ls .assist/assist-core*.jar .assist/assist-path*.jar 2>/dev/null | wc -l)" -lt 2 ]; then
+            echo "Assist Core / Assist Path jars missing (push once with [assist] in the message)"; exit 1
+          fi
       - name: build 26.2
         run: |
           set -o pipefail
@@ -74,22 +109,6 @@ jobs:
           start=$(date +%s)
           xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew :26.2:runClientGameTest -Pmod_version=$RW_VERSION --stacktrace 2>&1 | tee gametest.log
           echo "gametest seconds: $(( $(date +%s) - start ))" >> gametest.log
-      - name: build assist mods
-        if: contains(github.event.head_commit.message, '[assist]')
-        continue-on-error: true
-        run: |
-          mkdir -p /tmp/assist
-          for r in assist-core assist-path; do
-            git clone -q --depth 1 "https://github.com/Seolwoni/$r" "/tmp/src-$r"
-            # The core/ folder inside each Assist mod is a copy of assist-core: refresh it to the latest.
-            if [ "$r" != "assist-core" ] && [ -d "/tmp/src-$r/core" ]; then
-              rm -rf "/tmp/src-$r/core/src" && cp -r /tmp/src-assist-core/src "/tmp/src-$r/core/src"
-              cp /tmp/src-assist-core/build.gradle "/tmp/src-$r/core/build.gradle"
-            fi
-            (cd "/tmp/src-$r" && chmod +x gradlew && ./gradlew build -x test --stacktrace > "/tmp/assist/$r-build.log" 2>&1) || echo "$r build failed"
-            find "/tmp/src-$r/build/libs" -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-dev.jar" -exec cp {} /tmp/assist/ \;
-          done
-          ls -la /tmp/assist
       - name: save log
         if: always()
         run: |
@@ -111,6 +130,7 @@ jobs:
             echo "== $j" >> /tmp/libs.txt
             unzip -l "$j" | grep -c "xyz/yourboykyle/secretroutes/.*class" >> /tmp/libs.txt || true
             echo "assist stubs in jar: $(unzip -l "$j" | grep -c "com/seolwoni/")" >> /tmp/libs.txt
+            echo "nested jars: $(unzip -l "$j" | grep -oE 'META-INF/jars/[^ ]+' | tr '\n' ' ')" >> /tmp/libs.txt
             unzip -l "$j" | grep -E "features/impl/routes|secretroutes.mixins|assets/secretroutesmod/(rooms|secretlocations)" >> /tmp/libs.txt || true
             unzip -p "$j" fabric.mod.json >> /tmp/libs.txt || true
           done

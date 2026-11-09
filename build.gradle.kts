@@ -140,6 +140,17 @@ afterEvaluate {
 tasks.withType<JavaCompile>().configureEach { options.release.set(25) }
 tasks.withType<KotlinCompile>().configureEach { compilerOptions { jvmTarget.set(JvmTarget.JVM_25) } }
 
+// Assist Core / Assist Path go inside the jar as nested mods (CI puts their jars in .assist, see build.yml):
+// copied next to the other nested jars, so writeNestedJarMetadata lists them in fabric.mod.json "jars".
+tasks.named("processIncludeJars") {
+    val assistDir = rootProject.file(".assist")
+    inputs.files(fileTree(assistDir) { include("*.jar") }).optional()
+    doLast {
+        val out = processedIncludeJarsDir.get().asFile
+        assistDir.listFiles()?.filter { it.isFile && it.extension == "jar" }?.forEach { it.copyTo(out.resolve(it.name), overwrite = true) }
+    }
+}
+
 fun File.writeWithoutNestedJarMetadata() {
     if (! isFile) return
 
