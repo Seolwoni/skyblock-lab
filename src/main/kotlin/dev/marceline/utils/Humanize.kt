@@ -19,59 +19,41 @@ object Humanize {
     private val rnd = Random()
     val timing = HumanTiming()
 
-    // turning state (Assist Core Body.turnTo, ported)
-    private var vel = 0f
-    private var turnSpeed = 10f
-    private var curve = 0f
-    private var curveFrom = 0f
-    private var lastYaw = 0f
-    private var lastPitch = 0f
-    // overshoot: a big turn aims a little past the target, then comes back (settings: Overshoot Min / Max)
-    private var osYaw = 0f
-    private var osPitch = 0f
-
     private val pace get() = HumanBehaviour.pace.value.coerceIn(0, 2)
     private val on get() = HumanBehaviour.enabled
 
-    // ---- frame glide: a tick's turn is spread over the frames until the next tick, so turns look smooth at any FPS
-    private var gliding = false
-    private var gFromYaw = 0f
-    private var gFromPitch = 0f
-    private var gToYaw = 0f
-    private var gToPitch = 0f
-    private var gStart = 0L
-    private var gTick = 0L
+    /** The turning state and maths (Assist Core Body.turnTo, ported); the settings are read on every call. */
+    internal val engine = TurnEngine(rnd) { turnConfig() }
+
+    private fun turnConfig() = TurnConfig(
+        pace = pace,
+        turnSpeed = HumanBehaviour.turnSpeed.value,
+        overshoot = HumanBehaviour.overshoot.value,
+        overshootMin = HumanBehaviour.overshootMin.value.toFloat(),
+        overshootMax = HumanBehaviour.overshootMax.value.toFloat(),
+        curvedTurns = HumanBehaviour.curvedTurns.value,
+        stepSpread = HumanBehaviour.stepSpread.value,
+        pauseRatio = HumanBehaviour.pauseTicks.value / 100.0,
+        snap = on && HumanBehaviour.mouseGrid.value,
+        sensitivity = net.minecraft.client.Minecraft.getInstance().options.sensitivity().get(),
+    )
+
+    private fun gameTick(): Long = net.minecraft.client.Minecraft.getInstance().level?.gameTime ?: 0L
 
     /** Turn to [yaw]/[pitch] over the next 50 ms, a little every frame (not in one jump on the tick). */
-    fun glide(p: LocalPlayer, yaw: Float, pitch: Float) {
-        settle(p)
-        gFromYaw = p.yRot
-        gFromPitch = p.xRot
-        gToYaw = HumanMotion.glideTarget(gFromYaw, yaw)
-        gToPitch = pitch.coerceIn(- 90f, 90f)
-        gStart = System.nanoTime()
-        gTick = net.minecraft.client.Minecraft.getInstance().level?.gameTime ?: 0L
-        gliding = true
-    }
+    fun glide(p: LocalPlayer, yaw: Float, pitch: Float) = engine.glide(PlayerView(p), yaw, pitch, gameTick())
 
     /** Finishes a glide that's still under way (called at the start of every tick, so logic sees where we ended up). */
-    fun settle(p: LocalPlayer) {
-        if (! gliding) return
-        gliding = false
-        write(p, gToYaw, gToPitch)
-    }
+    fun settle(p: LocalPlayer) = engine.settle(PlayerView(p))
 
     /** Call every frame. */
     fun frame() {
-        if (! gliding) return
-        val p = net.minecraft.client.Minecraft.getInstance().player ?: run { gliding = false; return }
+        if (! engine.gliding) return
+        val mc = net.minecraft.client.Minecraft.getInstance()
+        val p = mc.player ?: return run { engine.settle(object: ViewAccess { override var yaw = 0f; override var pitch = 0f }) }
         // follow the game's own tick clock (partial tick 0 -> 1 until the next tick), so the glide ends exactly when
         // the next tick's step starts: no stop-and-go at tick edges whatever the frame rate or tick timing
-        val mc = net.minecraft.client.Minecraft.getInstance()
-        val now = mc.level?.gameTime ?: 0L
-        val t = if (gTick == now) mc.deltaTracker.getGameTimeDeltaPartialTick(true).coerceIn(0f, 1f) else 1f
-        write(p, HumanMotion.glideAt(gFromYaw, gToYaw, t), HumanMotion.glideAt(gFromPitch, gToPitch, t))
-        if (t >= 1f) gliding = false
+        engine.frame(PlayerView(p), gameTick(), mc.deltaTracker.getGameTimeDeltaPartialTick(true))
     }
 
     // ---- the only way automatic code changes where the player looks
@@ -80,17 +62,7 @@ object Humanize {
     fun setView(p: LocalPlayer, yaw: Float, pitch: Float) = write(p, yaw, pitch)
 
     /** The single writer: the change from the current view, in whole mouse counts (Mouse Grid), then applied. */
-    private fun write(p: LocalPlayer, yaw: Float, pitch: Float) {
-        var dy = wrap(yaw - p.yRot).toDouble()
-        var dp = (pitch.coerceIn(- 90f, 90f) - p.xRot).toDouble()
-        if (on && HumanBehaviour.mouseGrid.value) {
-            val sens = net.minecraft.client.Minecraft.getInstance().options.sensitivity().get()
-            dy = HumanMotion.gcdSnap(dy, sens)
-            dp = HumanMotion.gcdSnap(dp, sens)
-        }
-        PlayerUtils.rotate((p.yRot + dy).toFloat(), (p.xRot + dp).toFloat().coerceIn(- 90f, 90f))
-        p.yHeadRot = p.yRot
-    }
+    private fun write(p: LocalPlayer, yaw: Float, pitch: Float) = engine.write(PlayerView(p), yaw, pitch)
 
     /** Move the view by a small amount (per-frame followers: tracking, steering). */
     fun nudgeView(p: LocalPlayer, dYaw: Float, dPitch: Float) = setView(p, p.yRot + dYaw, p.xRot + dPitch)
@@ -147,10 +119,7 @@ object Humanize {
     }
 
     /** Fresh top speed for the next turn, so no two movements look the same. */
-    fun newTurn() {
-        val scale = floatArrayOf(1f, 1.25f, 1.6f)[pace]
-        turnSpeed = (7f + rnd.nextFloat() * 7f) * scale * HumanBehaviour.turnSpeed.value.toFloat()
-    }
+    fun newTurn() = engine.newTurn()
 
     /**
      * Turns towards yaw / pitch like a hand on a mouse: speeds up, cruises, eases in, along a gentle arc.
@@ -171,56 +140,7 @@ object Humanize {
             glide(p, y1, p1)
             return done && kotlin.math.abs(wrap(yaw - y0)) <= tolerance * 4
         }
-        settle(p)
-        val ry = wrap(yaw - p.yRot)
-        val rp = pitch - p.xRot
-        val realDist = sqrt(ry * ry + rp * rp)
-        val fresh = abs(wrap(yaw - lastYaw)) + abs(pitch - lastPitch) > 15f || realDist > curveFrom + 15f
-        if (fresh) {
-            // a new turn: maybe aim a bit past it (share of the turn from Human Behaviour, never on small turns)
-            val extra = if (overshoot && HumanBehaviour.overshoot.value) HumanMotion.overshoot(realDist, HumanBehaviour.overshootMin.value.toFloat(), HumanBehaviour.overshootMax.value.toFloat(), rnd) else 0f
-            osYaw = if (realDist > 0f) ry / realDist * extra else 0f
-            osPitch = if (realDist > 0f) rp / realDist * extra else 0f
-            if (pitch + osPitch !in - 90f .. 90f) osPitch = 0f
-        }
-        val dy = wrap(yaw + osYaw - p.yRot)
-        val dp = pitch + osPitch - p.xRot
-        val dist = sqrt(dy * dy + dp * dp)
-        if (dist <= tolerance) {
-            if (osYaw != 0f || osPitch != 0f) { // reached the overshoot point: now correct back
-                osYaw = 0f; osPitch = 0f
-                curveFrom = realDist
-                lastYaw = yaw; lastPitch = pitch
-                return false
-            }
-            vel *= 0.5f
-            return true
-        }
-        if (fresh) {
-            newTurn()
-            val lively = doubleArrayOf(1.0, 0.7, 0.4)[pace]
-            curve = ((0.15 + rnd.nextDouble() * 0.3) * (if (rnd.nextBoolean()) 1 else - 1) * lively * (if (HumanBehaviour.curvedTurns.value) 1 else 0)).toFloat()
-            curveFrom = realDist
-        }
-        lastYaw = yaw
-        lastPitch = pitch
-        val accel = maxOf(0.6f, turnSpeed * 0.3f)
-        var want = minOf(turnSpeed, sqrt(2f * accel * dist))
-        want = maxOf(want, 0.6f)
-        vel = if (vel < want) minOf(want, vel + accel) else maxOf(want, vel - accel * 1.5f)
-        // this tick's share: log-normal around the eased speed, or nothing at all (Step Spread / Pause Ticks)
-        val step = HumanMotion.turnStep(minOf(vel, dist), HumanBehaviour.stepSpread.value, HumanBehaviour.pauseTicks.value / 100.0, rnd).coerceAtMost(dist)
-        if (step <= 0f) return false
-        val ux = dy / dist
-        val uy = dp / dist
-        val bend = if (dist > 4f) curve * minOf(1f, dist / 25f) else 0f
-        val mx = ux - uy * bend
-        val my = uy + ux * bend
-        val ml = sqrt(mx * mx + my * my)
-        // spread this tick's step over the coming frames; we count as "there" from the next tick on, once the
-        // view really is there (so nothing is used while the aim is still on its way)
-        glide(p, p.yRot + step * mx / ml, (p.xRot + step * my / ml).coerceIn(- 90f, 90f))
-        return false
+        return engine.turn(PlayerView(p), yaw, pitch, tolerance, overshoot, gameTick())
     }
 
     fun lookAt(p: LocalPlayer, target: Vec3, tolerance: Float = 1.5f): Boolean {
