@@ -271,7 +271,12 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
         val bend = if (dist > 4f) minOf(1f, dist / 25f) else 0f
         // (an axis that has arrived isn't pushed off again, and nothing bends pitch at the ±90 edge)
         val ddy = sgnY * sy - (if (ay > tolerance) curve * bend * sgnP * sp else 0f)
-        val ddp = sgnP * sp + (if (ap > tolPitch && ! edge) curvePitch * bend * sgnY * sy else 0f)
+        var ddp = sgnP * sp + (if (ap > tolPitch && ! edge) curvePitch * bend * sgnY * sy else 0f)
+        // the bend mustn't carry pitch into its tolerance before yaw either
+        if (! edge && yawOut && abs(rpNow) > hold) {
+            val left = rpNow - ddp
+            if (abs(left) < hold || left * rpNow < 0f) ddp = rpNow - (if (rpNow < 0f) - hold else hold)
+        }
         glide(v, v.yaw + ddy, (v.pitch + ddp).coerceIn(- 90f, 90f), now)
         return false
     }
