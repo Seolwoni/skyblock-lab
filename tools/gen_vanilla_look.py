@@ -91,8 +91,8 @@ def buttons():
     save('widget/text_field', glass(w, h, 3, 58, RIM, (10, 8, 9, 232)), w, h, 3)
     save('widget/text_field_highlighted', glass(w, h, 3, 210, GOLD, (12, 9, 10, 236)), w, h, 3)
     # scroll bar
-    im = canvas(6, 32); rrect(im, (1, 0, 5, 32), 2, GOLD + (225,)); save('widget/scroller', im, 6, 32, 3)
-    im = canvas(6, 32); rrect(im, (1, 0, 5, 32), 2, (12, 8, 10, 170)); save('widget/scroller_background', im, 6, 32, 3)
+    im = canvas(6, 32); rrect(im, (1, 0, 5, 32), 2, GOLD + (225,)); save('widget/scroller', im, 6, 32, {'left': 2, 'top': 3, 'right': 2, 'bottom': 3})
+    im = canvas(6, 32); rrect(im, (1, 0, 5, 32), 2, (12, 8, 10, 170)); save('widget/scroller_background', im, 6, 32, {'left': 2, 'top': 3, 'right': 2, 'bottom': 3})
     # tabs (options screens, world creation)
     tw, th = 130, 24
     for name, rim_a, rim_c, glass_c, under in (

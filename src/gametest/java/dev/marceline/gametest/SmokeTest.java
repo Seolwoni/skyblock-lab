@@ -202,6 +202,8 @@ public class SmokeTest implements FabricClientGameTest {
 			context.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.options.OptionsScreen(new net.minecraft.client.gui.screens.TitleScreen(), mc.options, false)));
 			context.waitTicks(25);
 			context.takeScreenshot("rw-11-options");
+			context.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
+			context.waitTicks(10);
 		} catch (Throwable t) {
 			failures.add("vanilla menus: " + t);
 		}
