@@ -140,3 +140,11 @@ jobs:
           git add compile.txt tail.txt libs.txt status.txt gt jar; [ -d probe ] && git add probe || true
           git commit -m "build log ${{ github.run_number }}"
           git push -f origin ci-log
+      - name: release
+        if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no release]')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.RW_VERSION }}
+          name: Marceline ${{ env.RW_VERSION }}
+          body: "Marceline ${{ env.RW_VERSION }} - personal build for the private test server."
+          files: build/libs/Marceline-*-26.2.jar
