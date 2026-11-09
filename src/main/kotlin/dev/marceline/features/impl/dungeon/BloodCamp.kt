@@ -30,6 +30,11 @@ import java.awt.Color
 import kotlin.math.ceil
 
 object BloodCamp: Feature("Features for Blood Room."), IFeatureWindow {
+    //#if CHEAT
+    /** The camp click: a snap onto the mob's landing spot one tick before the hit. */
+    private val AIM_CAMP = AimPriority.CRITICAL
+    //#endif
+
     private val bloodCamp by ToggleSetting("Blood Camp Helper", true).section("Blood Camp Helper")
     private val decimalPlaces by SliderSetting("Decimal Places", 1, 0, 2, 1).showIf { bloodCamp.value }.withDescription("The number of decimal places shown on blood mob timers")
     private val timerColor by ColorSetting("Timer Color", Color.WHITE).showIf { bloodCamp.value }
@@ -152,7 +157,8 @@ object BloodCamp: Feature("Features for Blood Room."), IFeatureWindow {
                 box.clip(eye, eye.add(look)).isPresent
             } ?: return@register
 
-            PlayerUtils.rotateTo(getEndBox(data.endVector !!).center)
+            if (! PlayerUtils.aimAt(BloodCamp, AIM_CAMP, getEndBox(data.endVector !!).center)) return@register
+            ThreadUtils.scheduledTaskServer(1) { Aim.release(BloodCamp) }
             ThreadUtils.scheduledTaskServer(1) { if (clickType.value == 0) PlayerUtils.leftClick() else PlayerUtils.rightClick() }
             data.tbClicked = true
         }

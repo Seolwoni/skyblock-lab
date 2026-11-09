@@ -94,9 +94,18 @@ object PlayerUtils: ISelfInit, Shortcuts {
         player.forceSetRotation(yaw, false, pitch, false)
     }
 
-    fun rotateTo(pos: Vec3) {
+    /**
+     * Sets the view through [Aim] as [owner] with [priority], on the game thread (callers may be on a coroutine).
+     * False when someone with a higher priority holds the view.
+     */
+    fun aimView(owner: Any, priority: AimPriority, yaw: Float, pitch: Float): Boolean =
+        if (mc.isSameThread) Aim.setViewAs(owner, priority, yaw, pitch)
+        else mc.submit(java.util.function.Supplier { Aim.setViewAs(owner, priority, yaw, pitch) }).join()
+
+    /** Looks straight at [pos] through [Aim] (see [aimView]). */
+    fun aimAt(owner: Any, priority: AimPriority, pos: Vec3): Boolean {
         val rot = MathUtils.calcYawPitch(pos)
-        rotate(rot.yaw, rot.pitch)
+        return aimView(owner, priority, rot.yaw, rot.pitch)
     }
 
     fun getHotbarSlot(i: Int): ItemStack? {
@@ -114,7 +123,11 @@ object PlayerUtils: ISelfInit, Shortcuts {
 
     fun getArmor() = listOf(EquipmentSlot.FEET, EquipmentSlot.LEGS, EquipmentSlot.CHEST, EquipmentSlot.HEAD).map(player::getItemBySlot)
 
-    suspend fun rotateSmoothly(rot: MathUtils.Rotation, time: Long, block: suspend () -> Unit = {}) {
+    /**
+     * Turns to [rot] over [time] ms (eased), every step through [Aim] as [owner] with [priority], then runs [block].
+     * Gives up without running [block] when someone with a higher priority takes the view on the way.
+     */
+    suspend fun rotateSmoothlyAs(owner: Any, priority: AimPriority, rot: MathUtils.Rotation, time: Long, block: suspend () -> Unit = {}) {
         val currentYaw = MathUtils.normalizeYaw(player.yRot)
         val currentPitch = MathUtils.normalizePitch(player.xRot)
         val targetYaw = MathUtils.normalizeYaw(rot.yaw)
@@ -133,7 +146,7 @@ object PlayerUtils: ISelfInit, Shortcuts {
             val newYaw = interpolateYaw(currentYaw, targetYaw, easedProgress)
             val newPitch = lerp(currentPitch, targetPitch, easedProgress).toFloat()
 
-            rotate(newYaw, newPitch)
+            if (! aimView(owner, priority, newYaw, newPitch)) return
 
             if (progress >= 1.0) {
                 block()
@@ -144,10 +157,8 @@ object PlayerUtils: ISelfInit, Shortcuts {
         }
     }
 
-    suspend fun rotateSmoothly(target: Vec3, time: Long, block: suspend () -> Unit = {}) {
-        val rot = MathUtils.calcYawPitch(target)
-        rotateSmoothly(rot, time, block)
-    }
+    suspend fun rotateSmoothlyAs(owner: Any, priority: AimPriority, target: Vec3, time: Long, block: suspend () -> Unit = {}) =
+        rotateSmoothlyAs(owner, priority, MathUtils.calcYawPitch(target), time, block)
 
 
     private var awaiting4EQ = emptyList<String>()

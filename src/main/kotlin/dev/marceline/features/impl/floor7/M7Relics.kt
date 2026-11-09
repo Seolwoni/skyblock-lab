@@ -11,6 +11,8 @@ import dev.marceline.utils.MathUtils.center
 import dev.marceline.utils.MathUtils.toPos
 import dev.marceline.utils.MathUtils.vec
 import dev.marceline.utils.NumbersUtils.toFixed
+import dev.marceline.utils.Aim
+import dev.marceline.utils.AimPriority
 import dev.marceline.utils.PlayerUtils
 import dev.marceline.utils.dungeons.DungeonListener
 import dev.marceline.utils.dungeons.enums.WitherRelic
@@ -32,6 +34,11 @@ import net.minecraft.world.phys.Vec3
 import java.awt.Color
 
 object M7Relics: Feature(name = "M7 Relics", description = "A bunch of M7 Relics features") {
+    //#if CHEAT
+    /** Relic Look: a quick timed turn to the cauldron, ahead of anything slower. */
+    private val AIM_RELIC = AimPriority.CRITICAL
+    //#endif
+
     private val relicBox by ToggleSetting("Box Relics").withDescription("Draws a box on where the relics are spawning and the cauldron you need to place.")
     private val relicSpawnTimer by ToggleSetting("Spawn Timer").withDescription("Shows on screen when the relic will spawn.")
     private val relicTimer by ToggleSetting("Place Timer").withDescription("Sends in chat the time it took to place the relic after you picked it up.")
@@ -189,7 +196,8 @@ object M7Relics: Feature(name = "M7 Relics", description = "A bunch of M7 Relics
             val item = PlayerUtils.getHotbarSlot(8)?.hoverName ?: return@register
             val relic = WitherRelic.fromName(item.unformattedText) ?: return@register
             if (relic == WitherRelic.RED || relic == WitherRelic.ORANGE) scope.launch {
-                PlayerUtils.rotateSmoothly(relic.cauldronPos.center(), relicLookTime.value)
+                PlayerUtils.rotateSmoothlyAs(M7Relics, AIM_RELIC, relic.cauldronPos.center(), relicLookTime.value)
+                Aim.release(M7Relics)
             }
         }
         //#endif

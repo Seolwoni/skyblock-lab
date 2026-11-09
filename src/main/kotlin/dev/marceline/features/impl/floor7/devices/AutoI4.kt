@@ -14,7 +14,8 @@ import dev.marceline.utils.MathUtils.calcYawPitch
 import dev.marceline.utils.MathUtils.interpolateYaw
 import dev.marceline.utils.MathUtils.lerp
 import dev.marceline.utils.PlayerUtils.leapAction
-import dev.marceline.utils.PlayerUtils.rotate
+import dev.marceline.utils.Aim
+import dev.marceline.utils.AimPriority
 import dev.marceline.utils.dungeons.DungeonListener
 import dev.marceline.utils.dungeons.enums.DungeonClass
 import dev.marceline.utils.location.LocationUtils
@@ -28,6 +29,9 @@ import kotlin.math.abs
 import kotlin.math.min
 
 object AutoI4: Feature("Fully Automated I4") {
+    /** The timed bow turns onto the emeralds. */
+    private val AIM_I4 = AimPriority.CRITICAL
+
     private val rotationTime by SliderSetting("Rotation Time", 170, 0, 250, 1).withDescription("Time (ms) to interpolate rotations when aiming at dev block targets. &eSet to 0 to disable the auto rotation.").section("Shooting")
     private val predictSetting by ToggleSetting("Predictions", true).withDescription("Enables prediction logic to aim at the next target block.")
 
@@ -178,6 +182,7 @@ object AutoI4: Feature("Fully Automated I4") {
     override fun onDisable() {
         super.onDisable()
         reset()
+        Aim.release(AutoI4)
     }
 
     private fun checkStall() {
@@ -249,7 +254,7 @@ object AutoI4: Feature("Fully Automated I4") {
             val progress = min(elapsed.toDouble() / duration, 1.0)
 
             if (progress >= 1) {
-                rotate(targetYaw, targetPitch)
+                if (! PlayerUtils.aimView(AutoI4, AIM_I4, targetYaw, targetPitch)) return
                 block()
                 break
             }
@@ -257,7 +262,7 @@ object AutoI4: Feature("Fully Automated I4") {
             val easedProgress = easeInOutCubic(progress).toFloat()
             val newYaw = interpolateYaw(currentYaw, targetYaw, easedProgress)
             val newPitch = lerp(currentPitch, targetPitch, easedProgress).toFloat()
-            rotate(newYaw, newPitch)
+            if (! PlayerUtils.aimView(AutoI4, AIM_I4, newYaw, newPitch)) return
             delay(1)
         }
     }

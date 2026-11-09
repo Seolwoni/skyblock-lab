@@ -182,5 +182,12 @@ class AimBrokerTest {
             .flatMap { f -> f.readLines().mapIndexedNotNull { n, l -> if (direct.containsMatchIn(l)) "${f.path}:${n + 1}" else null } }
             .toList()
         assertTrue(offenders.isEmpty(), "looks that skip the broker: $offenders")
+
+        // nor straight through PlayerUtils (its rotate is the low-level writer under Humanize / ViewAccess)
+        val raw = Regex("""PlayerUtils\.(rotate|rotateTo|rotateSmoothly)\(|(?<![.\w])(rotate|rotateTo|rotateSmoothly)\(""")
+        val rawOffenders = File(src, "features").walkTopDown().filter { it.isFile && it.extension == "kt" }
+            .flatMap { f -> f.readLines().mapIndexedNotNull { n, l -> if (raw.containsMatchIn(l) && ! l.trimStart().startsWith("//")) "${f.path}:${n + 1}" else null } }
+            .toList()
+        assertTrue(rawOffenders.isEmpty(), "features turning the view without the broker: $rawOffenders")
     }
 }
