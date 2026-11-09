@@ -126,6 +126,12 @@ jobs:
               for c in $CLASSES; do
                 javap -p -cp "$j" "$c" >> /tmp/probe/javap.txt 2>&1 || true
               done
+              # bytecode of a few classes, to see how vanilla does something (.github/probe-bytecode.txt)
+              if [ -f .github/probe-bytecode.txt ]; then
+                for c in $(cat .github/probe-bytecode.txt); do
+                  javap -c -p -cp "$j" "$c" >> /tmp/probe/bytecode.txt 2>&1 || true
+                done
+              fi
             done
           fi
           git checkout --orphan ci-log
