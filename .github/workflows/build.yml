@@ -68,7 +68,7 @@ jobs:
               find "/tmp/src-$r/build/libs" -maxdepth 1 -name "*.jar" ! -name "*-sources.jar" ! -name "*-dev.jar" -exec cp {} /tmp/assist/ \;
             done
             ls -la /tmp/assist
-            if [ "$(ls /tmp/assist/assist-core*.jar /tmp/assist/assist-path*.jar 2>/dev/null | wc -l)" -ge 2 ]; then
+            if [ "$(ls /tmp/assist/assist*core*.jar /tmp/assist/assist*path*.jar 2>/dev/null | wc -l)" -ge 2 ]; then
               mkdir -p /tmp/ajrepo && cd /tmp/ajrepo && git init -q && cp /tmp/assist/*.jar . && git add *.jar \
                 && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "assist jars $(date -u +%F)" \
                 && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" HEAD:assist-jars || true
@@ -82,7 +82,7 @@ jobs:
             git fetch -q origin assist-jars && git archive origin/assist-jars | tar -x -C .assist || true
           fi
           ls -la .assist
-          if [ "$(ls .assist/assist-core*.jar .assist/assist-path*.jar 2>/dev/null | wc -l)" -lt 2 ]; then
+          if [ "$(ls .assist/assist*core*.jar .assist/assist*path*.jar 2>/dev/null | wc -l)" -lt 2 ]; then
             echo "Assist Core / Assist Path jars missing (push once with [assist] in the message)"; exit 1
           fi
       - name: build 26.2
@@ -123,7 +123,7 @@ jobs:
           LOG=$(find . -name "latest.log" -path "*run*" -not -path "./.git/*" | head -1); [ -n "$LOG" ] && grep -E -B2 -A8 "Exception|ERROR" "$LOG" | head -400 > /tmp/gt/latest-errors.txt || true
           git config user.name "ci"
           git config user.email "ci@users.noreply.github.com"
-          grep -E -A6 "error:|^e: " build.log | head -400 > /tmp/compile.txt || true
+          touch build.log; grep -E -A6 "error:|^e: " build.log | head -400 > /tmp/compile.txt || true
           tail -300 build.log > /tmp/tail.txt
           ls -la build/libs > /tmp/libs.txt 2>&1 || true
           for j in build/libs/Marceline-*-26.2.jar; do
