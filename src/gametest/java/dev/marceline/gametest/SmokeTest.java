@@ -187,6 +187,14 @@ public class SmokeTest implements FabricClientGameTest {
 			log.add("title screen open: " + title);
 			if (!title.equals("MarcelineTitleScreen")) failures.add("title screen is " + title + " (expected MarcelineTitleScreen)");
 			context.takeScreenshot("rw-07-title");
+			// our settings opened from the title screen, then closed: back on our title screen, not the vanilla one
+			context.runOnClient(mc -> mc.gui.setScreen(ClickGui.createScreen()));
+			context.waitTicks(10);
+			context.runOnClient(mc -> mc.gui.setScreen(null));
+			context.waitTicks(10);
+			String back = context.computeOnClient(mc -> mc.gui.screen() == null ? "none" : mc.gui.screen().getClass().getSimpleName());
+			log.add("title after closing settings: " + back);
+			if (!back.equals("MarcelineTitleScreen")) failures.add("closing settings on the title screen gave " + back + " (expected MarcelineTitleScreen)");
 		} catch (Throwable t) {
 			failures.add("title screen: " + t);
 		}

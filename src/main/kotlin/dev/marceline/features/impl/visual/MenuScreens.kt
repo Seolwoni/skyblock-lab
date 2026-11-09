@@ -35,7 +35,10 @@ object MenuScreens: Feature("Marceline title screen and ESC menu: blurred backgr
     /** Our screen in place of [screen], or null to keep the game's own. */
     @JvmStatic
     fun replace(screen: Screen?): Screen? {
-        if (! enabled || screen == null) return null
+        if (! enabled) return null
+        // closing a screen with no world loaded: the game makes a plain TitleScreen itself after this hook
+        // (Gui.setScreen), so ours has to be put in here, or "back" from our settings lands on the vanilla menu
+        if (screen == null) return if (title.value && net.minecraft.client.Minecraft.getInstance().level == null) MarcelineTitleScreen() else null
         return when {
             screen is TitleScreen && screen !is MarcelineTitleScreen && title.value -> MarcelineTitleScreen()
             screen is PauseScreen && screen !is MarcelinePauseScreen && screen.showsPauseMenu() && pause.value -> MarcelinePauseScreen()
