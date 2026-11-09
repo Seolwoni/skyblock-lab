@@ -198,6 +198,9 @@ internal fun AutoFishing.tick() {
             if (p.fishing != null) rod()?.let { hold(it); use(p) }
             hypeStage = 0; blastBlocked = false; healthWaiting = false
             path = emptyList(); hotspot = null
+            // start the look over as well: no half-done head movement, a fresh turn (as a manual restart does)
+            offYaw = 0f; offPitch = 0f; moveLen = 0; returning = false
+            dev.marceline.utils.Aim.release(AutoFishing)
             stallSince = tickCount
             state = FishingState.FIND
             return
@@ -302,7 +305,12 @@ internal object CastState : FishingStateHandler {
             val p = player!!
             val rod = rod() ?: return stop("no fishing rod in the hotbar")
             val hook = p.fishing
-            if (moveLen > 0) return // don't cast in the middle of a head movement
+            // a head movement around the bobber only moves on while waiting for a bite; one cut short by a bite or a
+            // fight would block the cast for good here (it never finishes in CAST), so drop it where it got to
+            if (moveLen > 0) {
+                journal.log("head movement cut short (${moveTick}/${moveLen}) - casting from here")
+                moveLen = 0
+            }
             if (! centered(p)) { status = "stepping to the middle of the block"; return }
             val free = freeSlots(p)
             if (autoSell.value && free <= sellWhenFree.value && sellFails < 3 && sellables(p).isNotEmpty()) {
