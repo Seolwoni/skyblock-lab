@@ -257,14 +257,17 @@ class TurnEngine(private val rnd: Random, private val config: () -> TurnConfig) 
             sp = HumanMotion.axisStep(pitchBudget, c.stepSpread, c.pauseRatio, rnd, pausedPitch).coerceAtMost(ap)
             pausedPitch = pitchBudget > 0f && sp == 0f
         }
-        // pitch lands no earlier than yaw: while yaw is still out, keep pitch a hair outside its tolerance
+        val sgnY = if (dy < 0f) - 1f else 1f
+        val sgnP = if (dp < 0f) - 1f else 1f
+        // pitch lands no earlier than yaw: while yaw is still out (on its way, or over the target on an overshoot),
+        // pitch stops a hair outside its tolerance around the real target
         val hold = tolPitch + 0.1f
-        if (! edge && ay > tolerance && ap > hold && ap - sp < hold) sp = ap - hold
+        val yawOut = ay > tolerance || abs(wrap(yaw - v.yaw)) > tolerance
+        val rpNow = pitch - v.pitch
+        if (! edge && yawOut && abs(rpNow) > hold && sgnP == (if (rpNow < 0f) - 1f else 1f)) sp = minOf(sp, abs(rpNow) - hold)
         if (sy <= 0f && sp <= 0f) return false
         // each axis bends with the other's movement, by its own amount and side
         val bend = if (dist > 4f) minOf(1f, dist / 25f) else 0f
-        val sgnY = if (dy < 0f) - 1f else 1f
-        val sgnP = if (dp < 0f) - 1f else 1f
         // (an axis that has arrived isn't pushed off again, and nothing bends pitch at the ±90 edge)
         val ddy = sgnY * sy - (if (ay > tolerance) curve * bend * sgnP * sp else 0f)
         val ddp = sgnP * sp + (if (ap > tolPitch && ! edge) curvePitch * bend * sgnY * sy else 0f)
