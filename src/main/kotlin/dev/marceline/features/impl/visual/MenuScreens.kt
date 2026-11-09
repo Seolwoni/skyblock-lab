@@ -19,6 +19,19 @@ object MenuScreens: Feature("Marceline title screen and ESC menu: blurred backgr
     private val title by ToggleSetting("Title Screen", true).withDescription("The main menu you see after starting the game")
     private val pause by ToggleSetting("ESC Menu", true).withDescription("The menu that opens with ESC in a world or on a server")
 
+    /** The selected row's outline in the game's lists: gold when focused, a dim gold otherwise (see MixinListSelection). */
+    @JvmStatic
+    fun selectionOutline(argb: Int): Int = when {
+        ! enabled -> argb
+        argb == -1 -> 0xFFC9A46A.toInt()
+        argb == -8355712 -> 0xFF6E5A48.toInt()
+        else -> argb
+    }
+
+    /** The selected row's inside: dark wine instead of black. */
+    @JvmStatic
+    fun selectionInside(argb: Int): Int = if (enabled && argb == -16777216) 0xFF180A0E.toInt() else argb
+
     /** Our screen in place of [screen], or null to keep the game's own. */
     @JvmStatic
     fun replace(screen: Screen?): Screen? {

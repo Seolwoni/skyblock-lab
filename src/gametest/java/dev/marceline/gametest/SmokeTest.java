@@ -191,6 +191,21 @@ public class SmokeTest implements FabricClientGameTest {
 			failures.add("title screen: " + t);
 		}
 
+		// the game's own menus in the Marceline look (sprites and backgrounds), from the title screen
+		try {
+			context.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.worldselection.SelectWorldScreen(new net.minecraft.client.gui.screens.TitleScreen())));
+			context.waitTicks(25);
+			context.takeScreenshot("rw-09-singleplayer");
+			context.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen(new net.minecraft.client.gui.screens.TitleScreen())));
+			context.waitTicks(25);
+			context.takeScreenshot("rw-10-multiplayer");
+			context.runOnClient(mc -> mc.gui.setScreen(new net.minecraft.client.gui.screens.options.OptionsScreen(new net.minecraft.client.gui.screens.TitleScreen(), mc.options, false)));
+			context.waitTicks(25);
+			context.takeScreenshot("rw-11-options");
+		} catch (Throwable t) {
+			failures.add("vanilla menus: " + t);
+		}
+
 		// the loading screen (a resource reload shows it), then wait for it to finish
 		try {
 			context.runOnClient(mc -> mc.reloadResourcePacks());
