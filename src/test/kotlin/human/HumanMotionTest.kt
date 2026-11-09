@@ -185,7 +185,7 @@ class HumanMotionTest {
         val xs = ArrayList<Double>()
         repeat(40_000) {
             val o = HumanMotion.waypointOffset(0.15, prev, rnd)
-            assertTrue(prev == null || ! o.contentEquals(prev!!), "same offset twice in a row")
+            assertTrue(prev == null || ! o.contentEquals(prev), "same offset twice in a row")
             prev = o
             xs += o[0]; xs += o[1]
         }

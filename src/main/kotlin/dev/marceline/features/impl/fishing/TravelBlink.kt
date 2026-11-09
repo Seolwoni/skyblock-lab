@@ -256,7 +256,7 @@ internal object TravelBlink {
                     if (sf == null || sf < SkyblockTravel.ETHERWARP_SOULFLOW) return fail(p, t, TravelFail.Reason.SOULFLOW, "soulflow ${sf ?: "?"}")
                     val range = dev.marceline.utils.items.EtherwarpHelper.getEtherwarpDistance(p.inventory.getItem(slot)) ?: SkyblockTravel.ETHERWARP_RANGE.toDouble()
                     val land = dev.marceline.utils.items.EtherwarpHelper.getEtherPos(p.position(), Vec3.directionFromRotation(p.xRot, p.yRot), range)
-                    if (! land.succeeded || ! standable(land.pos!!.above()) || nearLava(land.pos!!.above(), 1)) return fail(p, t, TravelFail.Reason.LANDING, "etherwarp would not land")
+                    if (! land.succeeded || ! standable(land.pos.above()) || nearLava(land.pos.above(), 1)) return fail(p, t, TravelFail.Reason.LANDING, "etherwarp would not land")
                 }
                 firedFrom = p.position()
                 landedAt = null

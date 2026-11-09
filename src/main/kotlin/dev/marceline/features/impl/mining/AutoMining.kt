@@ -452,7 +452,7 @@ object AutoMining: Feature("Mines by itself where you stand: Mithril and Titaniu
         val range = staffRange.value.toDouble()
         for (o in p.level().players()) {
             if (o === p || o.distanceToSqr(p) > range * range) continue
-            val shown = o.displayName?.string ?: o.name.string
+            val shown = o.displayName.string
             val tag = WatchSigns.staffTag(shown, tags)
                 ?: mc.connection?.getPlayerInfo(o.uuid)?.tabListDisplayName?.string?.let { WatchSigns.staffTag(it, tags) }
             if (tag != null) return "[$tag] ${o.name.string}"

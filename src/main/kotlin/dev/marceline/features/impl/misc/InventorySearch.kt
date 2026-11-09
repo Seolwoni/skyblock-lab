@@ -51,7 +51,7 @@ object InventorySearch: Feature("Lets you search in inventory and support math")
             val localMouseX = (Resolution.getMouseX() - searchHud.x) / searchHud.scale
             val localMouseY = (Resolution.getMouseY() - searchHud.y) / searchHud.scale
 
-            Style.roundRect(context, - WIDTH / 2f, 0f, WIDTH.toFloat(), HEIGHT.toFloat(), 4f, Color(15, 12, 13, 220))
+            Style.roundRect(context, - WIDTH / 2f, 0f, WIDTH, HEIGHT, 4f, Color(15, 12, 13, 220))
             val color = if (searchHandler.listening) Style.accentColor else Color(255, 255, 255, 30)
             context.drawRect(- WIDTH / 2, HEIGHT - 1, WIDTH, 1f, color)
 

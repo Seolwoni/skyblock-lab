@@ -529,7 +529,7 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
         if (rail) {
             val idx = entries.indexOf(tabsEntry)
             val before = heights.take(idx).sum() + idx * CARD_GAP
-            total = maxOf(total, before + tabsEntry!!.tabs.size * (RAIL_ROW + 3f))
+            total = maxOf(total, before + tabsEntry.tabs.size * (RAIL_ROW + 3f))
         }
         scroll.update(total, h)
 

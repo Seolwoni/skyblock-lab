@@ -72,7 +72,7 @@ internal fun AutoFishing.throwLanding(p: LocalPlayer, yaw: Float, pitch: Float):
         val next = pos.add(v)
         val hit = lvl.clip(net.minecraft.world.level.ClipContext(pos, next, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.ANY, p))
         if (hit.type == net.minecraft.world.phys.HitResult.Type.BLOCK) {
-            val bp = (hit as net.minecraft.world.phys.BlockHitResult).blockPos
+            val bp = hit.blockPos
             return if (wantedFluid(bp) || wantedFluid(BlockPos.containing(hit.location))) hit.location else null
         }
         if (next.y < p.y - 30) return null
@@ -120,7 +120,7 @@ internal fun AutoFishing.throwLandsInFluid(p: LocalPlayer, yaw: Float, pitch: Fl
         val next = pos.add(v)
         val hit = lvl.clip(net.minecraft.world.level.ClipContext(pos, next, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.ANY, p))
         if (hit.type == net.minecraft.world.phys.HitResult.Type.BLOCK) {
-            val bp = (hit as net.minecraft.world.phys.BlockHitResult).blockPos
+            val bp = hit.blockPos
             return wantedFluid(bp) || wantedFluid(BlockPos.containing(hit.location))
         }
         if (next.y < p.y - 30) return false

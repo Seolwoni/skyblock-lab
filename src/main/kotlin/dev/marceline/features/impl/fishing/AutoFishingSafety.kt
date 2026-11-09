@@ -175,7 +175,7 @@ internal fun AutoFishing.staffNearby(p: LocalPlayer): String? {
     val r = staffRange.value.toDouble()
     for (o in p.level().players()) {
         if (o === p || o.distanceToSqr(p) > r * r) continue
-        val shown = o.displayName?.string ?: o.name.string
+        val shown = o.displayName.string
         val tag = dev.marceline.utils.WatchSigns.staffTag(shown, tags)
             ?: mc.connection?.getPlayerInfo(o.uuid)?.tabListDisplayName?.string?.let { dev.marceline.utils.WatchSigns.staffTag(it, tags) }
         if (tag != null) return "[$tag] ${o.name.string}"

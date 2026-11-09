@@ -62,7 +62,7 @@ internal fun AutoFishing.lookingAtFluid(p: LocalPlayer): Vec3? {
     val end = eye.add(p.lookAngle.scale(24.0))
     val hit = p.level().clip(net.minecraft.world.level.ClipContext(eye, end, net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.ANY, p))
     if (hit.type != net.minecraft.world.phys.HitResult.Type.BLOCK) return null
-    val bp = (hit as net.minecraft.world.phys.BlockHitResult).blockPos
+    val bp = hit.blockPos
     if (! wantedFluid(bp)) return null
     return if (solveAim(p, hit.location) != null) hit.location else null
 }

@@ -191,7 +191,7 @@ internal fun AutoFishing.tick() {
         // waiting for a bite (it has its own recast timeout) and breaks are quiet on purpose
         if (sig != stallSig || state == FishingState.BREAK || (state == FishingState.WAIT_BITE && p.fishing != null)) { stallSig = sig; stallSince = tickCount }
         // waiting for mana / health is slow on purpose: give it 30 s before calling it stuck
-        else if (tickCount - stallSince > (if (status.startsWith("waiting for mana") || healthWaiting) maxOf(30, stallSeconds.value.toInt()) else stallSeconds.value.toInt()) * 20) {
+        else if (tickCount - stallSince > (if (status.startsWith("waiting for mana") || healthWaiting) maxOf(30, stallSeconds.value) else stallSeconds.value) * 20) {
             statStalls++
             val mf = dev.marceline.utils.ManaGuard.mana
             journal.log("STALL ${stallSeconds.value}s  state=$state  status=\"$status\"  wait=$wait  timer=$timer  hook=${p.fishing != null}  " +
@@ -467,7 +467,7 @@ internal object WaitBiteState : FishingStateHandler {
                 // every 5 s: is there a closer / new hotspot in sight while ours isn't (e.g. it moved as a new entity)
                 val elsewhere = hs != null && timer % 100 == 0 && nearestHotspot(p)?.let { it !== hs && it.position().distanceTo(hs.position()) > 3.0 && hs.distanceTo(p) > 20f } == true
                 if (moved || gone || elsewhere) { // the hotspot ended or moved: go after it
-                    if (hs != null) badHotspots -= hs.id
+                    badHotspots -= hs.id
                     info(if (moved) "&7The hotspot moved, following it." else "&7Hotspot gone, looking for the next one.")
                     hold(rod); use(p)
                     hotspot = null

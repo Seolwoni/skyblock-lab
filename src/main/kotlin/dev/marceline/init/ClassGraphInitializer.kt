@@ -97,7 +97,7 @@ class ClassGraphInitializer {
                     val sw = h.width * h.scale; val sh = h.height * h.scale
                     dev.marceline.utils.HudLayout.R(h.x - (if (h.centered()) sw / 2f else 0f) - 5f * h.scale, h.y - 3.5f * h.scale, sw + 10f * h.scale, sh + 7f * h.scale)
                 }
-                val dy = dev.marceline.utils.HudLayout.offsets(rects, Resolution.height.toFloat())
+                val dy = dev.marceline.utils.HudLayout.offsets(rects, Resolution.height)
                 shown.forEachIndexed { i, h ->
                     if (dy[i] == 0f) return@forEachIndexed h.renderElement(event.context, false)
                     h.y += dy[i]

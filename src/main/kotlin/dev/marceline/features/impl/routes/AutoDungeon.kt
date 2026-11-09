@@ -169,11 +169,11 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
 
         val blood = DungeonScanner.uniqueRooms.values.firstOrNull { it.data.type == RoomType.BLOOD }
         val bloodDone = blood == null || blood.name in finished
-        if (here?.data?.type == RoomType.BLOOD && ! bloodDone) return startCamp(here)
+        if (here.data.type == RoomType.BLOOD && ! bloodDone) return startCamp(here)
 
         if (order.value == 1 && endAtBlood.value && ! bloodDone) {
             // blood rush: straight to Blood when the doors allow it, else the rooms on the way there first
-            if (blood != null && blood in prev) return goTo(blood, prev, doorOf)
+            if (blood in prev) return goTo(blood, prev, doorOf)
             val rush = dev.marceline.utils.dungeons.map.handlers.DungeonTree.getBloodRush().toSet()
             prev.keys.filter { it in rush && needsDoing(it) }.minByOrNull { distance(prev, it) }?.let { return goTo(it, prev, doorOf) }
         }
@@ -183,7 +183,7 @@ object AutoDungeon: Feature("Clears the dungeon room by room on its own: goes to
         if (next != null) return goTo(next, prev, doorOf)
 
         // everything else is done: Blood
-        if (endAtBlood.value && ! bloodDone && blood != null) {
+        if (endAtBlood.value && ! bloodDone) {
             if (blood in prev && here != blood) return goTo(blood, prev, doorOf)
         }
         setState(State.DONE, "nothing left")

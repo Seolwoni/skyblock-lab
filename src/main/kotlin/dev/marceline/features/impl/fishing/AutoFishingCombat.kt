@@ -424,7 +424,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
     }
     if (weaponSlot.value in 1 .. 9) hold(weaponSlot.value - 1)
     val target = close.minByOrNull { it.distanceToSqr(p) } ?: return
-    status = if (hypeSlot != null && hype == null) "no mana, hitting ${target.name.string}" else "fighting ${target.name.string}"
+    status = if (hypeSlot != null) "no mana, hitting ${target.name.string}" else "fighting ${target.name.string}"
     val rot = MathUtils.calcYawPitch(dev.marceline.utils.Humanize.aimPoint(target.boundingBox.center, 0.25))
     if (! turn(p, rot.yaw, rot.pitch, 4f) || hitCooldown > 0) return
     if (clickMissed()) return
