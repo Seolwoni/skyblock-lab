@@ -89,19 +89,33 @@ internal object SkyHanniTheme {
 
     fun titleOf(cat: CategoryType) = cat.title
 
-    /** The Marceline emblem (red guitar and bat in a gold ring), in colour: draw it with white. 64 px and 256 px versions. */
-    val logoSmall = net.minecraft.resources.Identifier.fromNamespaceAndPath(dev.marceline.Marceline.MOD_ID, "textures/gui/logo_small.png")
-    val logoBig = net.minecraft.resources.Identifier.fromNamespaceAndPath(dev.marceline.Marceline.MOD_ID, "textures/gui/logo.png")
+    /**
+     * The Marceline emblem (red guitar and bat in a gold ring), in colour: draw it with white. It comes pre-shrunk to
+     * every size from 12 to 256 pixels (textures/gui/emblem/<n>.png) and is drawn at the one matching the screen
+     * pixels it covers, one texture pixel per screen pixel: no blocky edges from shrinking it while drawing.
+     */
+    private val emblemSizes = (12 .. 96 step 2) + (100 .. 256 step 4)
+    private val emblems = HashMap<Int, net.minecraft.resources.Identifier>()
+    private fun emblem(n: Int) = emblems.getOrPut(n) { net.minecraft.resources.Identifier.fromNamespaceAndPath(dev.marceline.Marceline.MOD_ID, "textures/gui/emblem/$n.png") }
 
-    /** Draws the mark [size] GUI pixels wide at x, y. */
+    /** Draws the mark [size] GUI pixels wide at x, y ([big] kept for callers; the size decides). */
     fun drawLogoMark(ctx: GuiGraphicsExtractor, x: Float, y: Float, size: Float, color: Color, big: Boolean = false) {
-        val px = if (big) 256 else 64
-        ctx.pose().pushMatrix()
-        ctx.pose().translate(x, y)
-        ctx.pose().scale(size / px, size / px)
-        ctx.drawTexture(if (big) logoBig else logoSmall, 0, 0, px, px, color)
-        ctx.pose().popMatrix()
+        val pose = ctx.pose()
+        // screen pixels per GUI unit here: the window's GUI scale times whatever scale the caller has pushed
+        val local = kotlin.math.sqrt(pose.m00() * pose.m00() + pose.m01() * pose.m01())
+        val perUnit = (mc.window.guiScale.toFloat() * local).coerceAtLeast(0.1f)
+        val want = size * perUnit
+        val n = emblemSizes.minBy { kotlin.math.abs(it - want) }
+        // start on a whole screen pixel so the texture's pixels line up with the screen's
+        val sx = kotlin.math.round(x * perUnit) / perUnit
+        val sy = kotlin.math.round(y * perUnit) / perUnit
+        pose.pushMatrix()
+        pose.translate(sx, sy)
+        pose.scale(1f / perUnit, 1f / perUnit)
+        ctx.drawTexture(emblem(n), 0, 0, n, n, color)
+        pose.popMatrix()
     }
+
 
 
     // ------------------------------------------------------------------ text helpers
