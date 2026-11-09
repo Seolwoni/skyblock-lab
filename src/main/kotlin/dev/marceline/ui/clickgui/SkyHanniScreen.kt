@@ -395,16 +395,16 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
                     val sel = anim(key to "sel", 220).also { it.update(if (open) (if (active) 1f else 0.6f) else 0f) }.value
                     val hov = anim(key, 140).also { it.update(if (hovered && ! open) 1f else 0f) }.value
                     if (sel > 0.01f) {
-                        ctx.drawHorizontalGradient(x, y, SIDEBAR_W, ROW_H, Style.accentColor.withAlpha((70 * sel).toInt()), Style.accent2.withAlpha((18 * sel).toInt()))
-                        ctx.drawRect(x, y + (ROW_H * (1 - sel)) / 2f, 2f, ROW_H * sel, Style.accentColor)
+                        ctx.drawHorizontalGradient(x, y, SIDEBAR_W, ROW_H, Style.accentColor.withAlpha((44 * sel).toInt()), Style.accent2.withAlpha((8 * sel).toInt()))
+                        ctx.drawRect(x, y + (ROW_H * (1 - sel)) / 2f, 1.5f, ROW_H * sel, Style.gold)
                     }
                     if (hov > 0.01f) ctx.drawRect(x, y, SIDEBAR_W, ROW_H, Color(255, 255, 255, (12 * hov).toInt()))
                     if (key != rows.first().first) ctx.drawRect(x + 6f, y, SIDEBAR_W - 12f, 1f, line)
                     drawIcon(ctx, key, x + 8f, y + 3.5f, if (open) 1f else 0.55f + 0.45f * hov)
-                    ctx.drawString(label, x + 21f, y + 4f, if (open) accentLight() else textMain)
+                    ctx.drawString(label, x + 21f, y + 4f, textMain)
                     val all = featuresIn(key)
                     val count = if (open) "${all.count { it.enabled }}/${all.size}" else "${all.size}"
-                    if (open) Style.drawTabular(ctx, count, x + SIDEBAR_W - 8f - Style.tabWidth(count), y + 4f, accentLight())
+                    if (open) Style.drawTabular(ctx, count, x + SIDEBAR_W - 8f - Style.tabWidth(count), y + 4f, Style.gold)
                     else ctx.drawString(count, x + SIDEBAR_W - 8f - uiWidth(count), y + 4f, textFaint, shadow = false)
                 }
 
@@ -412,7 +412,7 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
                     val list = featuresIn(category).filter { it.group == key.name }
                     val hov = anim(key to "side", 140).also { it.update(if (hovered) 1f else 0f) }.value
                     if (hov > 0.01f) ctx.drawRect(x + 6f, y, SIDEBAR_W - 6f, ROW_H, Color(255, 255, 255, (10 * hov).toInt()))
-                    ctx.drawRect(x + 14f, y + 3f, 1f, ROW_H - 6f, Style.accentColor.withAlpha(110))
+                    ctx.drawRect(x + 14f, y + 3f, 1f, ROW_H - 6f, Style.gold.withAlpha(90))
                     ctx.drawString(fit(label, SIDEBAR_W - 50f), x + 21f, y + 4f, if (hov > 0.5f) textMain else textSoft, shadow = false)
                     val count = "${list.count { it.enabled }}/${list.size}"
                     ctx.drawString(count, x + SIDEBAR_W - 8f - uiWidth(count), y + 4f, textFaint, shadow = false)
@@ -593,7 +593,7 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
                         if (selected != f && hasSettings(f)) {
                             val n = f.configSettings.size
                             val label = if (f is IFeatureScreen) "open ›" else "$n setting${if (n == 1) "" else "s"} ›"
-                            ctx.drawString(label, x + w - 8f - uiWidth(label), y + eh - 12f, if (f.enabled) accentLight() else textFaint, shadow = false)
+                            ctx.drawString(label, x + w - 8f - uiWidth(label), y + eh - 12f, if (f.enabled) Style.gold else textFaint, shadow = false)
                         }
                         ctx.pose().popMatrix()
                     }
