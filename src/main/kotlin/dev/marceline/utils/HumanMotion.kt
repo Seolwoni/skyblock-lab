@@ -162,4 +162,51 @@ object HumanMotion {
 
     /** The glide's end yaw for a turn to [yaw] from [fromYaw]: the short way round. */
     fun glideTarget(fromYaw: Float, yaw: Float): Float = fromYaw + wrapDeg(yaw - fromYaw)
+
+    // ---- axis independence: each axis of a turn gets its own step, ceiling and start
+
+    /**
+     * One axis' share of a tick of a turn: [base] scaled by its own log-normal factor (median 1, sigma [spread]), or 0
+     * with probability [pauseRatio] - but never two pauses in a row on the same axis ([pausedLast]).
+     * Each axis draws its own numbers, so the two never move in lock-step.
+     */
+    fun axisStep(base: Float, spread: Double, pauseRatio: Double, rnd: Random, pausedLast: Boolean = false): Float {
+        if (base <= 0f) return 0f
+        if (! pausedLast && pauseRatio > 0 && rnd.nextDouble() < pauseRatio) return 0f
+        if (spread <= 0) return base
+        return (base * exp(rnd.nextGaussian() * spread)).toFloat()
+    }
+
+    /**
+     * The pitch axis' top speed (degrees a tick) from yaw's [yawCeiling]: [share] of it. Big up / down turns
+     * (|[pitchDelta]| >= [bigTurn] degrees) use at least [bigShare] so looking straight down isn't slow, and a target at
+     * the ±90 edge ([nearEdge]) gets the full yaw ceiling (no slowing at the edge).
+     */
+    fun pitchCeiling(yawCeiling: Float, share: Double, pitchDelta: Float, nearEdge: Boolean, bigTurn: Float = 60f, bigShare: Double = 0.9): Float {
+        if (nearEdge) return yawCeiling
+        val s = if (abs(pitchDelta) >= bigTurn) maxOf(share, bigShare) else share
+        return (yawCeiling * s.coerceIn(0.0, 1.0)).toFloat()
+    }
+
+    /**
+     * Ticks the pitch axis still waits. A [fresh] turn starts a lag of [lag] ticks scaled by its size ([turnSize]:
+     * none under [minTurn] degrees, all of it from [fullTurn]); a lag already running is carried over when the target
+     * changes mid-turn ([current]); no new lag while following something ([tracking]: a turn ended moments ago), when
+     * not [allowed] (urgent aims), when the pitch hardly moves ([pitchDelta] under 3 degrees) or the target sits at the
+     * ±90 edge ([nearEdge]).
+     */
+    fun lagRemaining(
+        current: Int, fresh: Boolean, lag: Int, turnSize: Float, pitchDelta: Float, nearEdge: Boolean,
+        allowed: Boolean = true, tracking: Boolean = false, minTurn: Float = 30f, fullTurn: Float = 90f,
+    ): Int {
+        if (nearEdge || ! allowed) return 0
+        if (! fresh) return current.coerceAtLeast(0)
+        if (current > 0) return current
+        if (tracking || lag <= 0 || abs(pitchDelta) < 3f) return 0
+        val k = ((turnSize - minTurn) / (fullTurn - minTurn)).coerceIn(0f, 1f)
+        return round(lag * k).toInt()
+    }
+
+    /** True when a pitch target is at the ±90 edge (within [margin] degrees). */
+    fun nearPitchEdge(pitch: Float, margin: Float = 1f) = abs(pitch) >= 90f - margin
 }
