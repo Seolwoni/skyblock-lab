@@ -28,13 +28,28 @@ object UiFont {
     /** The menu font, for chat components. */
     val regular: FontDescription get() = REGULAR
     private val BOLD = FontDescription.Resource(Identifier.fromNamespaceAndPath(MOD_ID, "marceline_bold"))
+    private val DISPLAY = FontDescription.Resource(Identifier.fromNamespaceAndPath(MOD_ID, "marceline_display"))
+    private val DISPLAY_BOLD = FontDescription.Resource(Identifier.fromNamespaceAndPath(MOD_ID, "marceline_display_bold"))
+
+    /**
+     * Titles: Cormorant Garamond (wordmark, title / ESC screen buttons, the settings window's name) while true.
+     * Letters it lacks (Hangul) come from Pretendard. Set around a draw and put back.
+     */
+    @JvmField var display = false
+
+    /** Runs [block] with the title font, then puts the previous one back. */
+    inline fun <T> displayed(block: () -> T): T {
+        val prev = display
+        display = true
+        try { return block() } finally { display = prev }
+    }
 
     private val cache = object: LinkedHashMap<String, Component>(256, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Component>?) = size > 2048
     }
 
     /** [text] may contain § (or &) codes. */
-    fun component(text: String): Component = cache.getOrPut(if (themed) "\u0000$text" else text) { build(text.replace('&', '§')) }
+    fun component(text: String): Component = cache.getOrPut((if (display) "\u0001" else "") + (if (themed) "\u0000$text" else text)) { build(text.replace('&', '§')) }
 
     fun width(text: String): Int = mc.font.width(component(text))
 
@@ -47,7 +62,7 @@ object UiFont {
         fun flush() {
             if (part.isEmpty()) return
             val c = color
-            val font = if (bold) BOLD else REGULAR
+            val font = if (display) (if (bold) DISPLAY_BOLD else DISPLAY) else if (bold) BOLD else REGULAR
             root.append(Component.literal(part.toString()).withStyle { s ->
                 val styled = s.withFont(font)
                 if (c != null) styled.withColor(c) else styled

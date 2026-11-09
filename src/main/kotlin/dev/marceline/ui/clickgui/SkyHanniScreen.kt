@@ -893,10 +893,12 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
             return x + mc.font.width(word)
         }
         var cx = x
-        word.forEachIndexed { i, ch ->
-            val t = i / (word.length - 1f)
-            ctx.drawString("§l$ch", cx, y, Style.mix(logoFrom, logoTo, t))
-            cx += UiFont.width("§l$ch")
+        UiFont.displayed {
+            word.forEachIndexed { i, ch ->
+                val t = i / (word.length - 1f)
+                ctx.drawString("§l$ch", cx, y - 0.5f, Style.mix(logoFrom, logoTo, t))
+                cx += UiFont.width("§l$ch") + 0.3f
+            }
         }
         return cx
     }

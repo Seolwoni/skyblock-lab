@@ -1,0 +1,8 @@
+{
+  "providers": [
+    { "type": "space", "advances": { " ": 3.0 } },
+    { "type": "ttf", "file": "marceline:cormorant-semibold.ttf", "size": 11.0, "oversample": 8.0, "shift": [0.0, -0.5] },
+    { "type": "ttf", "file": "marceline:pretendard-semibold.ttf", "size": 9.0, "oversample": 8.0, "shift": [0.0, 0.5] },
+    { "type": "reference", "id": "minecraft:default" }
+  ]
+}

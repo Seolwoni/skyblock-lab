@@ -67,7 +67,7 @@ them back to the game's).
 
 - **NoammAddons** by Noamm — the base this started from (CC0 1.0).
 - **Secret Routes** by yourboykyle — included under GPL-3.0 (`LICENSE-SECRETROUTES.txt`).
-- **Pretendard** font — SIL Open Font License (`LICENSE-PRETENDARD-OFL.txt`).
+- **Pretendard** (menu text) and **Cormorant Garamond** (titles) — SIL Open Font License (`LICENSE-PRETENDARD-OFL.txt`, `LICENSE-CORMORANT-OFL.txt`).
 - Parts adapted from Odin (`LICENSE-ODIN.txt`) and others, credited in the files they came from.
 
 ## License

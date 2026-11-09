@@ -66,7 +66,7 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
         // the menu's smooth font (Pretendard), like the settings window
         val prev = dev.marceline.utils.render.UiFont.active
         dev.marceline.utils.render.UiFont.active = dev.marceline.features.impl.dev.ClickGui.customFont.value
-        try { draw(graphics, mouseX, mouseY, corners) } finally { dev.marceline.utils.render.UiFont.active = prev }
+        try { draw(graphics, mouseX, mouseY, corners) } finally { dev.marceline.utils.render.UiFont.active = prev; dev.marceline.utils.render.UiFont.display = false }
     }
 
     private fun draw(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, corners: (GuiGraphicsExtractor, Float) -> Unit) {
@@ -82,10 +82,11 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
         }
         SkyHanniTheme.drawLogoMark(graphics, cx - markSize / 2f, top + rise, markSize, Color.WHITE.withAlpha((255 * f).toInt()), big = true)
 
+        dev.marceline.utils.render.UiFont.display = true
         // MARCELINE, spaced and blended wine -> rose
         val word = "MARCELINE"
-        val scale = 1.8f
-        val spacing = 2.6f
+        val scale = 2.0f
+        val spacing = 2.8f
         val widths = word.map { SkyHanniTheme.uiWidth("§l$it") * scale }
         val total = widths.sum() + spacing * (word.length - 1)
         var x = cx - total / 2f
@@ -108,6 +109,7 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
         spaced(graphics, subtitle, cx, ly + 4f, 0.72f, 2.2f, SkyHanniTheme.gold.withAlpha((210 * f).toInt()))
 
         for (b in buttons) drawButton(graphics, b, mouseX.toDouble(), mouseY.toDouble(), f)
+        dev.marceline.utils.render.UiFont.display = false
         graphics.drawString("v${Marceline.MOD_VERSION} · Minecraft 26.2", 4f, height - 11f, Color(225, 200, 202, (150 * f).toInt()), scale = 0.85f, shadow = false)
         corners(graphics, f)
     }
@@ -128,7 +130,7 @@ class StyledMenu(private val screen: Screen, private val markSize: Float, privat
             val lw = (b.w - 2 * r - 12f) * h
             g.drawRect(b.x + (b.w - lw) / 2f, b.y + b.h - 3f, lw, 0.75f, (if (b.danger) tint else SkyHanniTheme.gold).withAlpha((220 * h * alpha).toInt()))
         }
-        spaced(g, b.label, b.x + b.w / 2f, b.y + (b.h - 8f * 0.85f) / 2f, 0.85f, 1.4f, Color.WHITE.withAlpha(((200 + 55 * h) * alpha).toInt()))
+        spaced(g, b.label, b.x + b.w / 2f, b.y + (b.h - 8f * 0.95f) / 2f, 0.95f, 1.5f, Color.WHITE.withAlpha(((200 + 55 * h) * alpha).toInt()))
     }
 
     /** Capitals with extra room between letters, centred on [cx]. */
