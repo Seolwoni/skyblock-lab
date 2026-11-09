@@ -79,7 +79,7 @@ class ClickGuiScreen: Screen(Component.literal("ClickGUI")) {
         val bx = (Resolution.width / 2) - (bw / 2)
         val by = Resolution.height - 40
 
-        drawRect(bx, by, bw, bh, Color(15, 11, 23, 220))
+        drawRect(bx, by, bw, bh, Color(15, 12, 13, 220))
 
         val borderColor = if (searchHandler.listening) Style.accentColor else Color(255, 255, 255, 30)
         drawRect(bx, by + bh - 2, bw, 2f, borderColor)
@@ -102,7 +102,7 @@ class ClickGuiScreen: Screen(Component.literal("ClickGUI")) {
         val hovered = isOverHudButton(mX, mY)
         val borderColor = if (hovered) Style.accentColor else Color(255, 255, 255, 30)
 
-        drawRect(x, y, searchbarButtonSize, searchbarButtonSize, Color(15, 11, 23, 220))
+        drawRect(x, y, searchbarButtonSize, searchbarButtonSize, Color(15, 12, 13, 220))
         drawRect(x, y + searchbarButtonSize - 2f, searchbarButtonSize, 2f, borderColor)
 
         val cx = x + searchbarButtonSize / 2f
@@ -139,7 +139,7 @@ class ClickGuiScreen: Screen(Component.literal("ClickGUI")) {
         val hovered = isOverDiscordButton(mX, mY)
         val borderColor = if (hovered) Style.accentColor else Color(255, 255, 255, 30)
 
-        drawRect(x, y, searchbarButtonSize, searchbarButtonSize, Color(15, 11, 23, 220))
+        drawRect(x, y, searchbarButtonSize, searchbarButtonSize, Color(15, 12, 13, 220))
         drawRect(x, y + searchbarButtonSize - 2f, searchbarButtonSize, 2f, borderColor)
 
         val iconSize = 18f

@@ -113,7 +113,7 @@ class ColorWidget(config: ColorSetting): Widget<Color>(config) {
             val hexY = pickerY + pickerSize + 5f
             val hexW = width - 20f
             if (hexFocused) Style.roundRect(ctx, x + 9f, hexY - 1f, hexW + 2f, 14f, 4f, Style.accentColor)
-            Style.roundRect(ctx, x + 10f, hexY, hexW, 12f, 3f, Color(21, 15, 32))
+            Style.roundRect(ctx, x + 10f, hexY, hexW, 12f, 3f, Color(22, 17, 19))
 
             val cursor = if (hexFocused && (System.currentTimeMillis() / 500) % 2 == 0L) "|" else ""
             ctx.drawString("Hex: §7#$hexText$cursor", x + 14f, hexY + 2f)

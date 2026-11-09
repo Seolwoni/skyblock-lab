@@ -32,7 +32,7 @@ class CategoryPanel(val category: CategoryType, var x: Int, var y: Int, private 
         const val MAX_DISPLAY_HEIGHT = 350
 
         private val headerBg = Color(32, 22, 50, 240)
-        private val bodyBg = Color(15, 11, 23, 215)
+        private val bodyBg = Color(15, 12, 13, 215)
         private val hoverColor = Color(255, 255, 255, 18)
     }
 

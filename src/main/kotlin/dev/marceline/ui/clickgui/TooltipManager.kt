@@ -13,7 +13,7 @@ import kotlin.math.abs
 
 object TooltipManager {
     private const val displayDelay = 500L
-    private val backgroundColor = Color(21, 15, 32, 245)
+    private val backgroundColor = Color(22, 17, 19, 245)
 
     private var hoveredText: String? = null
     private var displayStartTime = 0L

@@ -140,7 +140,7 @@ open class FeatureConfigWindow(val feature: Feature) {
         val closeHovered = isInsideCloseButton(mx, my)
 
         drawBackground(context, x - 2f, y - 2f, width + 4f, height + 4f, Color(4, 0, 12, 90))
-        drawBackground(context, x, y, width, height, Color(21, 15, 32, 240))
+        drawBackground(context, x, y, width, height, Color(22, 17, 19, 240))
         if (useSidebar) context.drawRect(x, y + titleBarHeight, categoryWidth, height - titleBarHeight, Color(11, 8, 18, 170))
         if (previewWidth > 0f) drawBackground(context, previewX, previewY, previewWidth, previewHeight, Color(11, 8, 18, 170))
         context.drawRect(x, y, width, titleBarHeight, Color(32, 22, 50, 245))

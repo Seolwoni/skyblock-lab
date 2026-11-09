@@ -37,7 +37,7 @@ object PetMenu: Feature("Replaces the Pets inventory with a custom pet wheel."),
     private val showKeyLabels by ToggleSetting("Show Key Labels", true)
     private val favouritePetsOnly by ToggleSetting("Favourite Pets Only").withDescription("Only shows pets favourited in Hypixel's Pets Menu.")
 
-    private val segmentColor by ColorSetting("Segment Color", Color(15, 11, 23, 215)).section("Colors")
+    private val segmentColor by ColorSetting("Segment Color", Color(15, 12, 13, 215)).section("Colors")
     private val hoverColor by ColorSetting("Hover Color", Color(255, 255, 255, 30))
     private val separatorColor by ColorSetting("Separator Color", Color(255, 255, 255, 40))
 

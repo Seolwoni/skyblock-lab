@@ -70,7 +70,7 @@ public class SmokeTest implements FabricClientGameTest {
 			}
 			context.runOnClient(mc -> {
 				dev.marceline.ui.notification.NotificationManager.INSTANCE.push("Auto Fishing stopped", "&fThe server moved or turned you.", 60000L);
-				dev.marceline.ui.notification.NotificationManager.INSTANCE.push("Marceline", "&fReset &d38 &fcolours to the Void Rift defaults", 60000L);
+				dev.marceline.ui.notification.NotificationManager.INSTANCE.push("Marceline", "&fReset &d38 &fcolours to the Marceline defaults", 60000L);
 			});
 			checkScreen(context, "rw-01-skyhanni", true);
 			checkScreen(context, "rw-02-classic", false);

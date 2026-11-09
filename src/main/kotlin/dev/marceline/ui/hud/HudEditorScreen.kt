@@ -142,7 +142,7 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
         var ty = el.y - 16f
         if (ty < 4f) ty = el.y + el.height * el.scale + 4f
         val tx = (left + w / 2f - tw / 2f).coerceIn(4f, Resolution.width - tw - 4f)
-        Style.roundRect(ctx, tx, ty, tw, 13f, 6.5f, Color(15, 11, 23, 235))
+        Style.roundRect(ctx, tx, ty, tw, 13f, 6.5f, Color(15, 12, 13, 235))
         Style.gradientPill(ctx, tx, ty + 12f, tw, 1f, Style.accentColor, Style.accent2)
         ctx.drawString(text, tx + 7f, ty + 3f, textMain, shadow = false)
         ctx.drawString(info, tx + 7f + textW(text) + 8f, ty + 3f, textFaint, shadow = false)
@@ -164,7 +164,7 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
         ctx.pose().pushMatrix()
         ctx.pose().translate(0f, lift)
         Style.drawShadow(ctx, px, py, pw, ph, 6f, o)
-        Style.roundRect(ctx, px, py, pw, ph, 6f, Color(21, 15, 32, 245))
+        Style.roundRect(ctx, px, py, pw, ph, 6f, Color(22, 17, 19, 245))
         ctx.drawHorizontalGradient(px + 6f, py, pw / 2f - 6f, 1f, Style.accentColor.withAlpha(0), Style.accentColor.withAlpha(180))
         ctx.drawHorizontalGradient(px + pw / 2f, py, pw / 2f - 6f, 1f, Style.accent2.withAlpha(180), Style.accent2.withAlpha(0))
 

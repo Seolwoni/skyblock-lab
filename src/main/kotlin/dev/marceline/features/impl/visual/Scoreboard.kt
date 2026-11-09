@@ -57,7 +57,7 @@ object Scoreboard: Feature("Draws a custom scoreboard instead of the vanilla one
             val fh = boxHeight.toFloat()
             Style.drawShadow(ctx, fx, fy, fw, fh, 6f, 0.6f * backgroundAlpha / 191f)
             Style.roundRect(ctx, fx - 0.5f, fy - 0.5f, fw + 1f, fh + 1f, 6.5f, Color(255, 255, 255, 20 * backgroundAlpha / 191))
-            Style.roundRect(ctx, fx, fy, fw, fh, 6f, Color(16, 11, 26, backgroundAlpha))
+            Style.roundRect(ctx, fx, fy, fw, fh, 6f, Color(17, 13, 15, backgroundAlpha))
             with(dev.marceline.utils.render.Render2D) {
                 ctx.drawVerticalGradient(fx + 4f, fy + 0.5f, fw - 8f, 10f, Color(255, 255, 255, 14), Color(255, 255, 255, 0))
             }

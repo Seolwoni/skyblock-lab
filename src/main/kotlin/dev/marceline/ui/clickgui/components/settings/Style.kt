@@ -18,7 +18,7 @@ object Style {
     /** Marceline: the second colour of every gradient (wine -> rose). */
     val accent2 = Color(232, 80, 106)
     val accentColorTrans get() = accentColor.withAlpha(120)
-    val settingBackgroundColor = Color(12, 8, 20, 110)
+    val settingBackgroundColor = Color(13, 9, 10, 110)
     val sliderBackgroundColor = Color(40, 40, 40, 200)
 
     fun drawBackground(ctx: GuiGraphicsExtractor, x: Number, y: Number, w: Number, h: Number) {
@@ -40,10 +40,10 @@ object Style {
     fun drawSlider(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, progress: Float, color: Color) {
         val kSize = 6f
         val h = 3f
-        roundRect(ctx, x, y, w, h, 1.5f, Color(42, 31, 61))
+        roundRect(ctx, x, y, w, h, 1.5f, Color(56, 40, 44))
         if (progress > 0.01f) gradientPill(ctx, x, y, w * progress, h, color, mix(color, accent2, progress))
         roundRect(ctx, x + (w * progress) - (kSize / 2f) - 1f, y + (h / 2f) - (kSize / 2f) - 1f, kSize + 2f, kSize + 2f, 4f, mix(color, accent2, progress).withAlpha(70))
-        roundRect(ctx, x + (w * progress) - (kSize / 2f), y + (h / 2f) - (kSize / 2f), kSize, kSize, 3f, Color(245, 240, 255))
+        roundRect(ctx, x + (w * progress) - (kSize / 2f), y + (h / 2f) - (kSize / 2f), kSize, kSize, 3f, Color(246, 238, 228))
     }
 
     /** Rounded value badge (slider numbers, key binds): wine -> rose, an outlined field while editing. */
@@ -51,7 +51,7 @@ object Style {
         val r = h / 2f
         if (editing) {
             roundRect(ctx, x - 1f, y - 1f, w + 2f, h + 2f, r + 1f, accentColor)
-            roundRect(ctx, x, y, w, h, r, Color(11, 8, 18))
+            roundRect(ctx, x, y, w, h, r, Color(11, 9, 10))
             return
         }
         val a = (150 + 70 * hover).toInt().coerceIn(0, 255)
@@ -122,7 +122,7 @@ object Style {
         for (i in layers downTo 1) {
             val d = i * 0.75f * 12f / layers
             val a = (9 * strength * (13 - i * 12f / layers) / 12f * 12f / layers).toInt().coerceIn(0, 255)
-            roundRect(ctx, x - d, y - d + 2.5f, w + d * 2, h + d * 2, radius + d, Color(4, 0, 12, a))
+            roundRect(ctx, x - d, y - d + 2.5f, w + d * 2, h + d * 2, radius + d, Color(8, 2, 4, a))
         }
     }
 
@@ -145,8 +145,8 @@ object Style {
     /** Pill-shaped on/off switch. [progress] 0 = off, 1 = on (animated by the caller). */
     fun drawSwitch(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, progress: Float) {
         // off: a lighter track with a hairline edge, so "off" reads clearly on the dark cards
-        roundRect(ctx, x - 0.5f, y - 0.5f, w + 1f, h + 1f, h / 2f + 0.5f, Color(150, 130, 190, (90 * (1f - progress)).toInt()))
-        roundRect(ctx, x, y, w, h, h / 2f, Color(62, 50, 86))
+        roundRect(ctx, x - 0.5f, y - 0.5f, w + 1f, h + 1f, h / 2f + 0.5f, Color(201, 164, 106, (90 * (1f - progress)).toInt()))
+        roundRect(ctx, x, y, w, h, h / 2f, Color(66, 48, 52))
         if (progress > 0.01f) {
             // the wine -> rose fill grows in from the left as it switches on
             val a = (255 * progress).toInt()
@@ -158,7 +158,7 @@ object Style {
         val stretch = if (progress > 0.02f && progress < 0.98f) kotlin.math.sin(progress * Math.PI).toFloat() * knob * 0.5f else 0f
         val kw = knob + stretch
         val kx = x + 1f + (w - kw - 2f) * progress
-        roundRect(ctx, kx, y + 1f, kw, knob, knob / 2f, Color(178, 168, 204).lerpTo(Color.WHITE, progress))
+        roundRect(ctx, kx, y + 1f, kw, knob, knob / 2f, Color(200, 184, 176).lerpTo(Color.WHITE, progress))
     }
 
     private fun Color.lerpTo(other: Color, t: Float): Color {

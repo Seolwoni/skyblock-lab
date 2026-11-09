@@ -375,11 +375,11 @@ internal fun AutoFishing.drawCard(ctx: net.minecraft.client.gui.GuiGraphicsExtra
         else -> "-"
     }
     st.drawShadow(ctx, 0f, 0f, w, h, 6f, 0.6f)
-    st.roundRect(ctx, 0f, 0f, w, h, 6f, java.awt.Color(15, 11, 23, 225))
+    st.roundRect(ctx, 0f, 0f, w, h, 6f, java.awt.Color(15, 12, 13, 225))
     st.roundRect(ctx, 10f, 1f, w - 20f, 0.75f, 0.4f, java.awt.Color(255, 255, 255, 22))
     // icon in an accent ring
     st.roundRect(ctx, 7f, 7f, 18f, 18f, 9f, st.accentColor)
-    st.roundRect(ctx, 8.5f, 8.5f, 15f, 15f, 7.5f, java.awt.Color(15, 11, 23))
+    st.roundRect(ctx, 8.5f, 8.5f, 15f, 15f, 7.5f, java.awt.Color(15, 12, 13))
     ctx.pose().pushMatrix()
     ctx.pose().translate(10.5f, 10.5f)
     ctx.pose().scale(11f / 64f, 11f / 64f)

@@ -34,7 +34,7 @@ object TabStyle: Feature("Draws the Tab player list in the Marceline violet glas
                 val a = (opacity.value / 100f * 255).toInt()
                 Style.drawShadow(ctx, x - 2f, y - 2f, w + 4f, h + 4f, 5f, 0.5f)
                 Style.roundRect(ctx, x - 2.5f, y - 2.5f, w + 5f, h + 5f, 5.5f, Color(255, 255, 255, 18))
-                Style.roundRect(ctx, x - 2f, y - 2f, w + 4f, h + 4f, 5f, Color(16, 11, 26, a))
+                Style.roundRect(ctx, x - 2f, y - 2f, w + 4f, h + 4f, 5f, Color(17, 13, 15, a))
                 ctx.drawVerticalGradient(x, y - 1.5f, w, minOf(8f, h / 2f), Color(255, 255, 255, 12), Color(255, 255, 255, 0))
                 Style.roundRect(ctx, x + 6f, y - 2f, w - 12f, 0.75f, 0.4f, Style.mix(Style.accentColor, Style.accent2, 0.5f).withAlpha(150))
                 return true

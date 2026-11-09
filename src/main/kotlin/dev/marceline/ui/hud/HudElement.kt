@@ -56,7 +56,7 @@ abstract class HudElement {
             Style.roundRect(ctx, left - 1f, top - 1f, w + 2f, h + 2f, 4f, Style.mix(Style.accentColor, Style.accent2, 0.5f).withAlpha((200 * hv).toInt()))
         }
         else Style.roundRect(ctx, left - 0.5f, top - 0.5f, w + 1f, h + 1f, 3.5f, Color(255, 255, 255, 22))
-        Style.roundRect(ctx, left, top, w, h, 3f, Color(15, 11, 23, (150 + 40 * hv).toInt()))
+        Style.roundRect(ctx, left, top, w, h, 3f, Color(15, 12, 13, (150 + 40 * hv).toInt()))
     }
 
     fun renderElement(ctx: GuiGraphicsExtractor, example: Boolean) {
@@ -75,7 +75,7 @@ abstract class HudElement {
             val ph = height + 7f
             Style.drawShadow(ctx, px, py, pw, ph, 4.5f, 0.55f)
             Style.roundRect(ctx, px - 0.5f, py - 0.5f, pw + 1f, ph + 1f, 5f, Color(255, 255, 255, 20)) // hairline edge
-            Style.roundRect(ctx, px, py, pw, ph, 4.5f, Color(16, 11, 26, 172))
+            Style.roundRect(ctx, px, py, pw, ph, 4.5f, Color(17, 13, 15, 172))
             // light on glass: a faint sheen across the top
             with(dev.marceline.utils.render.Render2D) {
                 ctx.drawVerticalGradient(px + 3f, py + 0.5f, pw - 6f, minOf(9f, ph / 2f), Color(255, 255, 255, 13), Color(255, 255, 255, 0))

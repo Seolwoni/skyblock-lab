@@ -301,7 +301,7 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
         drawContent(context, mx, my)
 
         drawRipples(context)
-        if (a < 0.999f) Style.roundRect(context, winX(), winY(), winW(), winH(), 5f, Color(15, 11, 23, (255 * (1f - a)).toInt()))
+        if (a < 0.999f) Style.roundRect(context, winX(), winY(), winW(), winH(), 5f, Color(15, 12, 13, (255 * (1f - a)).toInt()))
         context.pose().popMatrix()
 
         if (! closing) TooltipManager.draw(context, Resolution.width, Resolution.height)
@@ -649,7 +649,7 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
             }
             y += eh + CARD_GAP
         }
-        if (contentAnim.value < 0.999f) ctx.drawRect(x, top, w, h, Color(15, 11, 23, (230 * (1f - contentAnim.value)).toInt()))
+        if (contentAnim.value < 0.999f) ctx.drawRect(x, top, w, h, Color(15, 12, 13, (230 * (1f - contentAnim.value)).toInt()))
         ctx.disableScissor()
         visibleWidgets = shown
         scroll.drawScrollbar(ctx, x + w + 2f, top, 2f, h, mx, my)

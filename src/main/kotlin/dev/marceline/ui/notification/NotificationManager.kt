@@ -26,7 +26,7 @@ object NotificationManager: ISelfInit {
     private const val WIDTH = 190f
     private const val PAD = 9f
     private const val MAX_VISIBLE = 5
-    private val bg = Color(21, 15, 32, 240)
+    private val bg = Color(22, 17, 19, 240)
     private val titleColor = Color(237, 231, 255)
     private val textColor = Color(176, 164, 204)
 
