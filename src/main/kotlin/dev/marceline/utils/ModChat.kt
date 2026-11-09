@@ -26,7 +26,8 @@ object ModChat {
     val prefix: MutableComponent by lazy {
         Component.empty().apply {
             val word = "Marceline"
-            word.forEachIndexed { i, ch -> append(part(ch.toString(), blend(0xB3263E, 0xE8506A, i / (word.length - 1f)), true)) }
+            // not bold (the game's bold draws each letter twice, which smears a gradient), dark wine shadow
+            word.forEachIndexed { i, ch -> append(part(ch.toString(), blend(0xB3263E, 0xE8506A, i / (word.length - 1f)), false).withStyle { it.withShadowColor(0xFF1A0A0E.toInt()) }) }
             append(part(" ›", 0xC9A46A, false))
         }
     }

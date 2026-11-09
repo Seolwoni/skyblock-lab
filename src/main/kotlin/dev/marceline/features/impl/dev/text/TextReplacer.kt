@@ -19,7 +19,7 @@ object TextReplacer: AhoCorasick() {
             put(k, parsed.string, parsed, parsed.visualOrderText)
         }
 
-        val mod = parse("""{"text":"","extra":[{"text":"M","color":"#B3263E","bold":true,"shadow_color":[0.39,0.08,0.13,1]},{"text":"a","color":"#BA2B44","bold":true,"shadow_color":[0.4,0.09,0.15,1]},{"text":"r","color":"#C03049","bold":true,"shadow_color":[0.41,0.1,0.16,1]},{"text":"c","color":"#C7364E","bold":true,"shadow_color":[0.43,0.12,0.17,1]},{"text":"e","color":"#CE3B54","bold":true,"shadow_color":[0.44,0.13,0.18,1]},{"text":"l","color":"#D4405A","bold":true,"shadow_color":[0.46,0.14,0.19,1]},{"text":"i","color":"#DB465F","bold":true,"shadow_color":[0.47,0.15,0.2,1]},{"text":"n","color":"#E14B64","bold":true,"shadow_color":[0.49,0.16,0.22,1]},{"text":"e","color":"#E8506A","bold":true,"shadow_color":[0.5,0.17,0.23,1]}]}""") !!
+        val mod = parse("""{"text":"","extra":[{"text":"M","color":"#B3263E","bold":false,"shadow_color":[0.1,0.03,0.05,1]},{"text":"a","color":"#BA2B44","bold":false,"shadow_color":[0.1,0.03,0.05,1]},{"text":"r","color":"#C03049","bold":false,"shadow_color":[0.1,0.03,0.05,1]},{"text":"c","color":"#C7364E","bold":false,"shadow_color":[0.1,0.03,0.05,1]},{"text":"e","color":"#CE3B54","bold":false,"shadow_color":[0.1,0.03,0.05,1]},{"text":"l","color":"#D4405A","bold":false,"shadow_color":[0.1,0.03,0.05,1]},{"text":"i","color":"#DB465F","bold":false,"shadow_color":[0.1,0.03,0.05,1]},{"text":"n","color":"#E14B64","bold":false,"shadow_color":[0.1,0.03,0.05,1]},{"text":"e","color":"#E8506A","bold":false,"shadow_color":[0.1,0.03,0.05,1]}]}""") !!
         put(MOD_NAME, mod.string, mod, mod.visualOrderText)
 
         build()
