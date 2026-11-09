@@ -59,7 +59,7 @@ object TrackerHud {
         if (b.uptimeMs > 0) {
             lines += "§7Time" to NumbersUtils.formatTime(b.uptimeMs)
             if (! o.countsOnly && hours > 0) lines += "§7Per hour" to short(hours)
-            if (rateBase != null && rateBase > 0) lines += "§7${o.rateCounter?.replaceFirstChar { it.uppercase() }} / h" to NumbersUtils.formatComma(rateBase.toLong())
+            if (rateBase != null && rateBase > 0) lines += "§7${o.rateCounter.replaceFirstChar { it.uppercase() }} / h" to NumbersUtils.formatComma(rateBase.toLong())
         }
 
         val gap = 10f

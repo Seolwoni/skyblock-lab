@@ -23,7 +23,7 @@ class TrackerDataTest {
     @Test
     fun `per hour needs ten seconds`() {
         assertEquals(0.0, Uptime.perHour(1_000.0, 9_999))
-        assertEquals(3_600.0, Uptime.perHour(1.0, 1_000L * 1).let { 0.0 } + Uptime.perHour(10.0, 10_000))
+        assertEquals(3_600.0, Uptime.perHour(10.0, 10_000))
         assertEquals(120_000.0, Uptime.perHour(60_000.0, 1_800_000))
     }
 
