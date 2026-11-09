@@ -126,12 +126,22 @@ jobs:
               for c in $CLASSES; do
                 javap -p -cp "$j" "$c" >> /tmp/probe/javap.txt 2>&1 || true
               done
+              # vanilla GUI pictures (sprites, menu backgrounds, separators) with their .mcmeta, for restyling them
+              mkdir -p /tmp/probe/assets && (cd /tmp/probe/assets && unzip -o -q "$j" "assets/minecraft/textures/gui/sprites/widget/*" "assets/minecraft/textures/gui/sprites/tooltip/*" "assets/minecraft/textures/gui/*.png" "assets/minecraft/textures/gui/sprites/world_list/*" "assets/minecraft/textures/gui/sprites/server_list/*" "assets/minecraft/textures/gui/sprites/popup/*" 2>/dev/null) || true
               # bytecode of a few classes, to see how vanilla does something (.github/probe-bytecode.txt)
               if [ -f .github/probe-bytecode.txt ]; then
                 for c in $(cat .github/probe-bytecode.txt); do
                   javap -c -p -cp "$j" "$c" >> /tmp/probe/bytecode.txt 2>&1 || true
                 done
               fi
+            done
+            # Fabric API resource loader classes (built-in resource packs)
+            for f in $(find ~/.gradle .gradle -name "fabric-resource-loader*.jar" 2>/dev/null | grep -v sources | head -4); do
+              echo "== $f" >> /tmp/probe/fabric.txt
+              unzip -l "$f" | grep -E "api/.*\.class" >> /tmp/probe/fabric.txt || true
+              for c in $(unzip -l "$f" | grep -oE "net/fabricmc/fabric/api/resource/[A-Za-z/]*(ResourceManagerHelper|ResourceLoader|PackActivationType|ResourcePackActivationType)\.class" | sed 's/\.class$//; s#/#.#g'); do
+                javap -cp "$f" "$c" >> /tmp/probe/fabric.txt 2>&1 || true
+              done
             done
           fi
           git checkout --orphan ci-log

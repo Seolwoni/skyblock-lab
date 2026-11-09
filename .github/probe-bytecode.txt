@@ -1,2 +1,4 @@
-net.minecraft.client.gui.screens.LoadingOverlay
-net.minecraft.client.gui.components.ChatComponent
+net.minecraft.client.gui.components.ChatComponent$1
+net.minecraft.client.multiplayer.chat.GuiMessageTag
+net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil
+net.minecraft.client.gui.components.AbstractSelectionList
