@@ -257,7 +257,7 @@ internal fun AutoFishing.writeReport(reason: String) {
         add("Coins       %,d  (${perH(coins)}/h)".format(coins) + (FishingTracker.topItem()?.let { "  best: $it" } ?: ""))
         if (d("trophies") > 0) add("Trophy fish ${d("trophies")}")
         add("Ended       $reason")
-        add("Problems    ground recasts $statGround, re-linked hooks $statRelink, splash recasts $statSplash, drift recasts $statDrift, lava escapes $statLava, deaths $statDeaths, stalls $statStalls")
+        add("Problems    ground recasts $statGround, re-linked hooks $statRelink, splash recasts $statSplash, drift recasts $statDrift, lava escapes $statLava, lava knocks $statKnocks, deaths $statDeaths, stalls $statStalls")
     }
     if (chatInfo.value) dev.marceline.utils.ChatUtils.modBlock("&dSession report", lines.drop(1).map { "&7" + it.substringBefore("  ") + " &f" + it.substringAfter("  ").trim() })
     val file = dev.marceline.utils.Journal("report")

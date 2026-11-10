@@ -212,6 +212,8 @@ internal fun AutoFishing.tick() {
         }
     }
     if (p.isInLava) return escapeLava(p)
+    if (p.onGround()) guardTeleported = false
+    if (lavaGuard(p)) return
 
     if (state == FishingState.FIND || state == FishingState.TRAVEL || state == FishingState.SELL) return FishingStates.of(state).tick(p)
     // pushed away from the spot: walk back (not while fighting, sea creatures come to us)

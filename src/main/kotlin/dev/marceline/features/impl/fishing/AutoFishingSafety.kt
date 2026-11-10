@@ -188,4 +188,52 @@ internal fun AutoFishing.staffNearby(p: LocalPlayer): String? {
     return null
 }
 
+
+/**
+ * Lava guard: a knock (a Thunder blast, a hit) that would carry us over lava is answered before we get there.
+ * The flight is predicted with the game's air physics ([LavaGuardMath]); heading for lava, we steer back towards
+ * the last safe ground (WASD, what air control there is) and, when it's close, teleport back to it (AOTV / Aspect
+ * of the End, else the Wither blade), as a player would. True while it's busy with that.
+ */
+internal fun AutoFishing.lavaGuard(p: LocalPlayer): Boolean {
+    if (! lavaGuardOn.value || p.onGround() || p.isInLava) { guardTicks = 0; return false }
+    val v = p.deltaMovement
+    val back = lastSafe ?: return false
+    // a fresh knock: fast sideways, and not our own jump (walking travel sprint-jumps)
+    if (guardTicks == 0 && (! LavaGuardMath.isKnock(v.x, v.z) || mc.options.keyJump.isDown)) return false
+    val lvl = p.level()
+    val flight = LavaGuardMath.path(p.x, p.y, p.z, v.x, v.y, v.z, 20)
+    val hit = LavaGuardMath.landsInLava(flight,
+        { x, y, z -> val b = BlockPos(x, y, z); ! lvl.getBlockState(b).getCollisionShape(lvl, b).isEmpty },
+        { x, y, z -> lvl.getFluidState(BlockPos(x, y, z)).`is`(FluidTags.LAVA) })
+    if (hit == null) { if (guardTicks > 0) releaseCentre(); guardTicks = 0; return false }
+    if (guardTicks == 0) {
+        statKnocks++
+        journal.log("knocked towards the lava (lands in it in ${hit} ticks, speed ${"%.2f".format(kotlin.math.hypot(v.x, v.z))}) - steering back")
+    }
+    guardTicks++
+    ownMoveTicks = 20
+    status = "knocked towards the lava, getting back"
+    // steer towards the safe ground with whatever air control there is, without turning
+    val dx = back.x - p.x; val dz = back.z - p.z
+    val yr = Math.toRadians(p.yRot.toDouble())
+    val f = dx * - kotlin.math.sin(yr) + dz * kotlin.math.cos(yr)
+    val r = dx * - kotlin.math.cos(yr) + dz * - kotlin.math.sin(yr)
+    mc.options.keyUp.isDown = f > 0.1; mc.options.keyDown.isDown = f < - 0.1
+    mc.options.keyRight.isDown = r > 0.1; mc.options.keyLeft.isDown = r < - 0.1
+    // close to it: teleport back to the safe ground (once per knock)
+    if (hit <= 8 && ! guardTeleported) {
+        val tp = PlayerUtils.findHotbarSlot { it.skyblockId in dev.marceline.utils.SkyblockText.TELEPORT_SWORDS }
+            ?: PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
+        if (tp != null && back.distanceTo(p.position()) < 9.0) {
+            val rot = MathUtils.calcYawPitch(back.add(0.0, 1.2, 0.0))
+            dev.marceline.utils.Aim.setViewAs(AutoFishing, dev.marceline.utils.AimPriority.CRITICAL, rot.yaw, rot.pitch)
+            hold(tp); use(p)
+            guardTeleported = true
+            journal.log("teleported back to safe ground")
+        }
+    }
+    return true
+}
+
 //#endif

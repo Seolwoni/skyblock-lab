@@ -205,6 +205,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val creatureGlow by ToggleSetting("Creature Outline", true).withDescription("Outlines your sea creatures' actual shape (the game's glow), on top of the box")
     internal val creatureTracer by ToggleSetting("Creature Tracer", true).withDescription("A line from the middle of your screen to each of your sea creatures")
 
+    internal val lavaGuardOn by ToggleSetting("Lava Guard", true).section("Safety").withDescription("When a blow (a Thunder, a hit) knocks you towards lava, steers back in the air and teleports back to safe ground (AOTV / AOTE, else the Wither blade) before you land in it")
     internal val standCentre by ToggleSetting("Stand In Block Centre", true).section("Safety").withDescription("Before casting and before fighting, steps (sneaking, so it can't walk off an edge) to the exact middle of a safe block: solid ground under it, no lava in or under it")
     internal val discordOn by ToggleSetting("Discord Alerts", false).section("Discord").withDescription(
         "When a session ends, posts one message to your Discord channel: \"goal reached\" or why it stopped, with the session report"
@@ -478,7 +479,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         fishTarget = null
         trackerAtStart = FishingTracker.numbers()
         breakMs = 0L; hotspotsVisited = 0; rareLog.clear()
-        statGround = 0; statRelink = 0; statSplash = 0; statDrift = 0; statLava = 0
+        statGround = 0; statRelink = 0; statSplash = 0; statDrift = 0; statLava = 0; statKnocks = 0
         hotspot = null
         badHotspots.clear()
         aimTries = 0

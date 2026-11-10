@@ -103,6 +103,8 @@ interface FishingVars {
     var pathGoal: Vec3?
     var lastSafe: Vec3?
     var lavaTicks: Int
+    var guardTicks: Int
+    var guardTeleported: Boolean
     var hopWait: Int
     var repath: Int
     var sellStep: Int
@@ -195,6 +197,7 @@ interface FishingVars {
     var statSplash: Int
     var statDrift: Int
     var statLava: Int
+    var statKnocks: Int
     var sellPass: Int
     var sellClicked: Int
     var sellWaitClick: Int
@@ -302,6 +305,8 @@ class FishingVarsImpl : FishingVars {
     override var pathGoal: Vec3? = null
     override var lastSafe: Vec3? = null
     override var lavaTicks: Int = 0
+    override var guardTicks: Int = 0 // ticks of a knock towards lava being answered
+    override var guardTeleported: Boolean = false // the teleport back was used for this knock
     override var hopWait: Int = 0
     override var repath: Int = 0
 
@@ -401,6 +406,7 @@ class FishingVarsImpl : FishingVars {
     override var statSplash: Int = 0
     override var statDrift: Int = 0
     override var statLava: Int = 0
+    override var statKnocks: Int = 0
     override var sellPass: Int = 0 // passes over the sell menu this time (rescans for what was missed)
     override var sellClicked: Int = - 1 // the last slot clicked, waiting for it to go
     override var sellWaitClick: Int = 0
