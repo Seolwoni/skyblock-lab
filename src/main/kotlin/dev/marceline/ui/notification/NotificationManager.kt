@@ -143,11 +143,11 @@ object NotificationManager: ISelfInit {
                 // the icon in a small dark ring, left of the title
                 val ix = x + PAD + 4f
                 val iy = y + PAD - 1.5f
-                Style.roundRect(ctx, ix - 1f, iy - 1f, 12f, 12f, 6f, iconColor(n.icon).withAlpha((70 * a).toInt()))
-                Style.roundRect(ctx, ix - 0.25f, iy - 0.25f, 10.5f, 10.5f, 5.25f, Color(24, 12, 16, alpha))
+                Style.roundRect(ctx, ix - 1.5f, iy - 1.5f, 13f, 13f, 6.5f, iconColor(n.icon).withAlpha((80 * a).toInt()))
+                Style.roundRect(ctx, ix - 0.75f, iy - 0.75f, 11.5f, 11.5f, 5.75f, Color(24, 12, 16, alpha))
                 ctx.pose().pushMatrix()
-                ctx.pose().translate(ix + 1.75f, iy + 1.75f)
-                ctx.pose().scale(6.5f / 32f, 6.5f / 32f)
+                ctx.pose().translate(ix + 1f, iy + 1f)
+                ctx.pose().scale(8f / 32f, 8f / 32f)
                 with(dev.marceline.utils.render.Render2D) { ctx.drawTexture(iconTexture(n.icon), 0, 0, 32, 32, iconColor(n.icon).withAlpha(alpha)) }
                 ctx.pose().popMatrix()
 

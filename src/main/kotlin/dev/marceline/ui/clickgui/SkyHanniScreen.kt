@@ -296,7 +296,7 @@ class SkyHanniScreen: Screen(Component.literal("Marceline")) {
         Style.roundRect(context, winX(), winY(), winW(), winH(), 5f, bg)
         drawSheen(context, winX(), winY(), winW(), winH())
         // film grain and a faint shade along the bottom, so the window reads as a surface
-        dev.marceline.ui.hud.HudCard.grain(context, winX() + 1f, winY() + 1f, winW() - 2f, winH() - 2f, a, 0.8f)
+        dev.marceline.ui.hud.HudCard.grain(context, winX() + 1f, winY() + 1f, winW() - 2f, winH() - 2f, a, 1.9f)
         with(dev.marceline.utils.render.Render2D) {
             context.drawVerticalGradient(winX() + 3f, winY() + winH() - 18f, winW() - 6f, 17.5f, Color(6, 1, 3, 0), Color(6, 1, 3, (40 * a).toInt()))
         }

@@ -43,7 +43,7 @@ object HudCard {
     /** Film grain over a rectangle, two texels per GUI pixel. Off in mobile mode or with the setting off. */
     fun grain(ctx: GuiGraphicsExtractor, x: Float, y: Float, w: Float, h: Float, alpha: Float = 1f, strength: Float = 1f) {
         if (! ClickGui.grain.value || ClickGui.mobileMode.value || w <= 2f || h <= 2f) return
-        val tint = Color(255, 255, 255, (110 * alpha * strength).toInt().coerceIn(0, 255)).rgb
+        val tint = Color(255, 255, 255, (46 * alpha * strength).toInt().coerceIn(0, 255)).rgb
         ctx.pose().pushMatrix()
         ctx.pose().translate(x, y)
         ctx.pose().scale(0.5f, 0.5f)
