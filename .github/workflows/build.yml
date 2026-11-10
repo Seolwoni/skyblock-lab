@@ -147,7 +147,7 @@ jobs:
                 javap -p -cp "$j" "$c" >> /tmp/probe/javap.txt 2>&1 || true
               done
               # vanilla GUI pictures (sprites, menu backgrounds, separators) with their .mcmeta, for restyling them
-              mkdir -p /tmp/probe/assets && (cd /tmp/probe/assets && unzip -o -q "$j" "assets/minecraft/textures/gui/sprites/widget/*" "assets/minecraft/textures/gui/sprites/tooltip/*" "assets/minecraft/textures/gui/*.png" "assets/minecraft/textures/gui/sprites/world_list/*" "assets/minecraft/textures/gui/sprites/server_list/*" "assets/minecraft/textures/gui/sprites/popup/*" 2>/dev/null) || true
+              mkdir -p /tmp/probe/assets && (cd /tmp/probe/assets && unzip -o -q "$j" "assets/minecraft/textures/gui/sprites/widget/*" "assets/minecraft/textures/gui/sprites/tooltip/*" "assets/minecraft/textures/gui/*.png" "assets/minecraft/textures/gui/sprites/world_list/*" "assets/minecraft/textures/gui/sprites/server_list/*" "assets/minecraft/textures/gui/sprites/popup/*" "assets/minecraft/textures/gui/container/*" "assets/minecraft/textures/gui/sprites/container/*" 2>/dev/null) || true
               # bytecode of a few classes, to see how vanilla does something (.github/probe-bytecode.txt)
               if [ -f .github/probe-bytecode.txt ]; then
                 for c in $(cat .github/probe-bytecode.txt); do

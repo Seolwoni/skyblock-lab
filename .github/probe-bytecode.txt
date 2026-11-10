@@ -1,4 +1,4 @@
-net.minecraft.client.gui.components.ChatComponent$1
-net.minecraft.client.multiplayer.chat.GuiMessageTag
-net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil
-net.minecraft.client.gui.components.AbstractSelectionList
+net.minecraft.client.gui.components.AbstractWidget
+net.minecraft.client.gui.components.AbstractButton
+net.minecraft.client.gui.components.AbstractSliderButton
+net.minecraft.client.gui.components.StringWidget
