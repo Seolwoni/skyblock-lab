@@ -1,0 +1,136 @@
+total 45460
+drwxr-xr-x 2 runner runner     4096 Nov 10 14:07 .
+drwxr-xr-x 4 runner runner     4096 Nov 10 14:07 ..
+-rw-r--r-- 1 runner runner 22953373 Nov 10 14:07 Marceline-1.1.221-26.2-legit.jar
+-rw-r--r-- 1 runner runner 23586275 Nov 10 14:07 Marceline-1.1.221-26.2.jar
+== build/libs/Marceline-1.1.221-26.2.jar
+100
+assist stubs in jar: 0
+nested jars: META-INF/jars/annotations-23.0.0.jar META-INF/jars/assistcore-1.9.0.jar META-INF/jars/assistpath-0.5.2.jar META-INF/jars/kotlin-stdlib-2.3.21.jar META-INF/jars/kotlinx-coroutines-core-jvm-1.11.0.jar META-INF/jars/kotlinx-coroutines-slf4j-1.11.0.jar META-INF/jars/kotlinx-datetime-jvm-0.8.0-0.6.x-compat.jar META-INF/jars/kotlinx-io-bytestring-jvm-0.9.1.jar META-INF/jars/kotlinx-io-core-jvm-0.9.1.jar META-INF/jars/kotlinx-serialization-core-jvm-1.11.0.jar META-INF/jars/kotlinx-serialization-json-io-jvm-1.11.0.jar META-INF/jars/kotlinx-serialization-json-jvm-1.11.0.jar META-INF/jars/slf4j-api-2.0.19.jar 
+     8875  1980-02-01 00:00   dev/marceline/features/impl/routes/AssistBridge.class
+      919  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoBoss$WhenMappings.class
+     3460  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoBoss$phase3$Task.class
+    33432  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoBoss.class
+     2351  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoDungeon$State.class
+     1940  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoDungeon$Waypoint.class
+     2038  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoDungeon$WhenMappings.class
+    48335  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoDungeon.class
+    19247  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoPuzzles.class
+     2429  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutes$Phase.class
+     4109  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutes$Step.class
+     2080  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutes$Travel.class
+     1208  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutes$WhenMappings.class
+    79159  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutes.class
+     7683  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutesAimKt.class
+     4661  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutesCombatKt$findRoomTarget$$inlined$compareBy$1.class
+     2761  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutesCombatKt$findRoomTarget$$inlined$thenBy$1.class
+    34353  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutesCombatKt.class
+     9142  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutesDataKt.class
+    35423  1980-02-01 00:00   dev/marceline/features/impl/routes/AutoRoutesMoveKt.class
+     2189  1980-02-01 00:00   dev/marceline/features/impl/routes/RouteBridge.class
+     2380  1980-02-01 00:00   dev/marceline/features/impl/routes/SecretRoutes$EntriesMappings.class
+   123214  1980-02-01 00:00   dev/marceline/features/impl/routes/SecretRoutes.class
+      268  1980-02-01 00:00   secretroutes.mixins.json
+    22195  1980-02-01 00:00   assets/secretroutesmod/rooms.json
+    59664  1980-02-01 00:00   assets/secretroutesmod/secretlocations.json
+        0  1980-02-01 00:00   dev/marceline/features/impl/routes/
+{
+    "schemaVersion": 1,
+    "id": "marceline",
+    "version": "1.1.221",
+    "name": "Marceline",
+    "description": "SkyBlock toolkit for 26.2: fishing, dungeons and routes in one clean menu.\nOpen with /mar. Built on NoammAddons (CC0) and Secret Routes (GPL-3.0).",
+    "authors": [
+        "seolwoni"
+    ],
+    "contributors": [
+        "Noamm - NoammAddons, the base (CC0)",
+        "yourboykyle - Secret Routes (GPL-3.0)"
+    ],
+    "license": [
+        "CC0-1.0",
+        "GPL-3.0-only"
+    ],
+    "icon": {
+        "16": "assets/marceline/icon/16.png",
+        "24": "assets/marceline/icon/24.png",
+        "32": "assets/marceline/icon/32.png",
+        "48": "assets/marceline/icon/48.png",
+        "64": "assets/marceline/icon/64.png",
+        "96": "assets/marceline/icon/96.png",
+        "128": "assets/marceline/icon/128.png",
+        "160": "assets/marceline/icon/160.png",
+        "192": "assets/marceline/icon/192.png",
+        "256": "assets/marceline/icon/256.png"
+    },
+    "environment": "*",
+    "entrypoints": {
+        "modmenu": [
+            "dev.marceline.ui.clickgui.ModMenuIntegration"
+        ],
+        "client": [
+            {
+                "value": "dev.marceline.Marceline",
+                "adapter": "kotlin"
+            },
+            "xyz.yourboykyle.secretroutes.Main"
+        ]
+    },
+    "mixins": [
+        "marceline.mixins.json",
+        "secretroutes.mixins.json"
+    ],
+    "accessWidener": "marceline.accesswidener",
+    "depends": {
+        "fabricloader": ">=0.19.5",
+        "minecraft": "26.2",
+        "java": ">=25",
+        "fabric-api": "*",
+        "fabric-language-kotlin": "*"
+    },
+    "suggests": {
+        "assistcore": "*",
+        "assistpath": "*"
+    },
+    "jars": [
+        {
+            "file": "META-INF/jars/annotations-23.0.0.jar"
+        },
+        {
+            "file": "META-INF/jars/assistcore-1.9.0.jar"
+        },
+        {
+            "file": "META-INF/jars/assistpath-0.5.2.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlin-stdlib-2.3.21.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-coroutines-core-jvm-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-coroutines-slf4j-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-datetime-jvm-0.8.0-0.6.x-compat.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-io-bytestring-jvm-0.9.1.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-io-core-jvm-0.9.1.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-serialization-core-jvm-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-serialization-json-io-jvm-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/kotlinx-serialization-json-jvm-1.11.0.jar"
+        },
+        {
+            "file": "META-INF/jars/slf4j-api-2.0.19.jar"
+        }
+    ]
+}

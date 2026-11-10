@@ -1,0 +1,44 @@
+Running Stonecutter 0.9.8
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :buildSrc:generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :buildSrc:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :buildSrc:compilePluginsBlocks UP-TO-DATE
+> Task :buildSrc:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :buildSrc:generateScriptPluginAdapters UP-TO-DATE
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources UP-TO-DATE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+
+> Configure project :26.2
+Fabric Loom: 1.19.1
+
+> Configure project :26.3
+Fabric Loom: 1.19.1
+
+> Task :26.2:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :26.2:stonecutterPrepare UP-TO-DATE
+> Task :26.2:stonecutterGenerate UP-TO-DATE
+> Task :26.2:preprocessMain UP-TO-DATE
+> Task :26.2:compileKotlin UP-TO-DATE
+> Task :26.2:compileJava UP-TO-DATE
+> Task :26.2:preprocessLegit UP-TO-DATE
+> Task :26.2:processResources
+> Task :26.2:classes
+> Task :26.2:processIncludeJars UP-TO-DATE
+> Task :26.2:stonecutterPrepareTest UP-TO-DATE
+> Task :26.2:stonecutterGenerateTest UP-TO-DATE
+> Task :26.2:processTestResources NO-SOURCE
+> Task :26.2:jar
+> Task :26.2:compileTestKotlin
+> Task :26.2:compileTestJava NO-SOURCE
+> Task :26.2:testClasses UP-TO-DATE
+> Task :26.2:test UP-TO-DATE
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/unittest-1794319656994.json
+
+BUILD SUCCESSFUL in 8s
+22 actionable tasks: 3 executed, 19 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.2/userguide/configuration_cache_enabling.html
