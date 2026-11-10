@@ -107,7 +107,9 @@ jobs:
           ./gradlew :26.2:downloadAssets > /dev/null 2>&1 || (sleep 15; ./gradlew :26.2:downloadAssets > /dev/null 2>&1) || true
           set -o pipefail
           start=$(date +%s)
-          xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew :26.2:runClientGameTest -Pmod_version=$RW_VERSION --stacktrace 2>&1 | tee gametest.log
+          # a run takes about 6 minutes: if the game is still up after 9, dump its threads (a hang shows where) and stop at 12
+          ( sleep 540; for p in $(pgrep -f "gametest" | head -20); do jstack "$p" 2>/dev/null; done > threads.txt ) &
+          timeout 12m xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew :26.2:runClientGameTest -Pmod_version=$RW_VERSION --stacktrace 2>&1 | tee gametest.log
           echo "gametest seconds: $(( $(date +%s) - start ))" >> gametest.log
       - name: save log
         if: always()
@@ -117,6 +119,7 @@ jobs:
           [ -f gametest.log ] && grep -E -A3 "ERROR|Exception|FAIL|Caused by|AssertionError|What went wrong|gametest seconds" gametest.log | head -300 > /tmp/gt/errors.txt || true
           [ -f gametest.log ] && tail -150 gametest.log > /tmp/gt/tail.txt || true
           [ -f unittest.log ] && cp unittest.log /tmp/gt/unittest.txt || true
+          [ -s threads.txt ] && grep -E -A28 '^"(Render thread|Server thread|main|Test worker|Client Game Test)' threads.txt | cut -c1-220 | head -400 > /tmp/gt/threads.txt || true
           find . -path "*test-results/test/*.xml" -not -path "./.git/*" -exec cat {} + 2>/dev/null | grep -oE '<testsuite [^>]*>|<testcase [^>]*name="[^"]*"|<failure [^>]*message="[^"]*"|MEASURE [^<]*' > /tmp/gt/unittest-results.txt || true
           find . -name "marceline-test-result.txt" -not -path "./.git/*" -exec cp {} /tmp/gt/ \; 2>/dev/null || true
           find . -name "*.png" -path "*screenshots*" -not -path "./.git/*" -exec cp {} /tmp/gt/shots/ \; 2>/dev/null || true
