@@ -204,6 +204,13 @@ interface FishingVars {
     var sellMenuId: Int
     val sellSnapshot: HashMap<Int, String>
     val sellRefused: HashSet<String>
+    var corner: net.minecraft.world.phys.Vec3?
+    var cornerTried: Boolean
+    var cornerPath: List<net.minecraft.core.BlockPos>
+    var cornerStep: Int
+    var cornerWalk: Int
+    var rareFightTicks: Int
+    var shieldAt: Int
     var soldThisRun: Int
     var statDeaths: Int
     var statStalls: Int
@@ -413,6 +420,13 @@ class FishingVarsImpl : FishingVars {
     override var sellMenuId: Int = - 1 // the sell menu's window id (a new window means the slots moved)
     override var soldThisRun: Int = 0 // stacks sold in this visit to the sell menu
     override val sellRefused: HashSet<String> = HashSet() // items the sell menu wouldn't take: left alone this session
+    override var corner: net.minecraft.world.phys.Vec3? = null // where a rare fight is held (CornerMath)
+    override var cornerTried: Boolean = false
+    override var cornerPath: List<net.minecraft.core.BlockPos> = emptyList()
+    override var cornerStep: Int = 0
+    override var cornerWalk: Int = 0 // ticks spent walking to the corner
+    override var rareFightTicks: Int = 0
+    override var shieldAt: Int = 0 // rare fight: tick of the next Wither Shield cast when nothing is in reach
     override val sellSnapshot: HashMap<Int, String> = HashMap() // inventory slot -> what was there to sell, taken before the menu opened
     override var statDeaths: Int = 0
     override var statStalls: Int = 0 // times the stall watchdog started over

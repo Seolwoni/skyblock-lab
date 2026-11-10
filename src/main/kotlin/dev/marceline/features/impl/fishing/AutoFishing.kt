@@ -100,6 +100,13 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
     internal val creatureCap by SliderSetting("Sea Creature Cap", 10, 0, 30, 1).withDescription("Stops casting while this many of your sea creatures are alive (no new ones come up past the cap anyway). 0 = off")
     internal val rareAlert by ToggleSetting("Rare Creature Alert", true).withDescription("Title, sound and a gold highlight when one of the creatures in the list below comes up for you")
     internal val rareList by dev.marceline.config.types.TextInputSetting("Rare Creatures", "Thunder|Lord Jawbus|Water Hydra|Sea Emperor|Loch Emperor|Great White Shark|Phantom Fisher|Grim Reaper|Yeti|Reindrake|Titanoboa|Plhlegblast|Fiery Scuttler|Ragnarok|Abyssal Miner|Wiki Tiki|Carrot King|Nessie").withDescription("Names, separated by |")
+    internal val rareFight by DropdownSetting("Rare Creature Fight", 1, listOf("Normal", "Corner")).withDescription(
+        "Corner: when one of the Rare Creatures comes up, walk to a nearby corner (two walls behind you, no lava close on the open sides) and hold it there with the Hyperion, " +
+        "casting for damage and to keep the Wither Shield up. Normal: fight it like any other sea creature")
+    internal val cornerRange by SliderSetting("Corner Search", 8, 3, 16, 1, " blocks").withDescription("How far from where you stand a corner is looked for").showIf { rareFight.value == 1 }
+    internal val rareRange by SliderSetting("Rare Fight Range", 24.0, 10.0, 40.0, 1.0, " blocks").withDescription("A rare creature this close keeps the fight going, even out of the Hyperion's reach").showIf { rareFight.value == 1 }
+    internal val shieldGap by SliderSetting("Shield Recast", 4.0, 2.0, 8.0, 0.5, " s").withDescription("With the rare one out of reach, a Hyperion cast about this often keeps the Wither Shield up (a little random on top)").showIf { rareFight.value == 1 }
+    internal val rareMaxMin by SliderSetting("Rare Fight Limit", 5, 1, 15, 1, " min").withDescription("Gives up a rare fight after this long and goes back to fishing").showIf { rareFight.value == 1 }
     internal val goldenFish by DropdownSetting("On Golden Fish", 1, listOf("Ignore", "Alert", "Alert and pause")).withDescription(
         "When a Golden Fish shows up (chat line or its name nearby): a loud alert, and optionally reel in and pause so you can catch it yourself. It stays a few minutes as long as you keep fishing near it"
     )
@@ -443,7 +450,7 @@ object AutoFishing: Feature("Fishes by itself in water or lava: casts, reels in 
         anchorYaw = p.yRot
         anchorPitch = p.xRot
         seenAt.clear(); seenPos.clear(); reels.clear(); catches.clear(); chase.clear(); claimsLeft = 0
-        claimedAt.clear(); despawnWarned.clear(); rareIds.clear(); castHp.clear(); immuneWaited.clear(); deaths.clear()
+        claimedAt.clear(); despawnWarned.clear(); rareIds.clear(); corner = null; cornerTried = false; cornerPath = emptyList(); rareFightTicks = 0; shieldAt = 0; castHp.clear(); immuneWaited.clear(); deaths.clear()
         tickCount += 100 // anything seen from now on is "after" any stale reel
         timing = dev.marceline.utils.HumanTiming().apply(dev.marceline.utils.Humanize.profile())
         lastLookYaw = null

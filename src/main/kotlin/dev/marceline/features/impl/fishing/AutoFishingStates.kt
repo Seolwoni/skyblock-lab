@@ -190,7 +190,7 @@ internal fun AutoFishing.tick() {
         val sig = "$state|${p.fishing != null}|${nums["casts"]}|${nums["reels"]}|$kills|${p.blockPosition().toShortString()}"
         // waiting for a bite (it has its own recast timeout) and breaks are quiet on purpose
         // (nor are a zone-out / pre-cast wait, and selling, which has its own time limit)
-        if (sig != stallSig || state == FishingState.BREAK || state == FishingState.SELL || wait > 0 || (state == FishingState.WAIT_BITE && p.fishing != null)) { stallSig = sig; stallSince = tickCount }
+        if (sig != stallSig || state == FishingState.BREAK || state == FishingState.SELL || wait > 0 || cornerTried || (state == FishingState.WAIT_BITE && p.fishing != null)) { stallSig = sig; stallSince = tickCount }
         // waiting for mana / health is slow on purpose: give it 30 s before calling it stuck
         else if (tickCount - stallSince > (if (status.startsWith("waiting for mana") || healthWaiting) maxOf(30, stallSeconds.value) else stallSeconds.value) * 20) {
             statStalls++
@@ -269,6 +269,16 @@ internal fun AutoFishing.tick() {
         journal.log("a creature of ours is ${"%.0f".format(p.y - noticed.first { it.id in mine }.y)} blocks below, past the Hyperion's reach")
         info("&eYour sea creature is below the Hyperion's reach - fish closer to the lava (2-4 blocks above it) or use a whip.")
     }
+    // a rare one (Thunder, Jawbus...) in Corner mode: its own fight until it's gone
+    val rare = if (killCreatures.value && mc.gui.screen() == null) rareInPlay(p) else null
+    if (rare != null) {
+        noReachTicks = 0
+        if (state != FishingState.FIGHT) { journal.log("rare fight: ${rare.name.string} ${"%.1f".format(p.distanceTo(rare))} away"); if (hypeStage == 2) hypeStage = 1 }
+        state = FishingState.FIGHT
+        fightTicks = 0
+        if (rareFightTick(p, rare, mobs)) return
+    }
+    else endRareFight("no rare creature around")
     if (state == FishingState.FIGHT && mobs.isEmpty() && ++noReachTicks < leaveAfter) { status = "watching ${noticed.firstOrNull()?.name?.string ?: "around"}"; return }
     if (mobs.isNotEmpty()) noReachTicks = 0
     if (state == FishingState.FIGHT || mobs.isNotEmpty()) {

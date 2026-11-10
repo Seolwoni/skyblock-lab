@@ -205,7 +205,7 @@ internal fun AutoFishing.hasHype() = weaponSlot.value !in 1 .. 9 && PlayerUtils.
 internal fun AutoFishing.whipFight(p: LocalPlayer, mobs: List<LivingEntity>, slot: Int) {
     for (m in mobs) {
         if (p.distanceTo(m) <= whipRange.value) waiting.remove(m.id)
-        else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > giveUp.value * 20) { ignored += m.id; waiting.remove(m.id) }
+        else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > giveUp.value * 20 && m.id !in rareIds) { ignored += m.id; waiting.remove(m.id) }
     }
     // stick with the creature we're already on while it's still in range; switch only when it's gone
     val inRange = mobs.filter { p.distanceTo(it) <= whipRange.value && p.hasLineOfSight(it) }
@@ -294,7 +294,8 @@ internal fun AutoFishing.trackFrame() {
     dev.marceline.utils.Aim.nudgeAs(AutoFishing, AutoFishing.AIM_COMBAT, trackVelYaw * dt, trackVelPitch * dt)
 }
 
-internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
+/** [keepShield] (rare fight): with nothing in reach, still cast every Shield Recast to keep the Wither Shield up. */
+internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>, keepShield: Boolean = false) {
     val whipSlot = WHIPS[weaponType.value]?.let { id -> PlayerUtils.findHotbarSlot { it.skyblockId == id } }
     if (whipSlot != null) return whipFight(p, mobs, whipSlot)
     val hypeSlot = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
@@ -323,17 +324,20 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
         val (t, hp) = inReach[m.id] ?: (0 to now)
         val n = if (now < hp - 0.01f) 0 else t + 1
         inReach[m.id] = n to now
-        if (n > inReachLimit && p.hurtTime == 0) { ignored += m.id; inReach.remove(m.id) }
+        if (n > inReachLimit && p.hurtTime == 0 && m.id !in rareIds) { ignored += m.id; inReach.remove(m.id) }
     }
     if (inReach.size > 200) inReach.keys.retainAll(mobs.map { it.id }.toSet())
     for (m in mobs) {
         if (p.distanceTo(m) <= reach) waiting.remove(m.id)
-        else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > giveUp.value * 20) {
+        else if ((waiting.merge(m.id, 1, Int::plus) ?: 0) > giveUp.value * 20 && m.id !in rareIds) {
             ignored += m.id
             waiting.remove(m.id)
         }
     }
-    val close = mobs.filter { p.distanceTo(it) <= reach }
+    val close = mobs.filter { p.distanceTo(it) <= reach }.ifEmpty {
+        // rare fight: nothing in reach, but the shield is due - cast anyway (the blast is what gives the shield)
+        if (keepShield && hype != null && tickCount >= shieldAt) mobs else emptyList()
+    }
     if (close.isEmpty()) {
         val far = mobs.minByOrNull { it.distanceToSqr(p) } ?: return
         status = "waiting for ${far.name.string}"
@@ -413,6 +417,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>) {
                 hypeFrom = p.position()
                 TravelBlink.fire(p)
                 hitCooldown = clickGap(hypeDelay.value)
+                if (keepShield) shieldAt = tickCount + (shieldGap.value * 20).toInt() + delay(0, 16)
                 castDownPitch = if (lavaAround(p)) 90f else (castDownPitch + (RANDOM.nextFloat() * 2 - 1) * 3f).coerceIn(76f, 90f)
                 if (abs(castDownPitch - p.xRot) > 1.5f) {
                     // keep casting: drift the view to the new pitch in place instead of restarting the sequence
