@@ -22,7 +22,8 @@ object CornerMath {
         if (! isCorner(s.walls)) return null
         val open = Dir.entries.filter { it !in s.walls }
         if (open.any { (s.lavaRun[it] ?: Int.MAX_VALUE) < minLavaGap }) return null
-        val lavaRoom = open.sumOf { minOf(s.lavaRun[it] ?: 8, 8) }
+        // room before lava, averaged over the open sides (a sum would make fewer walls look better)
+        val lavaRoom = if (open.isEmpty()) 8.0 else open.sumOf { minOf(s.lavaRun[it] ?: 8, 8) }.toDouble() / open.size
         return s.walls.size * 3.0 + lavaRoom * 0.3 - s.dist * 0.6
     }
 
