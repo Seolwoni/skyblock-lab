@@ -29,12 +29,25 @@ object NotificationManager: ISelfInit {
     private val bg = Color(22, 17, 19, 240)
     private val titleColor = Color(243, 234, 222)
     private val textColor = Color(206, 190, 180)
+    /** Room the icon takes before the title and the text. */
+    private const val ICON = 15f
+
+    private fun iconTexture(i: NotificationIcon) =
+        net.minecraft.resources.Identifier.fromNamespaceAndPath(dev.marceline.Marceline.MOD_ID, "textures/gui/notify/${i.texture}.png")
+
+    /** Icons in the palette: warnings rose, rare finds and coins gold, the rest ivory. */
+    private fun iconColor(i: NotificationIcon) = when (i) {
+        NotificationIcon.WARN -> Color(232, 96, 112)
+        NotificationIcon.STAR, NotificationIcon.COIN -> Style.gold
+        NotificationIcon.CHECK -> Color(170, 204, 166)
+        else -> Color(226, 206, 190)
+    }
 
     fun push(title: String, message: String, duration: Long = 3000L) {
         val t = title.addColor()
         val m = message.addColor()
         if (notifications.any { it.title == t && it.message == m && it.duration == duration }) return
-        mc.execute { notifications.add(Notification(t, m, duration)) }
+        mc.execute { notifications.add(Notification(t, m, duration, NotificationIcon.of(t, m))) }
     }
 
     override fun init() {
@@ -95,7 +108,7 @@ object NotificationManager: ISelfInit {
                     notifications.remove(n)
                     continue
                 }
-                if (n.lines == null) n.lines = wrap(n.message, WIDTH - PAD * 2 - 8f)
+                if (n.lines == null) n.lines = wrap(n.message, WIDTH - PAD * 2 - 8f - ICON)
                 val lines = n.lines!!
                 val height = PAD + 10f + lines.size * 10f + PAD + 2f
 
@@ -122,24 +135,36 @@ object NotificationManager: ISelfInit {
                 val alpha = (a * 255).toInt().coerceIn(0, 255)
                 Style.drawShadow(ctx, x, y, WIDTH, height, 6f, 0.7f * a)
                 Style.roundRect(ctx, x, y, WIDTH, height, 6f, bg.withAlpha((bg.alpha * a).toInt()))
+                dev.marceline.ui.hud.HudCard.inner(ctx, x, y, WIDTH, height, 6f, a)
                 // warm hairline edge, wine stripe on the left and a gold hairline along the top, like the menus
                 Style.roundRect(ctx, x + 4f, y + PAD, 2f, height - PAD * 2 - 2f, 1f, Style.mix(Style.accentColor, Style.accent2, 0.3f).withAlpha(alpha))
                 Style.goldHairline(ctx, x + 10f, y + 0.6f, WIDTH - 20f, a * 0.8f)
 
+                // the icon in a small dark ring, left of the title
+                val ix = x + PAD + 4f
+                val iy = y + PAD - 1.5f
+                Style.roundRect(ctx, ix - 1f, iy - 1f, 12f, 12f, 6f, iconColor(n.icon).withAlpha((70 * a).toInt()))
+                Style.roundRect(ctx, ix - 0.25f, iy - 0.25f, 10.5f, 10.5f, 5.25f, Color(24, 12, 16, alpha))
+                ctx.pose().pushMatrix()
+                ctx.pose().translate(ix + 1.75f, iy + 1.75f)
+                ctx.pose().scale(6.5f / 32f, 6.5f / 32f)
+                with(dev.marceline.utils.render.Render2D) { ctx.drawTexture(iconTexture(n.icon), 0, 0, 32, 32, iconColor(n.icon).withAlpha(alpha)) }
+                ctx.pose().popMatrix()
+
                 val title = n.title.replace(Regex("§[0-9a-fk-or]"), "")
                 if (title == "Marceline" && UiFont.active) {
                     // the brand name in the same wine -> rose letters as the menu logo
-                    var tx = x + PAD + 5f
+                    var tx = x + PAD + 5f + ICON
                     title.forEachIndexed { i, ch ->
                         ctx.drawString("§l$ch", tx, y + PAD, Style.mix(Color(179, 38, 62), Color(232, 80, 106), i / (title.length - 1f)).withAlpha(alpha), shadow = false)
                         tx += UiFont.width("§l$ch")
                     }
                 }
-                else ctx.drawString("§l$title", x + PAD + 5f, y + PAD, titleColor.withAlpha(alpha), shadow = false)
+                else ctx.drawString("§l$title", x + PAD + 5f + ICON, y + PAD, titleColor.withAlpha(alpha), shadow = false)
                 var ly = y + PAD + 12f
                 for (l in lines) {
                     // the game's bright magenta / aqua / yellow codes come out in the Marceline palette
-                    Style.drawPaletteString(ctx, l, x + PAD + 5f, ly, textColor, { width(it).toFloat() }, alpha)
+                    Style.drawPaletteString(ctx, l, x + PAD + 5f + ICON, ly, textColor, { width(it).toFloat() }, alpha)
                     ly += 10f
                 }
 
@@ -158,7 +183,7 @@ object NotificationManager: ISelfInit {
         }
     }
 
-    private class Notification(val title: String, val message: String, val duration: Long) {
+    private class Notification(val title: String, val message: String, val duration: Long, val icon: NotificationIcon) {
         val anim = Animation(380L)
         val stack = Animation(260L)
         var elapsedTime = 0L

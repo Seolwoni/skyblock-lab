@@ -376,40 +376,42 @@ internal fun AutoFishing.drawCard(ctx: net.minecraft.client.gui.GuiGraphicsExtra
         nextBreakAt > 0 -> clock(nextBreakAt - now)
         else -> "-"
     }
-    st.drawShadow(ctx, 0f, 0f, w, h, 6f, 0.6f)
-    st.roundRect(ctx, 0f, 0f, w, h, 6f, java.awt.Color(15, 12, 13, 225))
-    st.roundRect(ctx, 10f, 1f, w - 20f, 0.75f, 0.4f, java.awt.Color(255, 255, 255, 22))
-    // icon in an accent ring
-    st.roundRect(ctx, 7f, 7f, 18f, 18f, 9f, st.accentColor)
-    st.roundRect(ctx, 8.5f, 8.5f, 15f, 15f, 7.5f, java.awt.Color(15, 12, 13))
+    val ivory = java.awt.Color(243, 234, 222)
+    val soft = java.awt.Color(184, 166, 156)
+    val faint = java.awt.Color(132, 114, 110)
+    dev.marceline.ui.hud.HudCard.draw(ctx, 0f, 0f, w, h, 6f, glassAlpha = 220)
+    // icon in a gold ring
+    st.roundRect(ctx, 7f, 7f, 18f, 18f, 9f, java.awt.Color(201, 164, 106, 200))
+    st.roundRect(ctx, 8f, 8f, 16f, 16f, 8f, java.awt.Color(24, 12, 16))
     ctx.pose().pushMatrix()
     ctx.pose().translate(10.5f, 10.5f)
     ctx.pose().scale(11f / 64f, 11f / 64f)
-    with(dev.marceline.utils.render.Render2D) { ctx.drawTexture(fishIcon, 0, 0, 64, 64, st.accentColor) }
+    with(dev.marceline.utils.render.Render2D) { ctx.drawTexture(fishIcon, 0, 0, 64, 64, st.gold) }
     ctx.pose().popMatrix()
-    ctx.drawString("§lAuto Fishing", 30f, 8f, st.mix(st.accentColor, java.awt.Color.WHITE, 0.35f), shadow = false)
-    ctx.drawString(label, 30f, 17.5f, java.awt.Color(150, 140, 175), shadow = false, scale = 0.9f)
+    ctx.drawString("§lAuto Fishing", 30f, 8f, ivory, shadow = false)
+    ctx.drawString(label, 30f, 17.5f, soft, shadow = false, scale = 0.9f)
+    st.goldHairline(ctx, 8f, 28.5f, w - 16f, 0.6f, 0.5f)
 
-    ctx.drawString("KILLS / HR", 8f, 32f, java.awt.Color(110, 100, 135), shadow = false, scale = 0.75f)
+    ctx.drawString("KILLS / HR", 8f, 32f, faint, shadow = false, scale = 0.75f)
     // the headline number, a size up
     ctx.pose().pushMatrix()
     ctx.pose().translate(8f, 39.5f)
     ctx.pose().scale(1.55f, 1.55f)
-    st.drawTabular(ctx, "%,d".format(killsHr), 0f, 0f, java.awt.Color(230, 224, 245))
+    st.drawTabular(ctx, "%,d".format(killsHr), 0f, 0f, st.gold)
     ctx.pose().popMatrix()
     fun cell(title: String, value: String, x: Float, y: Float, right: Boolean) {
         val tw = with(dev.marceline.utils.render.RenderHelper) { title.width() } * 0.7f
         val vw = with(dev.marceline.utils.render.RenderHelper) { value.width() } * 0.9f
-        ctx.drawString(title, if (right) x - tw else x, y, java.awt.Color(110, 100, 135), shadow = false, scale = 0.7f)
-        ctx.drawString(value, if (right) x - vw else x, y + 7.5f, java.awt.Color(214, 206, 232), shadow = false, scale = 0.9f)
+        ctx.drawString(title, if (right) x - tw else x, y, faint, shadow = false, scale = 0.7f)
+        ctx.drawString(value, if (right) x - vw else x, y + 7.5f, ivory, shadow = false, scale = 0.9f)
     }
     cell("SEA CREATURES", if (example) "38" else "$creaturesCaught", 8f, 55f, false)
     cell("SESSION TIME", clock(session), w - 8f, 55f, true)
     cell("KILLS", if (example) "36" else "$kills", 8f, 73f, false)
     cell("NEXT BREAK", breakText, w - 8f, 73f, true)
     if (stats.isNotEmpty()) {
-        st.roundRect(ctx, 8f, 91f, w - 16f, 0.5f, 0.25f, java.awt.Color(255, 255, 255, 18))
-        ctx.drawString(stats, 8f, 94f, java.awt.Color(150, 140, 175), shadow = false, scale = 0.7f)
+        st.goldHairline(ctx, 8f, 91f, w - 16f, 0.45f, 0.5f)
+        ctx.drawString(stats, 8f, 94f, soft, shadow = false, scale = 0.7f)
     }
     return w to h
 }

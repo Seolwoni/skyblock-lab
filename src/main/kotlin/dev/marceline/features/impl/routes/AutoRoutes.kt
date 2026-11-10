@@ -234,9 +234,8 @@ object AutoRoutes: Feature("Follows the current room's secret route automaticall
             )
             val w = lines.maxOf { with(dev.marceline.utils.render.RenderHelper) { it.width() } }
             val h = lines.size * 10
-            // Marceline panel behind the text
-            dev.marceline.ui.clickgui.components.settings.Style.roundRect(ctx, 0f, 0f, w + 12f, h + 6f, 4f, Color(15, 12, 13, 215))
-            ctx.fill(0, 2, 2, h + 4, dev.marceline.ui.clickgui.components.settings.Style.accentColor.rgb)
+            // the shared Marceline card behind the text
+            dev.marceline.ui.hud.HudCard.draw(ctx, 0f, 0f, w + 12f, h + 6f, 4f, glassAlpha = 215)
             lines.forEachIndexed { i, l -> ctx.drawString(l, 7, 4 + i * 10) }
             return@hudElement (w + 12) to (h + 6)
         }.also { it.themedPanel = false }

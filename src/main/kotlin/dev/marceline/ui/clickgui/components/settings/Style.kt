@@ -271,7 +271,12 @@ object Style {
         net.minecraft.sounds.SoundEvent.createVariableRangeEvent(net.minecraft.resources.Identifier.fromNamespaceAndPath(dev.marceline.Marceline.MOD_ID, "ui.click"))
     }
 
+    private val pluck by lazy {
+        net.minecraft.sounds.SoundEvent.createVariableRangeEvent(net.minecraft.resources.Identifier.fromNamespaceAndPath(dev.marceline.Marceline.MOD_ID, "ui.pluck"))
+    }
+
     fun playClickSound(pitch: Float) =
-        if (ClickGui.riftClickSound.value) SoundUtils.playSound(riftClick, 0.55f, pitch)
+        if (ClickGui.riftClickSound.value && ClickGui.clickTone.value == 0) SoundUtils.playSound(pluck, 0.5f, pitch)
+        else if (ClickGui.riftClickSound.value) SoundUtils.playSound(riftClick, 0.55f, pitch)
         else SoundUtils.playSound(SoundEvents.UI_BUTTON_CLICK, 0.25f, pitch)
 }

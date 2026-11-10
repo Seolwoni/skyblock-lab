@@ -98,7 +98,8 @@ object TrackerHud {
             val first = i == 0
             drawText(ctx, l, 0f, y, if (first) title else if (l.startsWith("§d")) profit else text)
             if (r.isNotEmpty()) drawText(ctx, r, w - r.width(), y, if (l.startsWith("§d")) profit else if (l.startsWith("§7")) dim else value)
-            y += if (first) 11f else 10f
+            if (first) dev.marceline.ui.clickgui.components.settings.Style.goldHairline(ctx, - 2f, y + 10.5f, w + 4f, 0.7f, 0.5f)
+            y += if (first) 13f else 10f
         }
         return w to y
     }

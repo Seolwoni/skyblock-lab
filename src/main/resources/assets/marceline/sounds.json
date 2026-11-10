@@ -1,6 +1,14 @@
 {
   "ui.click": {
     "subtitle": "Marceline click",
-    "sounds": ["marceline:click"]
+    "sounds": [
+      "marceline:click"
+    ]
+  },
+  "ui.pluck": {
+    "subtitle": "Marceline pluck",
+    "sounds": [
+      "marceline:pluck"
+    ]
   }
 }

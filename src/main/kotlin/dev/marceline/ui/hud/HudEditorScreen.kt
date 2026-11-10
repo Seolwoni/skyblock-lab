@@ -23,14 +23,17 @@ import net.minecraft.network.chat.Component
 import java.awt.Color
 
 /**
- * Marceline HUD editor: dimmed world, faint purple grid, a floating toolbar at the bottom
- * and a name tag on the element under the mouse. Drag to move, scroll to resize.
+ * Marceline HUD editor: the world under a wine veil, a faint gold grid, gold guides that catch elements on each
+ * other's edges and on the screen centre, a name tag on the element under the mouse and a glass toolbar.
+ * Drag to move, scroll to resize.
  */
 class HudEditorScreen: Screen(Component.literal("HudEditor")) {
     private val huds = FeatureManager.hudElements.filter(HudElement::toggle)
     private var resetConfirmed = false
     private var gridEnabled = false
     private var gridSize = 10
+    private var snapEnabled = true
+    private var snapLines: HudSnap.Result? = null
 
     private val openAnim = Animation(180, 0f)
     private val gridAnim = Animation(180, 0f)
@@ -47,6 +50,7 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
         val y = Resolution.height - 34f
         val labels = listOf(
             "grid" to if (gridEnabled) "Grid  ${gridSize}px" else "Grid  Off",
+            "snap" to if (snapEnabled) "Snap  On" else "Snap  Off",
             "minus" to "−",
             "plus" to "+",
             "arrange" to "Arrange",
@@ -66,8 +70,8 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
         if (strength <= 0.01f) return
         val w = Resolution.width.toInt()
         val h = Resolution.height.toInt()
-        val minor = Style.accentColor.withAlpha((22 * strength).toInt())
-        val major = Style.accentColor.withAlpha((45 * strength).toInt())
+        val minor = Style.gold.withAlpha((14 * strength).toInt())
+        val major = Style.gold.withAlpha((34 * strength).toInt())
 
         var i = 0
         var x = 0
@@ -87,11 +91,63 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
     private fun drawGuides(ctx: GuiGraphicsExtractor, dragging: Boolean) {
         val w = Resolution.width
         val h = Resolution.height
-        val a = if (dragging) 120 else 40
-        ctx.drawHorizontalGradient(0, h / 2, w / 2, 1, Style.accentColor.withAlpha(0), Style.accentColor.withAlpha(a))
-        ctx.drawHorizontalGradient(w / 2, h / 2, w / 2, 1, Style.accent2.withAlpha(a), Style.accent2.withAlpha(0))
-        ctx.drawVerticalGradient(w / 2, 0, 1, h / 2, Style.accentColor.withAlpha(0), Style.accentColor.withAlpha(a))
-        ctx.drawVerticalGradient(w / 2, h / 2, 1, h / 2, Style.accent2.withAlpha(a), Style.accent2.withAlpha(0))
+        val a = if (dragging) 90 else 34
+        val g = Style.gold
+        ctx.drawHorizontalGradient(0, h / 2, w / 2, 0.5f, g.withAlpha(0), g.withAlpha(a))
+        ctx.drawHorizontalGradient(w / 2, h / 2, w / 2, 0.5f, g.withAlpha(a), g.withAlpha(0))
+        ctx.drawVerticalGradient(w / 2, 0, 0.5f, h / 2, g.withAlpha(0), g.withAlpha(a))
+        ctx.drawVerticalGradient(w / 2, h / 2, 0.5f, h / 2, g.withAlpha(a), g.withAlpha(0))
+    }
+
+    private fun box(el: HudElement): HudSnap.Box {
+        val w = el.width * el.scale
+        val h = el.height * el.scale
+        return HudSnap.Box(el.x - if (el.centered()) w / 2f else 0f, el.y, w, h)
+    }
+
+    /** Catches the dragged element on the others' edges and centres, and remembers where to draw the lines. */
+    private fun snap(el: HudElement) {
+        if (! snapEnabled) { snapLines = null; return }
+        val r = HudSnap.snap(box(el), huds.filter { it !== el && it.width > 0f }.map(::box), Resolution.width, Resolution.height)
+        el.x += r.dx
+        el.y += r.dy
+        snapLines = r
+    }
+
+    /** The lines an element just caught on: bright gold, full length, with a small diamond where they meet. */
+    private fun drawSnapLines(ctx: GuiGraphicsExtractor) {
+        val r = snapLines ?: return
+        val g = Style.gold
+        r.vLine?.let { ctx.drawVerticalGradient(it - 0.25f, 0f, 0.5f, Resolution.height, g.withAlpha(60), g.withAlpha(190)) }
+        r.hLine?.let { ctx.drawHorizontalGradient(0f, it - 0.25f, Resolution.width, 0.5f, g.withAlpha(60), g.withAlpha(190)) }
+        val vx = r.vLine
+        val hy = r.hLine
+        if (vx != null && hy != null) {
+            ctx.pose().pushMatrix()
+            ctx.pose().translate(vx, hy)
+            ctx.pose().rotate(Math.toRadians(45.0).toFloat())
+            ctx.drawRect(- 2f, - 2f, 4f, 4f, g)
+            ctx.pose().popMatrix()
+        }
+    }
+
+    /** The screen's name along the top: spaced serif capitals over a gold hairline, like the menus. */
+    private fun drawTitle(ctx: GuiGraphicsExtractor, o: Float) {
+        val text = "HUD  EDITOR"
+        val sp = 2.2f
+        val prev = UiFont.active
+        UiFont.active = ClickGui.customFont.value
+        try {
+            UiFont.displayed {
+                val widths = text.map { textW(it.toString()).toFloat() }
+                var x = Resolution.width / 2f - (widths.sum() + sp * (text.length - 1)) / 2f
+                text.forEachIndexed { i, ch ->
+                    if (ch != ' ') ctx.drawString(ch.toString(), x, 12f, Style.gold.withAlpha((230 * o).toInt()), shadow = false)
+                    x += widths[i] + sp
+                }
+            }
+        } finally { UiFont.active = prev }
+        Style.goldHairline(ctx, Resolution.width / 2f - 70f, 24f, 140f, o)
     }
 
     override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, a: Float) {
@@ -114,7 +170,10 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
         drawGuides(graphics, draggedElement != null)
 
         val effectiveGridSize = if (gridEnabled) gridSize else 0
-        for (hud in huds) hud.drawEditor(graphics, mX, mY, effectiveGridSize)
+        if (draggedElement == null) snapLines = null
+        for (hud in huds) hud.drawEditor(graphics, mX, mY, effectiveGridSize, ::snap)
+        if (draggedElement != null && ! gridEnabled) drawSnapLines(graphics)
+        drawTitle(graphics, o)
 
         val hoveredElement = if (draggedElement == null) huds.find { it.isHovered(mX, mY) } else null
         val activeElement = draggedElement ?: hoveredElement
@@ -142,14 +201,14 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
         var ty = el.y - 16f
         if (ty < 4f) ty = el.y + el.height * el.scale + 4f
         val tx = (left + w / 2f - tw / 2f).coerceIn(4f, Resolution.width - tw - 4f)
-        Style.roundRect(ctx, tx, ty, tw, 13f, 6.5f, Color(15, 12, 13, 235))
-        Style.gradientPill(ctx, tx, ty + 12f, tw, 1f, Style.accentColor, Style.accent2)
+        HudCard.draw(ctx, tx, ty, tw, 13f, 4f, glassAlpha = 235, rule = false)
+        Style.goldHairline(ctx, tx + 4f, ty + 12.4f, tw - 8f, 1f, 0.6f)
         ctx.drawString(text, tx + 7f, ty + 3f, textMain, shadow = false)
         ctx.drawString(info, tx + 7f + textW(text) + 8f, ty + 3f, textFaint, shadow = false)
     }
 
     private fun drawHint(ctx: GuiGraphicsExtractor) {
-        val hint = "Drag to move  ·  Scroll to resize  ·  Esc to close"
+        val hint = "Drag to move  ·  Scroll to resize  ·  G grid  ·  Esc to close"
         ctx.drawCenteredString(hint, Resolution.width / 2, Resolution.height - 50, textFaint, shadow = false)
     }
 
@@ -163,25 +222,24 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
         val lift = (1f - o) * 10f
         ctx.pose().pushMatrix()
         ctx.pose().translate(0f, lift)
-        Style.drawShadow(ctx, px, py, pw, ph, 6f, o)
-        Style.roundRect(ctx, px, py, pw, ph, 6f, Color(22, 17, 19, 245))
-        ctx.drawHorizontalGradient(px + 6f, py, pw / 2f - 6f, 1f, Style.accentColor.withAlpha(0), Style.accentColor.withAlpha(180))
-        ctx.drawHorizontalGradient(px + pw / 2f, py, pw / 2f - 6f, 1f, Style.accent2.withAlpha(180), Style.accent2.withAlpha(0))
+        HudCard.draw(ctx, px, py, pw, ph, 6f, o, glassAlpha = 235)
 
         for (b in bs) {
             val hovered = mx in b.x .. b.x + b.w && my in b.y .. b.y + b.h
             val hv = hoverAnims.getOrPut(b.id) { Animation(140, 0f) }.also { it.update(if (hovered) 1f else 0f) }.value
-            val active = (b.id == "grid" && gridEnabled) || (b.id == "reset" && resetConfirmed)
-            when {
-                b.id == "reset" && resetConfirmed -> Style.roundRect(ctx, b.x, b.y, b.w, b.h, 4f, Color(150, 40, 70))
-                b.id == "done" -> Style.gradientPill(ctx, b.x, b.y, b.w, b.h, Style.accentColor.withAlpha(200 + (55 * hv).toInt()), Style.accent2.withAlpha(200 + (55 * hv).toInt()))
-                active -> Style.roundRect(ctx, b.x, b.y, b.w, b.h, 4f, Style.mix(Color(72, 30, 40), Color(96, 36, 50), hv))
-                else -> Style.roundRect(ctx, b.x, b.y, b.w, b.h, 4f, Style.mix(Color(32, 24, 46), Color(52, 30, 36), hv))
+            val active = (b.id == "grid" && gridEnabled) || (b.id == "snap" && snapEnabled)
+            val warn = b.id == "reset" && resetConfirmed
+            if (b.id == "done") {
+                // the one gold button: what you press when you are finished
+                Style.roundRect(ctx, b.x, b.y, b.w, b.h, 4f, Style.gold.withAlpha(150 + (80 * hv).toInt()))
+                Style.roundRect(ctx, b.x + 1f, b.y + 1f, b.w - 2f, b.h - 2f, 3f, Style.mix(Color(58, 40, 24), Color(84, 60, 32), hv))
             }
+            else Style.glassButton(ctx, b.x, b.y, b.w, b.h, maxOf(hv, if (active) 0.45f else 0f), warn)
             val color = when {
-                b.id == "done" || (b.id == "reset" && resetConfirmed) -> Color.WHITE
-                b.id == "reset" -> Style.mix(Color(240, 120, 150), Color(255, 170, 190), hv)
-                active -> textMain
+                b.id == "done" -> Style.mix(Color(236, 214, 170), Color(255, 240, 210), hv)
+                warn -> Color.WHITE
+                b.id == "reset" -> Style.mix(Color(226, 120, 132), Color(250, 170, 180), hv)
+                active -> Style.mix(Style.gold, textMain, hv)
                 else -> Style.mix(textSoft, textMain, hv)
             }
             ctx.drawCenteredString(b.label, b.x + b.w / 2f, b.y + 5f, color, shadow = false)
@@ -194,6 +252,7 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
         if (id != "reset") resetConfirmed = false
         when (id) {
             "grid" -> gridEnabled = ! gridEnabled
+            "snap" -> snapEnabled = ! snapEnabled
             "minus" -> { gridSize = (gridSize - 5).coerceAtLeast(5); gridEnabled = true }
             "plus" -> { gridSize = (gridSize + 5).coerceAtMost(50); gridEnabled = true }
             "done" -> onClose()

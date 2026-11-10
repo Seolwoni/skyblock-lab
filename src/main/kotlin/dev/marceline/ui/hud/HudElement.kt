@@ -3,7 +3,6 @@ package dev.marceline.ui.hud
 import dev.marceline.ui.clickgui.components.settings.Style
 import dev.marceline.utils.ColorUtils.withAlpha
 import net.minecraft.client.gui.GuiGraphicsExtractor
-import java.awt.Color
 import kotlin.math.roundToInt
 import kotlin.reflect.jvm.jvmName
 
@@ -50,13 +49,12 @@ abstract class HudElement {
         val w = scaledW + 4f
         val h = scaledH + 4f
 
-        // accent outline that fades in, then the dark rounded panel on top of it
+        // a gold outline that fades in on hover / drag, then the card itself
         if (hv > 0.01f) {
-            Style.roundRect(ctx, left - 2f, top - 2f, w + 4f, h + 4f, 5f, Style.accentColor.withAlpha((45 * hv).toInt()))
-            Style.roundRect(ctx, left - 1f, top - 1f, w + 2f, h + 2f, 4f, Style.mix(Style.accentColor, Style.accent2, 0.5f).withAlpha((200 * hv).toInt()))
+            Style.roundRect(ctx, left - 2.5f, top - 2.5f, w + 5f, h + 5f, 6f, Style.gold.withAlpha((34 * hv).toInt()))
+            Style.roundRect(ctx, left - 1f, top - 1f, w + 2f, h + 2f, 4.5f, Style.gold.withAlpha((190 * hv).toInt()))
         }
-        else Style.roundRect(ctx, left - 0.5f, top - 0.5f, w + 1f, h + 1f, 3.5f, Color(255, 255, 255, 22))
-        Style.roundRect(ctx, left, top, w, h, 3f, Color(15, 12, 13, (150 + 40 * hv).toInt()))
+        HudCard.draw(ctx, left, top, w, h, 3.5f, glassAlpha = (150 + 40 * hv).toInt(), rule = hv < 0.5f)
     }
 
     fun renderElement(ctx: GuiGraphicsExtractor, example: Boolean) {
@@ -73,15 +71,7 @@ abstract class HudElement {
             val py = - 3.5f
             val pw = width + 10f
             val ph = height + 7f
-            Style.drawShadow(ctx, px, py, pw, ph, 4.5f, 0.55f)
-            Style.roundRect(ctx, px - 0.5f, py - 0.5f, pw + 1f, ph + 1f, 5f, Color(255, 255, 255, 20)) // hairline edge
-            Style.roundRect(ctx, px, py, pw, ph, 4.5f, Color(17, 13, 15, 172))
-            // light on glass: a faint sheen across the top
-            with(dev.marceline.utils.render.Render2D) {
-                ctx.drawVerticalGradient(px + 3f, py + 0.5f, pw - 6f, minOf(9f, ph / 2f), Color(255, 255, 255, 13), Color(255, 255, 255, 0))
-                // accent strip, purple into pink
-                ctx.drawVerticalGradient(px + 1.5f, 0f, 1.5f, height, Style.accentColor.withAlpha(230), Style.accent2.withAlpha(230))
-            }
+            HudCard.draw(ctx, px, py, pw, ph)
         }
 
         val prevFont = dev.marceline.utils.render.UiFont.active
@@ -101,7 +91,8 @@ abstract class HudElement {
         ctx.pose().popMatrix()
     }
 
-    fun drawEditor(ctx: GuiGraphicsExtractor, mx: Int, my: Int, gridSize: Int = 0) {
+    /** [snap] may nudge the element while it is dragged without a grid (alignment with other elements). */
+    fun drawEditor(ctx: GuiGraphicsExtractor, mx: Int, my: Int, gridSize: Int = 0, snap: ((HudElement) -> Unit)? = null) {
         if (! toggle) return
 
         if (isDragging) {
@@ -111,6 +102,7 @@ abstract class HudElement {
                 x = (x / gridSize).roundToInt() * gridSize.toFloat()
                 y = (y / gridSize).roundToInt() * gridSize.toFloat()
             }
+            else snap?.invoke(this)
         }
 
         drawBackground(ctx, mx, my)

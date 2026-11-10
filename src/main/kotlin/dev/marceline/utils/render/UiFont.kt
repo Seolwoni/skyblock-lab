@@ -44,6 +44,8 @@ object UiFont {
         try { return block() } finally { display = prev }
     }
 
+    private const val SHADOW = 0xFF1A0A0E.toInt()
+
     private val cache = object: LinkedHashMap<String, Component>(256, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Component>?) = size > 2048
     }
@@ -64,7 +66,8 @@ object UiFont {
             val c = color
             val font = if (display) (if (bold) DISPLAY_BOLD else DISPLAY) else if (bold) BOLD else REGULAR
             root.append(Component.literal(part.toString()).withStyle { s ->
-                val styled = s.withFont(font)
+                // HUD text (themed) casts the same soft wine shadow as Marceline's chat, not the game's grey one
+                val styled = s.withFont(font).let { if (themed) it.withShadowColor(SHADOW) else it }
                 if (c != null) styled.withColor(c) else styled
             })
             part.setLength(0)
