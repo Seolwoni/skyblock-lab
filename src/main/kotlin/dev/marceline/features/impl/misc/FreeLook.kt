@@ -22,6 +22,8 @@ object FreeLook: Feature("Hold a key to look around without turning your charact
     @JvmField var active = false
     @JvmField var yaw = 0f
     @JvmField var pitch = 0f
+    /** Silent Aim is using the camera (see [beginSilent]): no third person, normal speed, the key does nothing. */
+    @JvmField var silent = false
     /** Set by the camera while it lines up with its entity, so the view angles it reads are ours. */
     @JvmField var aligning = false
 
@@ -32,6 +34,7 @@ object FreeLook: Feature("Hold a key to look around without turning your charact
         register<TickEvent.Start> {
             val p = mc.player
             if (p == null) { if (active) end(); return@register }
+            if (silent) return@register
             if (toggleMode.value && key.isPressed() && mc.gui.screen() == null) toggled = ! toggled
             val want = enabled && (if (toggleMode.value) toggled else key.isDown())
             if (want && ! active) begin(p.yRot, p.xRot)
@@ -55,7 +58,23 @@ object FreeLook: Feature("Hold a key to look around without turning your charact
         }
     }
 
+    /** Silent Aim: the camera stays at [y]/[x] and follows the mouse while the character's view is aimed. False when Free Look is in use. */
+    fun beginSilent(y: Float, x: Float): Boolean {
+        if (active) return silent
+        yaw = y; pitch = x
+        active = true
+        silent = true
+        return true
+    }
+
+    fun endSilent() {
+        if (! silent) return
+        silent = false
+        active = false
+    }
+
     private fun end() {
+        silent = false
         active = false
         previous?.let { mc.options.cameraType = it }
         previous = null
@@ -65,9 +84,9 @@ object FreeLook: Feature("Hold a key to look around without turning your charact
     @JvmStatic
     fun turn(dx: Double, dy: Double): Boolean {
         if (! active) return false
-        val s = speed.value.toFloat()
+        val s = if (silent) 1f else speed.value.toFloat()
         yaw += (dx * 0.15).toFloat() * s
-        pitch = (pitch + (dy * 0.15).toFloat() * s * (if (invertY.value) - 1f else 1f)).coerceIn(- 90f, 90f)
+        pitch = (pitch + (dy * 0.15).toFloat() * s * (if (invertY.value && ! silent) - 1f else 1f)).coerceIn(- 90f, 90f)
         return true
     }
 }

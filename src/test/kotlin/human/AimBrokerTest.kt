@@ -190,4 +190,21 @@ class AimBrokerTest {
             .toList()
         assertTrue(rawOffenders.isEmpty(), "features turning the view without the broker: $rawOffenders")
     }
+
+    @Test
+    fun `onTake fires for a new owner and for a priority change, not for the same ask`() {
+        val seen = ArrayList<Pair<Any, AimPriority>>()
+        val w = World(3, cfg)
+        val broker = LeasedAimBroker(w.turner) { o, p -> seen += o to p }
+        val fishing = Any()
+        val other = Any()
+        broker.acquire(fishing, AimPriority.TRAVEL)
+        broker.acquire(fishing, AimPriority.TRAVEL)
+        broker.acquire(fishing, AimPriority.COMBAT)
+        assertFalse(broker.acquire(other, AimPriority.COMBAT))
+        broker.release(fishing)
+        broker.acquire(other, AimPriority.IDLE)
+        assertEquals(listOf(fishing to AimPriority.TRAVEL, fishing to AimPriority.COMBAT, other to AimPriority.IDLE), seen)
+        assertEquals(AimPriority.IDLE, broker.holderPriority)
+    }
 }

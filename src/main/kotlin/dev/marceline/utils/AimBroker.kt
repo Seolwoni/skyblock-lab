@@ -19,6 +19,8 @@ enum class AimPriority { IDLE, TRAVEL, COMBAT, CRITICAL }
  */
 interface AimBroker {
     val holder: Any?
+    /** The holder's priority (IDLE when nobody holds the view). */
+    val holderPriority: AimPriority
 
     fun acquire(owner: Any, p: AimPriority): Boolean
     fun turnTo(owner: Any, yaw: Float, pitch: Float, tolerance: Float, overshoot: Boolean = true): Boolean
@@ -50,11 +52,13 @@ interface Turner {
     fun resetTurnState()
 }
 
-class LeasedAimBroker(private val turner: Turner, val leaseTicks: Int = 40): AimBroker {
+/** [onTake]: called when the view goes to an owner, or its holder asks again with another priority (Silent Aim listens). */
+class LeasedAimBroker(private val turner: Turner, val leaseTicks: Int = 40, private val onTake: (Any, AimPriority) -> Unit = { _, _ -> }): AimBroker {
     override var holder: Any? = null
         private set
     var priority = AimPriority.IDLE
         private set
+    override val holderPriority get() = priority
 
     /** Whose turn the engine's state belongs to (kept after a lease runs out, so the same owner carries on). */
     private var stateOwner: Any? = null
@@ -69,8 +73,10 @@ class LeasedAimBroker(private val turner: Turner, val leaseTicks: Int = 40): Aim
             stateOwner = owner
             lastMove = now
         }
+        val changed = h !== owner || p != priority
         holder = owner
         priority = p
+        if (changed) onTake(owner, p)
         return true
     }
 
@@ -124,7 +130,10 @@ private object HumanizeTurner: Turner {
 }
 
 /** The game's broker. Every automatic look goes through it. */
-object Aim: AimBroker by LeasedAimBroker(HumanizeTurner), ISelfInit {
+object Aim: AimBroker by LeasedAimBroker(HumanizeTurner, onTake = { o, p -> Aim.onTake?.invoke(o, p) }), ISelfInit {
+    /** Told before the new owner's first move (Silent Aim takes the camera off the view here). */
+    @JvmField var onTake: ((Any, AimPriority) -> Unit)? = null
+
     override fun init() {
         EventBus.register<TickEvent.Start> { tick() }
     }
