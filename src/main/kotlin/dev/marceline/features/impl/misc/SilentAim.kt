@@ -26,15 +26,20 @@ import kotlin.math.abs
 /**
  * Silent Aim.
  *
+ * - Free Camera While Fishing: while Auto Fishing runs, the mouse turns only your screen. Your character - what the
+ *   server and everyone around see - keeps fishing with its own smooth turns. When fishing stops, the screen eases
+ *   back onto the character.
  * - Silent Hyperion: every Wither Impact (your click, Auto Hyperion or Auto Fishing) goes to the server looking
  *   straight down, while your screen and your character keep looking wherever you are. The use packet is sent again
  *   with the down angles (Humanize.silentUse) and the real view goes out with the next movement.
  * - Auto Hyperion: with a wither blade in hand, it casts by itself whenever enemies are in reach.
  * - Lock Screen (the old mode, off by default): while an automatic aim turns the character, the screen stays put.
  */
-object SilentAim: Feature("Hyperion casts go to the server looking straight down while you keep looking wherever you like, and with Auto Hyperion it casts by itself when enemies are close.") {
-    private val silentHype by ToggleSetting("Silent Hyperion", true).withDescription(
-        "Every Wither Impact (your own clicks, Auto Hyperion, Auto Fishing) is sent looking straight down; your screen doesn't move")
+object SilentAim: Feature("Look around freely while Auto Fishing runs: your screen follows your mouse, while everyone else sees your character fishing with its usual smooth turns.") {
+    private val freeFish by ToggleSetting("Free Camera While Fishing", true).withDescription(
+        "While Auto Fishing runs, the mouse turns only your screen; your character keeps fishing (and looking down to cast the Hyperion) as everyone sees it")
+    private val silentHype by ToggleSetting("Silent Hyperion", false).withDescription(
+        "Every Wither Impact is sent looking straight down without the character turning at all (your head doesn't move for others either)")
     private val autoHype by ToggleSetting("Auto Hyperion", true).withDescription(
         "With a Hyperion (or Astraea, Scylla, Valkyrie) in hand, casts Wither Impact by itself when enemies are in range")
     private val range by SliderSetting("Range", 6.0, 3.0, 10.0, 0.5, " blocks").withDescription("How close an enemy has to be").showIf { autoHype.value }
@@ -62,7 +67,7 @@ object SilentAim: Feature("Hyperion casts go to the server looking straight down
     private fun holdsWitherBlade() = mc.player?.mainHandItem?.skyblockId in SkyblockText.WITHER_BLADES
 
     // ---- lock screen state
-    private enum class Phase { OFF, ON, RETURN, CATCH_UP }
+    private enum class Phase { OFF, ON, RETURN, CATCH_UP, FISH }
     private var phase = Phase.OFF
     private var lastNs = 0L
 
@@ -102,6 +107,7 @@ object SilentAim: Feature("Hyperion casts go to the server looking straight down
         ticks++
         if (claimed > 0) claimed--
         autoCast()
+        if (fishTick()) return
         lockTick()
     }
 
@@ -124,10 +130,25 @@ object SilentAim: Feature("Hyperion casts go to the server looking straight down
         p.swing(InteractionHand.MAIN_HAND)
     }
 
+    /** Free Camera While Fishing. True while it has the camera. */
+    private fun fishTick(): Boolean {
+        val want = enabled && freeFish.value && claimed > 0 && mc.player != null
+        if (! want) {
+            if (phase == Phase.FISH) phase = Phase.CATCH_UP // fishing stopped: the screen eases back onto the character
+            return false
+        }
+        when (phase) {
+            Phase.FISH -> Unit
+            Phase.OFF -> { val pl = mc.player!!; if (FreeLook.beginSilent(pl.yRot, pl.xRot)) phase = Phase.FISH }
+            else -> { Aim.release(this); phase = Phase.FISH } // the camera is already ours: keep it where it is
+        }
+        return true
+    }
+
     // ---- lock screen (the old Silent Aim)
 
     private fun onTake(owner: Any, p: AimPriority) {
-        if (! enabled || ! lockScreen.value || owner === this) return
+        if (! enabled || ! lockScreen.value || owner === this || phase == Phase.FISH) return
         val pl = mc.player ?: return
         if (! inScope(owner, p)) return
         when (phase) {
