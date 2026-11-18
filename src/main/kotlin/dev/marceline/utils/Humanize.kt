@@ -154,4 +154,17 @@ object Humanize {
         val rot = MathUtils.calcYawPitch(aimPoint(target))
         return turnTo(p, rot.yaw, rot.pitch, tolerance)
     }
+
+    /**
+     * Silent rotation: sends one item use as if looking at [yaw]/[pitch], without turning the screen or the
+     * character's view. A rotation packet goes first, then the use with the same angles; the last-sent angles are
+     * set to these, so the next movement packet sends the real view again.
+     */
+    fun silentUse(p: LocalPlayer, hand: net.minecraft.world.InteractionHand, sequence: Int, yaw: Float, pitch: Float) {
+        val conn = net.minecraft.client.Minecraft.getInstance().connection ?: return
+        conn.send(net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.Rot(yaw, pitch, p.onGround(), p.horizontalCollision))
+        (p as dev.marceline.mixin.ILocalPlayer).setLastYaw(yaw)
+        (p as dev.marceline.mixin.ILocalPlayer).setLastPitch(pitch)
+        conn.send(net.minecraft.network.protocol.game.ServerboundUseItemPacket(hand, sequence, yaw, pitch))
+    }
 }

@@ -108,6 +108,7 @@ internal object FishingStates {
  * pushed away, sea creatures); the state's own work is its handler's tick, called where its `when` branch was.
  */
 internal fun AutoFishing.tick() {
+    dev.marceline.features.impl.misc.SilentAim.claim() // Auto Hyperion leaves the casting to us
     if (state == FishingState.RESUME) return FishingStates.of(state).tick(null)
     relinkBobber()
     val guiOpen = mc.gui.screen() != null

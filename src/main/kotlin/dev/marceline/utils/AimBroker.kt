@@ -134,6 +134,10 @@ object Aim: AimBroker by LeasedAimBroker(HumanizeTurner, onTake = { o, p -> Aim.
     /** Told before the new owner's first move (Silent Aim takes the camera off the view here). */
     @JvmField var onTake: ((Any, AimPriority) -> Unit)? = null
 
+    /** One item use sent looking at [yaw]/[pitch]; the screen and the character's view stay (see Humanize.silentUse). */
+    fun silentUse(p: net.minecraft.client.player.LocalPlayer, hand: net.minecraft.world.InteractionHand, sequence: Int, yaw: Float, pitch: Float) =
+        Humanize.silentUse(p, hand, sequence, yaw, pitch)
+
     override fun init() {
         EventBus.register<TickEvent.Start> { tick() }
     }

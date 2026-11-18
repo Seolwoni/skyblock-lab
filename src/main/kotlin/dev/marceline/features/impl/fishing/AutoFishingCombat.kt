@@ -296,6 +296,7 @@ internal fun AutoFishing.trackFrame() {
 
 /** [keepShield] (rare fight): with nothing in reach, still cast every Shield Recast to keep the Wither Shield up. */
 internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>, keepShield: Boolean = false) {
+    val silent = dev.marceline.features.impl.misc.SilentAim.silentHyperion()
     val whipSlot = WHIPS[weaponType.value]?.let { id -> PlayerUtils.findHotbarSlot { it.skyblockId == id } }
     if (whipSlot != null) return whipFight(p, mobs, whipSlot)
     val hypeSlot = if (weaponSlot.value in 1 .. 9) null else PlayerUtils.findHotbarSlot { it.skyblockId in WITHER_BLADES }
@@ -342,6 +343,13 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>, keepShi
         val far = mobs.minByOrNull { it.distanceToSqr(p) } ?: return
         status = "waiting for ${far.name.string}"
         // quick kill: it's on its way - Hyperion out and looking down already, so it goes off the moment it's in reach
+        // Silent Hyperion: the cast goes out looking down by itself, so just have the Hyperion ready
+        if (silent && hype != null && p.distanceTo(far) < 14f && (blastSafe(p, p.yRot, 90f) || centered(p))) {
+            if (p.inventory.selectedSlot != hype) { hold(hype); hypeBeat = delay(1, 4) }
+            hypeStage = 2
+            status = "ready for ${far.name.string}"
+            return
+        }
         if (quickKill.value && hype != null && p.distanceTo(far) < 14f && (blastSafe(p, p.yRot, 90f) || centered(p))) {
             if (castDownPitch == 0f) castDownPitch = 80f + RANDOM.nextFloat() * 9f
             if (lavaAround(p) || ! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
@@ -354,7 +362,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>, keepShi
         }
         // keep an eye on it loosely: only turn when it's well off to the side, and not onto its exact middle
         val rot = MathUtils.calcYawPitch(dev.marceline.utils.Humanize.aimPoint(far.boundingBox.center, 0.6))
-        if (abs(wrap(rot.yaw - p.yRot)) > 22f || abs(rot.pitch - p.xRot) > 18f) turn(p, rot.yaw, rot.pitch, 9f)
+        if (! (silent && hype != null) && (abs(wrap(rot.yaw - p.yRot)) > 22f || abs(rot.pitch - p.xRot) > 18f)) turn(p, rot.yaw, rot.pitch, 9f)
         return
     }
     if (hype != null && ! blastSafe(p, p.yRot, 90f) && ! centered(p)) { status = "stepping to the middle of the block"; return }
@@ -363,7 +371,7 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>, keepShi
         if (hypeBeat > 0) { hypeBeat--; return }
         when (hypeStage) {
             0 -> { // glance at the creature first (still holding the rod)
-                if (quickKill.value) { hypeStage = 1; return } // no glance: straight down
+                if (quickKill.value || silent) { hypeStage = 1; return } // no glance: straight down
                 val m = close.minByOrNull { it.distanceToSqr(p) } ?: return
                 val rot = MathUtils.calcYawPitch(dev.marceline.utils.Humanize.aimPoint(m.boundingBox.center, 0.5))
                 if (abs(wrap(rot.yaw - p.yRot)) > 15f && ! turn(p, rot.yaw, rot.pitch, 10f)) return
@@ -371,6 +379,13 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>, keepShi
                 hypeBeat = delay(3, 9)
             }
             1 -> { // then look down so the blast covers everything around us
+                if (silent) { // the cast itself is sent looking down: no turn, just the Hyperion out
+                    val swapped = p.inventory.selectedSlot != hype
+                    hold(hype)
+                    hypeStage = 2
+                    hypeBeat = if (swapped) delay(3, 8) else delay(1, 4)
+                    return
+                }
                 if (castDownPitch == 0f) castDownPitch = 78f + RANDOM.nextFloat() * 11f
                 if (lavaAround(p) || ! blastSafe(p, p.yRot, castDownPitch)) castDownPitch = 90f
                 if (! turn(p, p.yRot, castDownPitch, 3f)) return
@@ -383,12 +398,12 @@ internal fun AutoFishing.fight(p: LocalPlayer, mobs: List<LivingEntity>, keepShi
             else -> { // cast; between casts keep looking down, each cast a little different
                 if (hitCooldown > 0) return
                 // only ever looking down: a stage left over from before (or a look that wandered up) goes back to "look down"
-                if (p.xRot < 75f) { hypeStage = 1; journal.log("hyperion held: looking ${"%.0f".format(p.xRot)} deg, turning down first"); return }
+                if (! silent && p.xRot < 75f) { hypeStage = 1; journal.log("hyperion held: looking ${"%.0f".format(p.xRot)} deg, turning down first"); return }
                 // next to lava: straight down only, whatever the pitch drifted to
-                if (lavaAround(p) && abs(p.xRot - 90f) > 2f) { castDownPitch = 90f; dev.marceline.utils.Aim.glideAs(AutoFishing, AutoFishing.AIM_COMBAT, p.yRot, 90f); return }
-                if (! blastSafe(p, p.yRot, p.xRot)) { // this look would teleport us off the edge: straight down instead
+                if (! silent && lavaAround(p) && abs(p.xRot - 90f) > 2f) { castDownPitch = 90f; dev.marceline.utils.Aim.glideAs(AutoFishing, AutoFishing.AIM_COMBAT, p.yRot, 90f); return }
+                if (! blastSafe(p, p.yRot, if (silent) 90f else p.xRot)) { // this look would teleport us off the edge: straight down instead
                     castDownPitch = 90f
-                    if (abs(p.xRot - 90f) > 2f) { dev.marceline.utils.Aim.glideAs(AutoFishing, AutoFishing.AIM_COMBAT, p.yRot, 90f); return }
+                    if (! silent && abs(p.xRot - 90f) > 2f) { dev.marceline.utils.Aim.glideAs(AutoFishing, AutoFishing.AIM_COMBAT, p.yRot, 90f); return }
                     if (! blastSafe(p, p.yRot, 90f)) { // no safe blast from here: fight it with the sword instead
                         blastBlocked = true
                         hypeStage = 0
